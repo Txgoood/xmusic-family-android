@@ -6,6 +6,7 @@ import android.webkit.WebView
 import java.util.Locale
 import android.widget.Toast
 import androidx.media3.session.MediaController
+import androidx.media3.common.MediaItem
 
 /**
  * JavaScript ve Native Android kodu arasındaki köprü.
@@ -53,6 +54,56 @@ class WebAppInterface(private val context: Context, private val webView: WebView
             } else {
                 controller.play()
             }
+        }
+    }
+
+    @JavascriptInterface
+    fun playStream(url: String) {
+        val uri = android.net.Uri.parse(url)
+        if (uri.scheme != "https" && uri.scheme != "http") {
+            webView.post { Toast.makeText(context, "Geçerli medya adresi bulunamadı", Toast.LENGTH_SHORT).show() }
+            return
+        }
+        webView.post {
+            val controller = mediaController
+            if (controller == null) {
+                Toast.makeText(context, "Oynatıcı hazır değil", Toast.LENGTH_SHORT).show()
+            } else {
+                controller.setMediaItem(MediaItem.fromUri(uri))
+                controller.prepare()
+                controller.play()
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun resumeStream(url: String) {
+        val uri = android.net.Uri.parse(url)
+        if (uri.scheme != "https" && uri.scheme != "http") {
+            webView.post { Toast.makeText(context, "Devam edilecek gerçek kayıt bulunamadı", Toast.LENGTH_SHORT).show() }
+            return
+        }
+        webView.post {
+            val controller = mediaController ?: return@post
+            val preferences = context.getSharedPreferences("xmusic_playback", Context.MODE_PRIVATE)
+            val position = preferences.getLong("position_" + url.hashCode(), 0L)
+            controller.setMediaItem(MediaItem.fromUri(uri))
+            controller.prepare()
+            controller.seekTo(position.coerceAtLeast(0))
+            controller.play()
+        }
+    }
+
+    @JavascriptInterface
+    fun hasResumeData(url: String): Boolean {
+        return context.getSharedPreferences("xmusic_playback", Context.MODE_PRIVATE)
+            .contains("position_" + url.hashCode())
+    }
+
+    @JavascriptInterface
+    fun showUnavailable(feature: String) {
+        webView.post {
+            Toast.makeText(context, "$feature için gerçek içerik bağlantısı henüz yok", Toast.LENGTH_SHORT).show()
         }
     }
 
