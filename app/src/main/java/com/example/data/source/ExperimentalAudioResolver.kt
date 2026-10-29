@@ -17,7 +17,9 @@ class ExperimentalAudioResolver(private val context: Context) {
         YoutubeDL.getInstance().init(context.applicationContext)
         val request = YoutubeDLRequest(sourceUrl)
         request.addOption("--no-playlist")
-        request.addOption("-f", "bestaudio/best")
+        // HTTP 403 sonrası HLS akışını öncele; uygun değilse mevcut ses seçeneğine dön.
+        request.addOption("--extractor-args", "youtube:player_client=web_safari")
+        request.addOption("-f", "bestaudio[protocol^=m3u8]/best[protocol^=m3u8]/bestaudio/best")
         val info = YoutubeDL.getInstance().getInfo(request)
         val url = requireNotNull(info.url) { "Ses akışı bulunamadı" }
         require(URI(url).scheme == "https") { "Güvensiz akış adresi" }
