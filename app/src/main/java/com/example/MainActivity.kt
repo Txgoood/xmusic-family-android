@@ -78,6 +78,54 @@ class MainActivity : ComponentActivity() {
                           icon.style.fontSize = '0';
                         }
                       });
+                      // Stitch arama ekranına gerçek Audius sonuçları ekle; HTML şablonunu koru.
+                      if ((location.pathname || '').includes('/arama_ve_ke_fet/')) {
+                        const input = document.getElementById('search-input');
+                        if (input && window.Android) {
+                          const panel = document.createElement('section');
+                          panel.id = 'xmusic-live-search';
+                          panel.style.cssText = 'display:none;margin:16px 16px 24px;padding:16px;background:#181c1f;border-radius:16px;color:#e0e3e7;';
+                          const heading = document.createElement('h2');
+                          heading.textContent = 'Gerçek müzik sonuçları';
+                          heading.style.cssText = 'font-weight:700;font-size:18px;margin-bottom:12px;';
+                          const list = document.createElement('div');
+                          panel.append(heading,list);
+                          const main = document.querySelector('main');
+                          if (main) main.insertBefore(panel,main.firstChild);
+                          let currentId = 0;
+                          let debounce;
+                          window.__xmusicSearchResult = function(id,payload) {
+                            if(id!==currentId)return;
+                            list.replaceChildren();
+                            if(payload.error){list.textContent=payload.error;return;}
+                            const entries=payload.items||[];
+                            if(!entries.length){list.textContent='Sonuç bulunamadı';return;}
+                            entries.forEach(function(item) {
+                              const line=document.createElement('div');
+                              line.style.cssText='display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid #313539;';
+                              if(item.artwork && item.artwork.startsWith('https://')){
+                                const img=document.createElement('img');img.src=item.artwork;
+                                img.style.cssText='width:48px;height:48px;object-fit:cover;border-radius:8px;';
+                                line.appendChild(img);
+                              }
+                              const caption=document.createElement('div');
+                              const name=document.createElement('strong');name.textContent=item.title||'İsimsiz parça';
+                              const artist=document.createElement('div');artist.textContent=item.artist||'Bilinmeyen sanatçı';artist.style.color='#bbcbb8';
+                              caption.append(name,artist);line.appendChild(caption);list.appendChild(line);
+                            });
+                          };
+                          input.addEventListener('input',function() {
+                            clearTimeout(debounce);
+                            const query=input.value.trim();
+                            currentId+=1;
+                            const id=currentId;
+                            if(!query){panel.style.display='none';return;}
+                            panel.style.display='block';
+                            list.textContent='Aranıyor...';
+                            debounce=setTimeout(function(){window.Android.searchMusic(query,id);},350);
+                          });
+                        }
+                      }
                       // Ayarlar ekranındaki anahtarları Android SharedPreferences ile sakla.
                       // Gerçek işlevi olmayan anahtarın görüntüsü değişse de özellik tamamlandı sayılmaz.
                       if ((location.pathname || '').includes('/ayarlar_ve_profil_y_netimi/')) {
