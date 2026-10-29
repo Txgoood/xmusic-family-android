@@ -55,6 +55,14 @@ class PlaybackService : MediaSessionService() {
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
         player!!.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                val id = player?.currentMediaItem?.mediaId.orEmpty()
+                if (id.startsWith("experimental:")) {
+                    com.example.data.source.ExperimentalAudioResolver.invalidate(
+                        "https://www.youtube.com/watch?v=" + id.removePrefix("experimental:")
+                    )
+                }
+            }
             override fun onMediaItemTransition(item: androidx.media3.common.MediaItem?, reason: Int) {
                 if (sleepAtEnd && (reason == androidx.media3.common.Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
                     reason == androidx.media3.common.Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT)) stopPlayback.run()
