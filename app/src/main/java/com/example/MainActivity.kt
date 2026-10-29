@@ -23,6 +23,17 @@ class MainActivity : ComponentActivity() {
         // Orijinal Stitch HTML dosyalarını değiştirmeden JavaScript köprüsünü kullan.
         // window.Android nesnesini JavaScript ile yeniden tanımlama: özyinelemeli çağrı oluşturur.
         webView.webViewClient = object : android.webkit.WebViewClient() {
+            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                // HTML ilk çizilmeden önce simge yazılarını gizle.
+                view?.evaluateJavascript("""
+                    (function() {
+                      var style=document.getElementById('xmusic-preload');
+                      if(!style){style=document.createElement('style');style.id='xmusic-preload';document.head.appendChild(style);}
+                      style.textContent='.material-symbols-outlined{visibility:hidden}';
+                    })();
+                """.trimIndent(), null)
+            }
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 // Stitch HTML/CSS'yi değiştirmeden ekranlara etkileşim ekle.
