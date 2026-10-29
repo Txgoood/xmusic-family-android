@@ -102,7 +102,13 @@ class WebAppInterface(private val context: Context, private val webView: WebView
                     }
                 }
             } catch (e: Exception) {
-                webView.post { Toast.makeText(context, "Ses akışı açılamadı. Daha sonra tekrar dene.", Toast.LENGTH_LONG).show() }
+                webView.post {
+                    android.app.AlertDialog.Builder(context)
+                        .setTitle("Ses kaynağı açılamadı")
+                        .setMessage(e.message ?: "Bilinmeyen kaynak hatası")
+                        .setPositiveButton("Tamam", null)
+                        .show()
+                }
             }
         }.start()
     }
