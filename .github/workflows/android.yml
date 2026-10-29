@@ -18,6 +18,7 @@ jobs:
         run: |
           npm install --prefix "$RUNNER_TEMP/xmusic-ui-test" jsdom@26.1.0 --no-audit --no-fund
           NODE_PATH="$RUNNER_TEMP/xmusic-ui-test/node_modules" node scripts/playback-ui.test.cjs
+          NODE_PATH="$RUNNER_TEMP/xmusic-ui-test/node_modules" node scripts/app-actions.test.cjs
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:

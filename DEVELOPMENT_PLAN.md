@@ -35,3 +35,11 @@ Durumları yalnız doğrulanan işin ardından güncelle.
 - Sıradaki iş: tek arama deneyimi; sanatçı/albüm katalog kimliği ile sağlayıcı kayıt kimliklerini ayrı tutan model, erişim durumları ve yalnızca güvenilir kayıt eşleştirmesi. Büyük kaynak seçim düğmeleri bu adımda kaldırılacak.
 - Kalıcı sıra, sonraki parça listesi, dinleme geçmişi, indirme ve bulut senkronizasyonu henüz bağlı değil.
 
+
+## Aktif olmayan kontrolleri bağlama — ikinci geliştirme
+- Kullanıcı isteği: tüm bağlantı/butonların gerçek işlemlere bağlanması. Kapsam ve kalan işler docs/CONTROL_AUDIT.md içinde.
+- Yerel yetişkin profili ve opsiyonel PIN; profil bazlı favori/liste/geçmiş; gerçek oynatma kuyruğu; servis tabanlı zamanlayıcı; yerel ses açma; sesli arama bağlantısı eklendi.
+- RSS podcast akışı, gerçek Android indirme listesi, indirme iptal/sil/çevrimdışı oynatma eklendi.
+- 18 ekran tarandı. 61 oynatıcı + 34 uygulama DOM kontrolü geçti; profil ve RSS için 6 Android birim testi eklendi.
+- Engelli kontroller tamamlandı sayılmadı. Güvenli çocuk modu, bulut, ticari müzik kaynak izinleri, kalite ve gerçek sanatçı/album detay bağları açık.
+- Kaynak seçilmemiş demo kartlar gerçek aramaya yönlenir; sahte parça oynatılmaz. Kullanıcı cihaz kabulü bekliyor.

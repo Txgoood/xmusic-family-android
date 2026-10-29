@@ -336,6 +336,50 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     }
 
     @JavascriptInterface
+    fun resolveAudiusTrack(trackId: String, enqueue: Boolean) {
+        if (!trackId.matches(Regex("[a-zA-Z0-9]{1,64}"))) return
+        Thread {
+            try {
+                val connection = java.net.URL("https://discoveryprovider.audius.co/v1/tracks/$trackId?app_name=XMusicFamily")
+                    .openConnection() as java.net.HttpURLConnection
+                connection.connectTimeout = 10000
+                connection.readTimeout = 12000
+                val track = try {
+                    if (connection.responseCode !in 200..299) throw java.io.IOException("Kaynak yanıt vermedi")
+                    val data = org.json.JSONObject(connection.inputStream.bufferedReader().use { it.readText() }).optJSONArray("data")
+                    data?.optJSONObject(0) ?: throw java.io.IOException("Kayıt bulunamadı")
+                } finally { connection.disconnect() }
+                if (track.optString("id") != trackId || !track.optBoolean("is_streamable", false) ||
+                    track.optBoolean("is_stream_gated", false) || track.optBoolean("is_delete", false) ||
+                    !track.optBoolean("is_available", true)) throw java.io.IOException("Oynatma erişimi yok")
+                val metadata = androidx.media3.common.MediaMetadata.Builder().setTitle(track.optString("title"))
+                    .setArtist(track.optJSONObject("user")?.optString("name"))
+                val artwork = track.optJSONObject("artwork")?.optString("150x150").orEmpty()
+                if (artwork.startsWith("https://")) metadata.setArtworkUri(android.net.Uri.parse(artwork))
+                val item = MediaItem.Builder().setMediaId("audius:$trackId")
+                    .setUri("https://discoveryprovider.audius.co/v1/tracks/$trackId/stream?app_name=XMusicFamily")
+                    .setMediaMetadata(metadata.build()).build()
+                webView.post {
+                    val p = mediaController ?: return@post
+                    if (enqueue) p.addMediaItem(item) else { p.setMediaItem(item); p.prepare(); p.play() }
+                }
+            } catch (_: Exception) { showToast("Kayıt açılamadı. İnternet veya kaynak erişimi uygun değil.") }
+        }.start()
+    }
+
+    @JavascriptInterface
+    fun enqueueAudiusTrack(trackId: String) {
+        webView.post {
+            val item = audiusTracks[trackId]
+            val p = mediaController
+            if (item != null && p != null) {
+                p.addMediaItem(item)
+                Toast.makeText(context, "Sıraya eklendi", Toast.LENGTH_SHORT).show()
+            } else Toast.makeText(context, "Erişimi doğrulamak için yeniden ara", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    @JavascriptInterface
     fun playStream(url: String) {
         val uri = android.net.Uri.parse(url)
         if (uri.scheme != "https" && uri.scheme != "http") {

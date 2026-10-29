@@ -40,6 +40,23 @@ class PlaybackWebBridge(private val webView: WebView) {
         val item = player?.currentMediaItem
         val duration = (player?.duration ?: 0L).coerceAtLeast(0L)
         val state = JSONObject().apply {
+            val queue = org.json.JSONArray()
+            if (player != null) for (i in 0 until player.mediaItemCount) {
+                val track = player.getMediaItemAt(i)
+                queue.put(JSONObject().put("id", track.mediaId)
+                    .put("title", track.mediaMetadata.title?.toString().orEmpty())
+                    .put("artist", track.mediaMetadata.artist?.toString().orEmpty())
+                    .put("artwork", track.mediaMetadata.artworkUri?.toString().orEmpty()))
+            }
+            put("queue", queue)
+            put("index", player?.currentMediaItemIndex ?: -1)
+            put("shuffle", player?.shuffleModeEnabled == true)
+            put("repeat", player?.repeatMode ?: 0)
+            put("speed", player?.playbackParameters?.speed ?: 1f)
+            val service = com.example.playback.PlaybackService.activeService
+            put("sleepRemaining", if ((service?.sleepDeadline ?: 0L) > 0L)
+                (service!!.sleepDeadline - android.os.SystemClock.elapsedRealtime()).coerceAtLeast(0L) else 0L)
+            put("sleepAtEnd", service?.sleepAtEnd == true)
             put("ready", player != null)
             put("id", item?.mediaId.orEmpty())
             put("title", item?.mediaMetadata?.title?.toString().orEmpty())

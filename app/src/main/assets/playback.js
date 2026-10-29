@@ -34,8 +34,8 @@
       const value = node.textContent.trim();
       if (value === 'Salon Soundbar (Google Cast)') text(node, 'Cihazın ses çıkışı');
       if (value === 'Bağlı') text(node, '');
-      if (value === 'Sırada (14)') text(node, 'Sıra henüz bağlı değil');
-      if (value === '45 dk uyku sayacı') text(node, 'Uyku sayacı hazır değil');
+      if (value === 'Sırada (14)') {node.id='xmusic-queue-count';text(node,'Sıra');}
+      if (value === '45 dk uyku sayacı') {node.id='xmusic-sleep-label';text(node,'Uyku zamanlayıcısı');}
       if (value.includes('Simsiyah gecenin')) text(node, 'Bu kayıt için şarkı sözleri bağlı değil.');
       if (value.includes('Gözlerim uzakta')) text(node, '');
     });
@@ -74,6 +74,7 @@
   }, true);
   window.__xmusicPlayback = function (value) {
     state = value;
+    window.dispatchEvent(new CustomEvent('xmusic:playback', { detail: value }));
     text(title, value.title || 'Henüz parça seçilmedi');
     text(artist, value.artist || 'Keşfet bölümünden bir parça seç');
     const source = value.id?.startsWith('audius:') ? 'Audius' : value.id ? 'Akış' : '';

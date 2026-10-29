@@ -13,6 +13,39 @@ class MainActivity : ComponentActivity() {
     private var controllerFuture: com.google.common.util.concurrent.ListenableFuture<MediaController>? = null
     private lateinit var playbackBridge: PlaybackWebBridge
     private lateinit var appWebView: WebView
+    private lateinit var appActions: AppActionsInterface
+    private val audioPicker = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            try {
+                contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                var title = "Yerel ses dosyası"
+                contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                    if (it.moveToFirst()) title = it.getString(0)
+                }
+                val data = org.json.JSONObject().put("id", "local:$uri").put("title", title).put("artist", "Yerel dosya")
+                appActions.playSavedTrack(data.toString(), false)
+                appWebView.evaluateJavascript("window.__xmusicLocalImported && window.__xmusicLocalImported($data)", null)
+            } catch (_: Exception) { android.widget.Toast.makeText(this, "Dosyaya erişilemedi", 0).show() }
+        }
+    }
+    fun openLocalAudio() { audioPicker.launch(arrayOf("audio/*")) }
+    private val speechPicker = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val phrase = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+            if (!phrase.isNullOrBlank()) appWebView.evaluateJavascript(
+                "(function(){const i=document.getElementById('search-input');if(i){i.value=" + org.json.JSONObject.quote(phrase) + ";i.dispatchEvent(new Event('input',{bubbles:true}));}})()", null)
+        }
+    }
+    fun openVoiceSearch() {
+        try {
+            speechPicker.launch(android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "tr-TR"))
+        } catch (_: android.content.ActivityNotFoundException) {
+            android.widget.Toast.makeText(this, "Bu cihazda ses tanıma hizmeti yok", 0).show()
+        }
+    }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -20,6 +53,7 @@ class MainActivity : ComponentActivity() {
         val webView = WebView(this)
         appWebView = webView
         playbackBridge = PlaybackWebBridge(webView)
+        val actionsScript = assets.open("app-actions.js").bufferedReader().use { it.readText() }
         val playbackScript = assets.open("playback.js").bufferedReader().use { it.readText() }
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
@@ -35,6 +69,7 @@ class MainActivity : ComponentActivity() {
             }
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                view?.evaluateJavascript(actionsScript, null)
                 view?.evaluateJavascript(playbackScript, null)
                 // Stitch HTML/CSS'yi değiştirmeden ekranlara etkileşim ekle.
                 view?.evaluateJavascript("""
@@ -130,6 +165,10 @@ class MainActivity : ComponentActivity() {
                                   window.Android.playAudiusTrack(item.id,item.title||'',item.artist||'');
                                 });
                                 line.appendChild(play);
+                                const queue=document.createElement('button');queue.type='button';queue.textContent='+ Sıraya';
+                                queue.style.cssText=play.style.cssText;
+                                queue.addEventListener('click',function(){window.Android.enqueueAudiusTrack(item.id);});
+                                line.appendChild(queue);
                               }
                               list.appendChild(line);
                             });
@@ -430,6 +469,8 @@ class MainActivity : ComponentActivity() {
         val webAppInterface = WebAppInterface(this, webView, null)
         webView.tag = webAppInterface
         webView.addJavascriptInterface(webAppInterface, "Android")
+        appActions = AppActionsInterface(this, webView)
+        webView.addJavascriptInterface(appActions, "AndroidActions")
         val sessionToken = SessionToken(this, ComponentName(this, PlaybackService::class.java))
         val future = MediaController.Builder(this, sessionToken).buildAsync()
         controllerFuture = future
@@ -439,6 +480,7 @@ class MainActivity : ComponentActivity() {
                     val controller = future.get()
                     mediaController = controller
                     webAppInterface.setMediaController(controller)
+                    appActions.controller = controller
                     playbackBridge.attach(controller)
                 } catch (e: Exception) {
                     android.util.Log.w("XMusicPlayback", "Oynatıcı bağlantısı kurulamadı", e)
@@ -463,6 +505,8 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         playbackBridge.close()
         controllerFuture?.let { MediaController.releaseFuture(it) }
+        appActions.controller = null
+        appWebView.removeJavascriptInterface("AndroidActions")
         appWebView.removeJavascriptInterface("Android")
         appWebView.destroy()
         super.onDestroy()
