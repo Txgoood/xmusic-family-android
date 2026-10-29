@@ -74,21 +74,17 @@ class MainActivity : ComponentActivity() {
                       scrollStyle.id = 'xmusic-scroll-fix';
                       scrollStyle.textContent = 'html,body{height:auto!important;min-height:100%!important;overflow-y:auto!important;overscroll-behavior-y:auto!important;touch-action:pan-y!important;-webkit-overflow-scrolling:touch!important;}main{height:auto!important;min-height:100vh!important;overflow-y:visible!important;touch-action:pan-y!important;}';
                       document.head.appendChild(scrollStyle);
-                      // Sabit üst çubuğun sayfa başlığını örtmesini önle.
-                      // Başlık ve içerik düzeni yalnızca çalışma anında ayarlanır.
+                      // Main zaten pt-16 kullanıyor; üst boşluğu ikinci kez EKLEME.
                       const fixedHeader = document.querySelector('header.fixed, header.sticky');
                       const pageMain = document.querySelector('main');
                       if (fixedHeader && pageMain) {
-                        const fixTopSpacing = function() {
-                          const headerBottom = Math.ceil(fixedHeader.getBoundingClientRect().bottom);
-                          const mainTop = pageMain.getBoundingClientRect().top;
-                          const missing = headerBottom + 8 - mainTop;
-                          if (missing > 0) {
-                            const current = parseFloat(getComputedStyle(pageMain).paddingTop) || 0;
-                            pageMain.style.setProperty('padding-top', (current + missing) + 'px', 'important');
-                          }
-                        };
-                        requestAnimationFrame(fixTopSpacing);
+                        const height = Math.ceil(fixedHeader.getBoundingClientRect().height);
+                        pageMain.style.setProperty('padding-top', Math.max(height + 8, 72) + 'px', 'important');
+                      }
+                      // Ayarlar tasarımındaki yanlış statik başlığı çalışma anında düzelt.
+                      if ((location.pathname || '').includes('/ayarlar_ve_profil_y_netimi/')) {
+                        const topTitle = document.querySelector('header h1, header h2');
+                        if (topTitle && /şimdi çalıyor/i.test(topTitle.textContent || '')) topTitle.textContent = 'Ayarlar';
                       }
                       // Ayarlar düğmesi için sağ üstte yer aç; profil alanı taşmasın.
                       if (header) {
@@ -105,6 +101,13 @@ class MainActivity : ComponentActivity() {
                           return;
                         }
                         if(target.id==='xmusic-settings-link') return;
+                        // Inline onclick=history.back() çalışmadan önce yakala; çift geri dönüşü engelle.
+                        const topLabel=(target.getAttribute('aria-label')||'').trim().toLocaleLowerCase('tr');
+                        if(topLabel==='geri'){
+                          event.preventDefault(); event.stopImmediatePropagation();
+                          if(window.Android) window.Android.goBack();
+                          return;
+                        }
                         // Demo kartlarda URL yoksa gerçek oynatma varmış gibi davranma.
                         const resumeSection = target.closest('section');
                         if (resumeSection && (resumeSection.textContent||'').includes('Kaldığın Yerden Devam Et')) {
@@ -144,7 +147,7 @@ class MainActivity : ComponentActivity() {
                         }else if(label==='önceki'){
                           if(window.Android)window.Android.previous();
                         }
-                      });
+                      }, true);
                     })();
                 """.trimIndent(), null)
             }
