@@ -35,6 +35,21 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         webView.post { webView.loadUrl(url) }
     }
 
+    // Ayarlar yalnızca cihazda saklanır; bulut senkronizasyonuna karışmaz.
+    @JavascriptInterface
+    fun saveSetting(key: String, enabled: Boolean) {
+        if (!key.matches(Regex("setting_[0-9]{1,2}"))) return
+        context.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE)
+            .edit().putBoolean(key, enabled).apply()
+    }
+
+    @JavascriptInterface
+    fun loadSetting(key: String, defaultValue: Boolean): Boolean {
+        if (!key.matches(Regex("setting_[0-9]{1,2}"))) return defaultValue
+        return context.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE)
+            .getBoolean(key, defaultValue)
+    }
+
     @JavascriptInterface
     fun goBack() {
         webView.post {
