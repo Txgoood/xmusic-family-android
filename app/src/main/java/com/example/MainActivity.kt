@@ -218,8 +218,9 @@ class MainActivity : ComponentActivity() {
                                   appleStage='albums';runSearch();
                                 }else if(appleStage==='albums'){
                                   appleId=item.id;appleStage='songs';runSearch();
-                                }else if(item.url && item.url.startsWith('https://')){
-                                  window.open(item.url,'_blank');
+                                }else{
+                                  // Apple katalog kayıtları ses akışı değildir: yanlışlıkla Apple Music'e yönlendirme.
+                                  if(window.Android)window.Android.showToast('Bu şarkı katalog bilgisidir. Dinlemek için Audius Şarkılar bölümünü kullan.');
                                 }
                               });
                               list.appendChild(row);
