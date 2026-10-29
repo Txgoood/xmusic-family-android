@@ -204,6 +204,35 @@ class MainActivity : ComponentActivity() {
                           const sourceAnchor=appleButton.parentNode;
                           sourceAnchor.insertBefore(sourceRow,appleButton);
                           sourceRow.append(appleButton,official);
+                          const experimentalButton=document.createElement('button');
+                          experimentalButton.type='button';experimentalButton.textContent='YouTube · Deneme';
+                          experimentalButton.style.cssText='flex:1;padding:8px;border:1px solid #62796f;border-radius:10px;color:#e0e3e7;font-size:12px;';
+                          sourceRow.appendChild(experimentalButton);
+                          let experimentalMode=false;
+                          experimentalButton.addEventListener('click',function(){
+                            experimentalMode=!experimentalMode;appleMode=false;verifiedMode=false;
+                            appleButton.style.background='transparent';official.style.background='transparent';
+                            experimentalButton.style.background=experimentalMode?'#36584d':'transparent';
+                            categories.style.display=experimentalMode?'none':'flex';
+                            heading.textContent=experimentalMode?'YouTube araması · Deneme':'Audius topluluk araması';
+                            disclaimer.textContent=experimentalMode?'Sonuçlar YouTube yüklemeleridir. Sürümü seçmeden önce başlığı ve yükleyeni kontrol et.':'Bu sonuçlar Audius kullanıcı yüklemeleridir.';
+                            runSearch();
+                          });
+                          window.__xmusicExperimentalResult=function(id,payload){
+                            if(id!==currentId || !experimentalMode)return;
+                            list.replaceChildren();
+                            if(payload.error){list.textContent=payload.error;return;}
+                            if(!(payload.items||[]).length){list.textContent='Sonuç bulunamadı';return;}
+                            payload.items.forEach(function(item){
+                              const row=document.createElement('button');row.type='button';
+                              row.style.cssText='display:block;width:100%;text-align:left;padding:12px 4px;border-bottom:1px solid #313539;color:#e0e3e7;';
+                              const name=document.createElement('strong');name.textContent=item.title||'İsimsiz';
+                              const artist=document.createElement('div');artist.textContent=item.artist||'Yükleyen bilinmiyor';artist.style.color='#b4c1c9';
+                              row.append(name,artist);
+                              row.addEventListener('click',function(){window.Android.playExperimentalSource(item.id,item.title||'',item.artist||'');});
+                              list.appendChild(row);
+                            });
+                          };
                           let appleMode=false, appleId='', appleStage='artists', appleName='';
                           let releaseFilter='Albüm';
                           function showApple(id,payload){
@@ -273,6 +302,7 @@ class MainActivity : ComponentActivity() {
                           }
                           window.__xmusicAppleResult=showApple;
                           appleButton.addEventListener('click',function(){
+                            experimentalMode=false;experimentalButton.style.background='transparent';
                             appleMode=!appleMode;appleStage='artists';appleId='';
                             if(appleMode){verifiedMode=false;official.style.background='transparent';}
                             appleButton.style.background=appleMode?'#36584d':'transparent';
@@ -313,6 +343,7 @@ class MainActivity : ComponentActivity() {
                           }
                           window.__xmusicVerifiedCatalog=showVerified;
                           official.addEventListener('click',function(){
+                            experimentalMode=false;experimentalButton.style.background='transparent';
                             verifiedMode=!verifiedMode;selectedArtist='';appleMode=false;appleButton.style.background='transparent';
                             official.style.background=verifiedMode?'#36584d':'transparent';
                             categories.style.display=verifiedMode?'none':'flex';
@@ -353,7 +384,8 @@ class MainActivity : ComponentActivity() {
                               if(verifiedMode){
                                 setTimeout(function(){if(verifiedMode && id===currentId && list.textContent==='Aranıyor...'){list.textContent='Katalog yanıt vermedi. Aramayı yeniden dene.';}},16000);
                               }
-                              if(appleMode)window.Android.searchAppleCatalog(q,appleId,appleStage,id);
+                              if(experimentalMode)window.Android.searchExperimentalSource(q,id);
+                              else if(appleMode)window.Android.searchAppleCatalog(q,appleId,appleStage,id);
                               else if(verifiedMode)window.Android.searchVerifiedCatalog(q,selectedArtist,id);
                               else if(mode==='tracks')window.Android.searchMusic(q,id);
                               else window.Android.searchAudiusCatalog(q,mode,id);
