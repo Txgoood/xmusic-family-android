@@ -53,6 +53,59 @@ class WebAppInterface(private val context: Context, private val webView: WebView
             .getBoolean(key, defaultValue)
     }
 
+    // Deneysel arama sonuçları her zaman kullanıcıya kaynak belirtilerek gösterilir.
+    @JavascriptInterface
+    fun searchExperimentalSource(query: String, requestId: Int) {
+        if (query.isBlank() || query.length > 120) return
+        Thread {
+            val result = try {
+                val engine = com.yausername.youtubedl_android.YoutubeDL.getInstance()
+                engine.init(context.applicationContext)
+                val request = com.yausername.youtubedl_android.YoutubeDLRequest("ytsearch10:" + query.trim())
+                request.addOption("--flat-playlist")
+                request.addOption("--dump-single-json")
+                request.addOption("--no-warnings")
+                val response = engine.execute(request, "xmusic-search-$requestId") { _, _, _ -> }
+                val entries = org.json.JSONObject(response.out).optJSONArray("entries") ?: org.json.JSONArray()
+                val items = org.json.JSONArray()
+                for (i in 0 until minOf(entries.length(), 10)) {
+                    val entry = entries.optJSONObject(i) ?: continue
+                    val id = entry.optString("id")
+                    if (!id.matches(Regex("[A-Za-z0-9_-]{11}"))) continue
+                    items.put(org.json.JSONObject().put("id", id).put("title", entry.optString("title")).put("artist", entry.optString("channel", entry.optString("uploader"))))
+                }
+                org.json.JSONObject().put("items", items)
+            } catch (e: Exception) {
+                org.json.JSONObject().put("error", "Kaynak araması başarısız oldu. İnternet bağlantısını kontrol edip tekrar dene.")
+            }
+            webView.post { webView.evaluateJavascript("window.__xmusicExperimentalResult && window.__xmusicExperimentalResult($requestId,${result})", null) }
+        }.start()
+    }
+
+    @JavascriptInterface
+    fun playExperimentalSource(id: String, title: String, artist: String) {
+        if (!id.matches(Regex("[A-Za-z0-9_-]{11}"))) return
+        Thread {
+            try {
+                val stream = com.example.data.source.ExperimentalAudioResolver(context).resolve("https://www.youtube.com/watch?v=$id")
+                webView.post {
+                    val controller = mediaController
+                    if (controller == null) {
+                        Toast.makeText(context, "Oynatıcı hazır değil", Toast.LENGTH_SHORT).show()
+                    } else {
+                        val metadata = androidx.media3.common.MediaMetadata.Builder().setTitle(title.take(180)).setArtist(artist.take(180)).build()
+                        val item = MediaItem.Builder().setMediaId("experimental:$id").setUri(stream.url).setMediaMetadata(metadata).build()
+                        controller.setMediaItem(item)
+                        controller.prepare()
+                        controller.play()
+                    }
+                }
+            } catch (e: Exception) {
+                webView.post { Toast.makeText(context, "Ses akışı açılamadı. Daha sonra tekrar dene.", Toast.LENGTH_LONG).show() }
+            }
+        }.start()
+    }
+
     @JavascriptInterface
     fun searchMusic(query: String, requestId: Int) {
         if (query.isBlank() || query.length > 120) return
