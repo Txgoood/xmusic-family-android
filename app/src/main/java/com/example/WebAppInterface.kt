@@ -194,6 +194,68 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         }.start()
     }
 
+    // Apple iTunes Store Türkiye: sanatçı / albüm / şarkı meta verileri.
+    @JavascriptInterface
+    fun searchAppleCatalog(query: String, itemId: String, kind: String, requestId: Int) {
+        if (query.length > 100 || kind !in setOf("artists", "albums", "songs") ||
+            (itemId.isNotEmpty() && !itemId.matches(Regex("[0-9]{1,16}")))) return
+        Thread {
+            val result = try {
+                val url = if (itemId.isNotEmpty()) {
+                    "https://itunes.apple.com/lookup?id=" + itemId +
+                        "&country=TR&entity=" + (if (kind == "albums") "album" else "song") + "&limit=100"
+                } else {
+                    "https://itunes.apple.com/search?term=" +
+                        java.net.URLEncoder.encode(query.trim(), "UTF-8") +
+                        "&country=TR&media=music&entity=musicArtist&limit=30"
+                }
+                val conn = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
+                    connectTimeout = 9000
+                    readTimeout = 11000
+                    setRequestProperty("Accept", "application/json")
+                    setRequestProperty("User-Agent", "XMusicFamily/0.2")
+                }
+                try {
+                    if (conn.responseCode !in 200..299) throw java.io.IOException("Apple HTTP " + conn.responseCode)
+                    val data = org.json.JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+                        .optJSONArray("results") ?: org.json.JSONArray()
+                    val rows = org.json.JSONArray()
+                    val seen = HashSet<String>()
+                    for (i in 0 until data.length()) {
+                        val entry = data.optJSONObject(i) ?: continue
+                        val type = entry.optString("wrapperType")
+                        if (itemId.isEmpty() && type != "artist") continue
+                        if (itemId.isNotEmpty() && (type == "artist" || (kind == "albums" && type != "collection") ||
+                                (kind == "songs" && type != "track"))) continue
+                        if (kind == "albums" && entry.optString("collectionType") != "Album") continue
+                        val id = if (type == "artist") entry.optString("artistId") else if (type == "collection")
+                            entry.optString("collectionId") else entry.optString("trackId")
+                        if (id.isBlank() || !seen.add(id)) continue
+                        rows.put(org.json.JSONObject().apply {
+                            put("id", id)
+                            put("title", if (type == "artist") entry.optString("artistName")
+                                else if (type == "collection") entry.optString("collectionName") else entry.optString("trackName"))
+                            put("subtitle", if (type == "artist") entry.optString("primaryGenreName")
+                                else entry.optString("artistName"))
+                            put("artwork", entry.optString("artworkUrl100"))
+                            put("type", type)
+                            put("url", entry.optString("artistViewUrl", entry.optString("collectionViewUrl", entry.optString("trackViewUrl"))))
+                        })
+                    }
+                    org.json.JSONObject().put("items", rows)
+                } finally { conn.disconnect() }
+            } catch (e: Exception) {
+                android.util.Log.w("XMusicCatalog", "Apple catalog failed", e)
+                org.json.JSONObject().put("error", "Apple kataloğuna ulaşılamadı. İnternet bağlantısını kontrol et.")
+            }
+            webView.post {
+                webView.evaluateJavascript(
+                    "window.__xmusicAppleResult && window.__xmusicAppleResult(" +
+                        requestId + "," + result.toString() + ")", null)
+            }
+        }.start()
+    }
+
     @JavascriptInterface
     fun goBack() {
         webView.post {
