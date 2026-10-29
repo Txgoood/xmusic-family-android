@@ -114,15 +114,56 @@ class MainActivity : ComponentActivity() {
                               caption.append(name,artist);line.appendChild(caption);list.appendChild(line);
                             });
                           };
+                          // Sanatçı ve albüm/koleksiyon aramalarını mevcut arama paneline ekle.
+                          const categories = document.createElement('div');
+                          categories.style.cssText='display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;';
+                          const modes=[['tracks','Şarkılar'],['users','Sanatçılar'],['playlists','Albümler / Listeler']];
+                          let mode='tracks';
+                          const buttons=[];
+                          modes.forEach(function(pair){
+                            const btn=document.createElement('button');btn.textContent=pair[1];
+                            btn.type='button';btn.style.cssText='border:1px solid #5b6369;border-radius:18px;padding:7px 12px;color:white;';
+                            btn.addEventListener('click',function(){
+                              mode=pair[0];buttons.forEach(function(b){b.style.background=b===btn?'#36584d':'transparent';});
+                              runSearch();
+                            });
+                            categories.appendChild(btn);buttons.push(btn);
+                          });
+                          buttons[0].style.background='#36584d';
+                          panel.insertBefore(categories,list);
+                          const renderCatalog=function(id,type,payload){
+                            if(id!==currentId || type!==mode)return;
+                            list.replaceChildren();
+                            if(payload.error){list.textContent=payload.error;return;}
+                            const entries=payload.items||[];
+                            if(!entries.length){list.textContent='Sonuç bulunamadı';return;}
+                            entries.forEach(function(item){
+                              const line=document.createElement('div');
+                              line.style.cssText='display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #313539;';
+                              if(item.artwork && item.artwork.startsWith('https://')){
+                                const img=document.createElement('img');img.src=item.artwork;
+                                img.style.cssText='width:48px;height:48px;object-fit:cover;border-radius:8px;';
+                                line.appendChild(img);
+                              }
+                              const info=document.createElement('div');
+                              const title=document.createElement('strong');title.textContent=item.title||'İsimsiz';
+                              const sub=document.createElement('div');sub.textContent=item.artist||'';sub.style.color='#b4c1c9';
+                              info.append(title,sub);line.appendChild(info);list.appendChild(line);
+                            });
+                          };
+                          window.__xmusicCatalogResult=renderCatalog;
+                          function runSearch(){
+                            clearTimeout(debounce);currentId+=1;
+                            const id=currentId;const q=input.value.trim();
+                            if(!q){panel.style.display='none';return;}
+                            panel.style.display='block';list.textContent='Aranıyor...';
+                            debounce=setTimeout(function(){
+                              if(mode==='tracks')window.Android.searchMusic(q,id);
+                              else window.Android.searchAudiusCatalog(q,mode,id);
+                            },350);
+                          }
                           input.addEventListener('input',function() {
-                            clearTimeout(debounce);
-                            const query=input.value.trim();
-                            currentId+=1;
-                            const id=currentId;
-                            if(!query){panel.style.display='none';return;}
-                            panel.style.display='block';
-                            list.textContent='Aranıyor...';
-                            debounce=setTimeout(function(){window.Android.searchMusic(query,id);},350);
+                            runSearch();
                           });
                         }
                       }
