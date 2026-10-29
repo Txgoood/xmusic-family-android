@@ -114,7 +114,18 @@ class MainActivity : ComponentActivity() {
                               const caption=document.createElement('div');
                               const name=document.createElement('strong');name.textContent=item.title||'İsimsiz parça';
                               const artist=document.createElement('div');artist.textContent=item.artist||'Bilinmeyen sanatçı';artist.style.color='#bbcbb8';
-                              caption.append(name,artist);line.appendChild(caption);list.appendChild(line);
+                              caption.append(name,artist);line.appendChild(caption);
+                              if(item.id && /^[a-zA-Z0-9]{1,64}$/.test(item.id)){
+                                const play=document.createElement('button');play.type='button';
+                                play.textContent='▶ Dinle';play.setAttribute('aria-label',item.title+' oynat');
+                                play.style.cssText='margin-left:auto;flex-shrink:0;color:#9af0ba;border:1px solid #36584d;padding:8px;border-radius:12px;font-size:12px;';
+                                play.addEventListener('click',function(e){
+                                  e.stopPropagation();
+                                  window.Android.playAudiusTrack(item.id,item.title||'',item.artist||'');
+                                });
+                                line.appendChild(play);
+                              }
+                              list.appendChild(line);
                             });
                           };
                           // Sanatçı ve albüm/koleksiyon aramalarını mevcut arama paneline ekle.
