@@ -56,6 +56,28 @@ class MainActivity : ComponentActivity() {
                       const sheet = document.createElement('style');
                       sheet.textContent = 'html,body{overflow-x:hidden;max-width:100%;}header{max-width:100vw;}header .h-16{min-width:0;}';
                       document.head.appendChild(sheet);
+                      // Sabit üst çubuğun sayfa başlığını örtmesini önle.
+                      // Başlık ve içerik düzeni yalnızca çalışma anında ayarlanır.
+                      const fixedHeader = document.querySelector('header.fixed, header.sticky');
+                      const pageMain = document.querySelector('main');
+                      if (fixedHeader && pageMain) {
+                        const fixTopSpacing = function() {
+                          const headerBottom = Math.ceil(fixedHeader.getBoundingClientRect().bottom);
+                          const mainTop = pageMain.getBoundingClientRect().top;
+                          const missing = headerBottom + 8 - mainTop;
+                          if (missing > 0) {
+                            const current = parseFloat(getComputedStyle(pageMain).paddingTop) || 0;
+                            pageMain.style.setProperty('padding-top', (current + missing) + 'px', 'important');
+                          }
+                        };
+                        requestAnimationFrame(fixTopSpacing);
+                      }
+                      // Ayarlar düğmesi için sağ üstte yer aç; profil alanı taşmasın.
+                      if (header) {
+                        header.style.minWidth = '0';
+                        header.style.gap = '8px';
+                        Array.from(header.children).forEach(function(child) { child.style.minWidth = '0'; });
+                      }
                       document.addEventListener('click',function(event) {
                         const target = event.target.closest('a[data-path],button');
                         if (!target) return;
