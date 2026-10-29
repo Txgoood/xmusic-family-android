@@ -53,3 +53,7 @@ Durumları yalnız doğrulanan işin ardından güncelle.
 - Oynatma, indirme ve Drive aktarımı tamamlandı sayılmaz. Geri dönüş: fd51e66716f0cf7b90f3006ab899a1d68210a197.
 
 - #57: Kullanıcı seçilen parçanın sesle çalıştığını bildirdi. Arka plan, kilit ekranı, diğer kayıtlar ve çevrimdışı indirme henüz doğrulanmadı.
+
+- #59: Kullanıcı sanatçı/albüm/şarkı geçişini ve oynatmayı başarılı bildirdi; başlatmada bazen 5–10 saniye bekleme var.
+- Hız denemesi: Çözülmüş bağlantıyı bellekte 90 saniye tut; oynatma hatasında sil. Bu ses dosyası önbelleği/çevrimdışı indirme değildir.
+- Drive OAuth ve yükleme entegrasyonu henüz bulunmuyor; Drive aktarımı hazır değildir.
