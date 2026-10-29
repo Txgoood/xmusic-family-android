@@ -51,3 +51,5 @@ Durumları yalnız doğrulanan işin ardından güncelle.
 - #56: Kullanıcı kaynak çözümlemede genel hata bildirdi. HLS yalnız başına doğrulanmadı.
 - Yeni deneme: Kurulu yt-dlp için günlük kararlı sürüm kontrolü, ayrı HLS/varsayılan denemeleri, motor sürümü ve hata ayrıntısı.
 - Oynatma, indirme ve Drive aktarımı tamamlandı sayılmaz. Geri dönüş: fd51e66716f0cf7b90f3006ab899a1d68210a197.
+
+- #57: Kullanıcı seçilen parçanın sesle çalıştığını bildirdi. Arka plan, kilit ekranı, diğer kayıtlar ve çevrimdışı indirme henüz doğrulanmadı.
