@@ -64,6 +64,15 @@ class MainActivity : ComponentActivity() {
                           header.appendChild(button);
                         }
                       }
+                      // Material Symbols fontu yüklenene kadar ikon adlarını metin olarak gösterme.
+                      // SVG yalnızca üst çandaki değil, tüm sayfalardaki bildirim ikonlarının
+                      // geçiş sırasında kısa süre görünmesini önler.
+                      document.querySelectorAll('.material-symbols-outlined').forEach(function(icon) {
+                        if ((icon.textContent || '').trim() === 'notifications') {
+                          icon.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>';
+                          icon.style.fontSize = '0';
+                        }
+                      });
                       // Ayarlar ekranındaki anahtarları Android SharedPreferences ile sakla.
                       // Gerçek işlevi olmayan anahtarın görüntüsü değişse de özellik tamamlandı sayılmaz.
                       if ((location.pathname || '').includes('/ayarlar_ve_profil_y_netimi/')) {
