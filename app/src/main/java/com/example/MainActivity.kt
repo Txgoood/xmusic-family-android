@@ -25,14 +25,8 @@ class MainActivity : ComponentActivity() {
         webView.webViewClient = object : android.webkit.WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-                // HTML ilk çizilmeden önce simge yazılarını gizle.
-                view?.evaluateJavascript("""
-                    (function() {
-                      var style=document.getElementById('xmusic-preload');
-                      if(!style){style=document.createElement('style');style.id='xmusic-preload';document.head.appendChild(style);}
-                      style.textContent='.material-symbols-outlined{visibility:hidden}';
-                    })();
-                """.trimIndent(), null)
+                // Sayfa geçişinde ham HTML/ikon yazıları kısa süre görüntülenmesin.
+                view?.alpha = 0f
             }
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
@@ -181,7 +175,7 @@ class MainActivity : ComponentActivity() {
                         }
                       }, true);
                     })();
-                """.trimIndent(), null)
+                """.trimIndent()) { view?.post { view.alpha = 1f } }
             }
         }
 
