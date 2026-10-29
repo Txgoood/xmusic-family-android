@@ -138,6 +138,64 @@ class MainActivity : ComponentActivity() {
                           official.type='button';official.textContent='Doğrulanabilir sanatçı / albüm kataloğu';
                           official.style.cssText='width:100%;padding:10px;margin-bottom:12px;border:1px solid #62796f;border-radius:12px;color:#e0e3e7;text-align:left;';
                           panel.insertBefore(official,list);
+                          const appleButton=document.createElement('button');
+                          appleButton.type='button';appleButton.textContent='Apple Türkiye müzik kataloğu';
+                          appleButton.style.cssText='width:100%;padding:10px;margin:0 0 12px;border:1px solid #62796f;border-radius:12px;color:#e0e3e7;text-align:left;';
+                          panel.insertBefore(appleButton,official);
+                          let appleMode=false, appleId='', appleStage='artists', appleName='';
+                          function showApple(id,payload){
+                            if(id!==currentId || !appleMode)return;
+                            list.replaceChildren();
+                            if(payload.error){list.textContent=payload.error;return;}
+                            const items=payload.items||[];
+                            if(!items.length){list.textContent='Apple Türkiye kataloğunda sonuç bulunamadı';return;}
+                            if(appleStage!=='artists'){
+                              const back=document.createElement('button');
+                              back.type='button';back.textContent='← Geri';
+                              back.style.cssText='display:block;padding:9px;color:#9af0ba;';
+                              back.addEventListener('click',function(){
+                                if(appleStage==='songs'){appleStage='albums';appleId=window.__appleArtistId||'';}
+                                else {appleStage='artists';appleId='';}
+                                runSearch();
+                              });list.appendChild(back);
+                            }
+                            items.forEach(function(item){
+                              const row=document.createElement('button');
+                              row.type='button';row.style.cssText='display:flex;gap:12px;align-items:center;text-align:left;width:100%;padding:10px 0;color:#e0e3e7;border-bottom:1px solid #313539;';
+                              if(item.artwork && item.artwork.startsWith('https://')){
+                                const img=document.createElement('img');img.src=item.artwork;
+                                img.style.cssText='width:48px;height:48px;object-fit:cover;border-radius:8px;';
+                                row.appendChild(img);
+                              }
+                              const cell=document.createElement('div');
+                              const title=document.createElement('strong');title.textContent=item.title||'İsimsiz';
+                              const sub=document.createElement('div');sub.textContent=item.subtitle||'';sub.style.cssText='color:#b4c1c9;font-size:13px;';
+                              cell.append(title,sub);row.appendChild(cell);
+                              row.addEventListener('click',function(){
+                                if(appleStage==='artists'){
+                                  appleId=item.id;window.__appleArtistId=item.id;appleName=item.title;
+                                  appleStage='albums';runSearch();
+                                }else if(appleStage==='albums'){
+                                  appleId=item.id;appleStage='songs';runSearch();
+                                }else if(item.url && item.url.startsWith('https://')){
+                                  window.open(item.url,'_blank');
+                                }
+                              });
+                              list.appendChild(row);
+                            });
+                          }
+                          window.__xmusicAppleResult=showApple;
+                          appleButton.addEventListener('click',function(){
+                            appleMode=!appleMode;appleStage='artists';appleId='';
+                            if(appleMode){verifiedMode=false;official.style.background='transparent';}
+                            appleButton.style.background=appleMode?'#36584d':'transparent';
+                            categories.style.display=appleMode?'none':'flex';
+                            heading.textContent=appleMode?'Apple Türkiye sanatçı ve albüm kataloğu':'Audius topluluk araması';
+                            disclaimer.textContent=appleMode?
+                              'Sanatçı → albüm → şarkı listesi. Apple kayıt bilgileri gösterilir; tam şarkı oynatma bu katalogdan yapılmaz.':
+                              'Bu sonuçlar Audius kullanıcı yüklemeleridir; resmî sanatçı diskografisi veya doğrulanmış albümler değildir.';
+                            runSearch();
+                          });
                           let verifiedMode=false;
                           let selectedArtist='';
                           function showVerified(payload,id) {
@@ -168,7 +226,7 @@ class MainActivity : ComponentActivity() {
                           }
                           window.__xmusicVerifiedCatalog=showVerified;
                           official.addEventListener('click',function(){
-                            verifiedMode=!verifiedMode;selectedArtist='';
+                            verifiedMode=!verifiedMode;selectedArtist='';appleMode=false;appleButton.style.background='transparent';
                             official.style.background=verifiedMode?'#36584d':'transparent';
                             categories.style.display=verifiedMode?'none':'flex';
                             heading.textContent=verifiedMode?'MusicBrainz sanatçı ve albümleri':'Audius topluluk araması';
@@ -208,7 +266,8 @@ class MainActivity : ComponentActivity() {
                               if(verifiedMode){
                                 setTimeout(function(){if(verifiedMode && id===currentId && list.textContent==='Aranıyor...'){list.textContent='Katalog yanıt vermedi. Aramayı yeniden dene.';}},16000);
                               }
-                              if(verifiedMode)window.Android.searchVerifiedCatalog(q,selectedArtist,id);
+                              if(appleMode)window.Android.searchAppleCatalog(q,appleId,appleStage,id);
+                              else if(verifiedMode)window.Android.searchVerifiedCatalog(q,selectedArtist,id);
                               else if(mode==='tracks')window.Android.searchMusic(q,id);
                               else window.Android.searchAudiusCatalog(q,mode,id);
                             },350);
