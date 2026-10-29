@@ -86,10 +86,13 @@ class MainActivity : ComponentActivity() {
                           panel.id = 'xmusic-live-search';
                           panel.style.cssText = 'display:none;margin:16px 16px 24px;padding:16px;background:#181c1f;border-radius:16px;color:#e0e3e7;';
                           const heading = document.createElement('h2');
-                          heading.textContent = 'Gerçek müzik sonuçları';
+                          heading.textContent = 'Audius topluluk araması';
                           heading.style.cssText = 'font-weight:700;font-size:18px;margin-bottom:12px;';
                           const list = document.createElement('div');
-                          panel.append(heading,list);
+                          const disclaimer=document.createElement('p');
+                          disclaimer.textContent='Bu sonuçlar Audius kullanıcı yüklemeleridir; resmî sanatçı diskografisi veya doğrulanmış albümler değildir.';
+                          disclaimer.style.cssText='color:#b4c1c9;font-size:12px;line-height:1.5;margin-bottom:12px;';
+                          panel.append(heading,disclaimer,list);
                           const main = document.querySelector('main');
                           if (main) main.insertBefore(panel,main.firstChild);
                           let currentId = 0;
@@ -117,7 +120,7 @@ class MainActivity : ComponentActivity() {
                           // Sanatçı ve albüm/koleksiyon aramalarını mevcut arama paneline ekle.
                           const categories = document.createElement('div');
                           categories.style.cssText='display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;';
-                          const modes=[['tracks','Şarkılar'],['users','Sanatçılar'],['playlists','Albümler / Listeler']];
+                          const modes=[['tracks','Şarkılar'],['users','Sanatçılar'],['playlists','Kullanıcı listeleri']];
                           let mode='tracks';
                           const buttons=[];
                           modes.forEach(function(pair){
