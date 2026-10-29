@@ -59,6 +59,7 @@ android {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
   }
+  packaging { jniLibs.useLegacyPackaging = true }
   buildFeatures {
     compose = true
     buildConfig = true
