@@ -95,6 +95,7 @@ class WebAppInterface(private val context: Context, private val webView: WebView
                     } else {
                         val metadata = androidx.media3.common.MediaMetadata.Builder().setTitle(title.take(180)).setArtist(artist.take(180)).build()
                         val item = MediaItem.Builder().setMediaId("experimental:$id").setUri(stream.url).setMediaMetadata(metadata).build()
+                        com.example.playback.PlaybackService.activeService?.registerExperimentalStream(stream.url, stream.headers)
                         controller.setMediaItem(item)
                         controller.prepare()
                         controller.play()
