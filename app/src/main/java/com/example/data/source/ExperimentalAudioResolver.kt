@@ -9,6 +9,24 @@ import java.net.URI
 class ExperimentalAudioResolver(private val context: Context) {
     companion object {
         private val updateLock = Any()
+        private data class CachedStream(val stream: Stream, val createdAt: Long)
+        private val streams = LinkedHashMap<String, CachedStream>()
+        @Synchronized
+        fun invalidate(sourceUrl: String) { streams.remove(sourceUrl) }
+        @Synchronized
+        private fun cached(sourceUrl: String): Stream? {
+            val entry = streams[sourceUrl] ?: return null
+            if (android.os.SystemClock.elapsedRealtime() - entry.createdAt >= 90_000L) {
+                streams.remove(sourceUrl)
+                return null
+            }
+            return entry.stream
+        }
+        @Synchronized
+        private fun remember(sourceUrl: String, stream: Stream) {
+            if (streams.size >= 32) streams.remove(streams.keys.first())
+            streams[sourceUrl] = CachedStream(stream, android.os.SystemClock.elapsedRealtime())
+        }
     }
     data class Stream(val title: String, val url: String, val headers: Map<String, String>)
 
@@ -17,6 +35,7 @@ class ExperimentalAudioResolver(private val context: Context) {
         require(uri.scheme == "https" && uri.host?.lowercase() in setOf("youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be")) {
             "Desteklenmeyen kaynak bağlantısı"
         }
+        cached(sourceUrl)?.let { return it }
         val engine = YoutubeDL.getInstance()
         engine.init(context.applicationContext)
         var updateStatus = "güncelleme kontrol edilmedi"
@@ -54,7 +73,9 @@ class ExperimentalAudioResolver(private val context: Context) {
                 val allowed = setOf("user-agent", "accept", "accept-language", "referer", "origin")
                 val headers = info.httpHeaders.orEmpty().filterKeys { it.lowercase() in allowed }
                     .filterValues { !it.contains('\n') && !it.contains('\r') }
-                return Stream(info.title ?: "İsimsiz", url, headers)
+                val stream = Stream(info.title ?: "İsimsiz", url, headers)
+                remember(sourceUrl, stream)
+                return stream
             } catch (e: Exception) {
                 // Akış URL'leri ve sorgu parametrelerini kullanıcı raporuna taşıma.
                 val detail = (e.message ?: e.javaClass.simpleName)
