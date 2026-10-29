@@ -17,20 +17,10 @@ class MainActivity : ComponentActivity() {
         
         val webView = WebView(this)
         webView.settings.javaScriptEnabled = true
-        webView.webViewClient = object : android.webkit.WebViewClient() {
-            override fun onPageFinished(view: WebView?, url: String?) {
-                super.onPageFinished(view, url)
-                // JavaScript köprüsünü enjekte et
-                view?.evaluateJavascript("""
-                    window.Android = {
-                        play: function() { Android.play(); },
-                        pause: function() { Android.pause(); },
-                        navigateTo: function(folder) { Android.navigateTo(folder); }
-                    };
-                """, null)
-            }
-        }
-        
+        // Orijinal Stitch HTML dosyalarını değiştirmeden JavaScript köprüsünü kullan.
+        // window.Android nesnesini JavaScript ile yeniden tanımlama: özyinelemeli çağrı oluşturur.
+        webView.webViewClient = android.webkit.WebViewClient()
+
         val sessionToken = SessionToken(this, ComponentName(this, PlaybackService::class.java))
         val controllerFuture = MediaController.Builder(this, sessionToken).buildAsync()
         controllerFuture.addListener({
