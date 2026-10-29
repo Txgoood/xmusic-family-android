@@ -84,7 +84,7 @@ class MainActivity : ComponentActivity() {
                         Array.from(header.children).forEach(function(child) { child.style.minWidth = '0'; });
                       }
                       document.addEventListener('click',function(event) {
-                        const target = event.target.closest('a[data-path],button');
+                        const target = event.target.closest('a[data-path],button,[data-stream-url],section .cursor-pointer');
                         if (!target) return;
                         if (target.matches('a[data-path]')) {
                           const folder=pages[target.getAttribute('data-path')];
@@ -92,6 +92,22 @@ class MainActivity : ComponentActivity() {
                           return;
                         }
                         if(target.id==='xmusic-settings-link') return;
+                        // Demo kartlarda URL yoksa gerçek oynatma varmış gibi davranma.
+                        const resumeSection = target.closest('section');
+                        if (resumeSection && (resumeSection.textContent||'').includes('Kaldığın Yerden Devam Et')) {
+                          const mediaUrl = target.closest('[data-stream-url]')?.getAttribute('data-stream-url')
+                              || resumeSection.querySelector('[data-stream-url]')?.getAttribute('data-stream-url');
+                          if (mediaUrl) window.Android.resumeStream(mediaUrl);
+                          else window.Android.showUnavailable('Kaldığın yerden devam et');
+                          event.preventDefault();
+                          return;
+                        }
+                        const streamElement = target.closest('[data-stream-url]');
+                        if (streamElement) {
+                          window.Android.playStream(streamElement.getAttribute('data-stream-url'));
+                          event.preventDefault();
+                          return;
+                        }
                         const label=(target.getAttribute('aria-label')||target.textContent||'').trim().toLocaleLowerCase('tr');
                         if(label==='geri'||label.startsWith('geri ')){
                           event.preventDefault();
