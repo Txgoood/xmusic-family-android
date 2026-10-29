@@ -52,6 +52,19 @@ class MainActivity : ComponentActivity() {
                         button.addEventListener('click',function(e){e.stopPropagation();go('ayarlar_ve_profil_y_netimi');});
                         header.appendChild(button);
                       }
+                      // Ayarlar ekranındaki anahtarları Android SharedPreferences ile sakla.
+                      // Gerçek işlevi olmayan anahtarın görüntüsü değişse de özellik tamamlandı sayılmaz.
+                      if ((location.pathname || '').includes('/ayarlar_ve_profil_y_netimi/')) {
+                        document.querySelectorAll('input[type="checkbox"]').forEach(function(box, index) {
+                          const key = 'setting_' + index;
+                          if (window.Android) {
+                            box.checked = window.Android.loadSetting(key, box.checked);
+                            box.addEventListener('change', function() {
+                              window.Android.saveSetting(key, box.checked);
+                            });
+                          }
+                        });
+                      }
                       // Ekran genişliğini aşan sabit öğelerin yatay taşmasını önle.
                       const sheet = document.createElement('style');
                       sheet.textContent = 'html,body{overflow-x:hidden;max-width:100%;}header{max-width:100vw;}header .h-16{min-width:0;}';
