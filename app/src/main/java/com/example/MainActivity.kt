@@ -134,6 +134,50 @@ class MainActivity : ComponentActivity() {
                           });
                           buttons[0].style.background='#36584d';
                           panel.insertBefore(categories,list);
+                          const official=document.createElement('button');
+                          official.type='button';official.textContent='Doğrulanabilir sanatçı / albüm kataloğu';
+                          official.style.cssText='width:100%;padding:10px;margin-bottom:12px;border:1px solid #62796f;border-radius:12px;color:#e0e3e7;text-align:left;';
+                          panel.insertBefore(official,list);
+                          let verifiedMode=false;
+                          let selectedArtist='';
+                          function showVerified(payload,id) {
+                            if(id!==currentId || !verifiedMode)return;
+                            list.replaceChildren();
+                            if(payload.error){list.textContent=payload.error;return;}
+                            const items=payload.items||[];
+                            if(!items.length){list.textContent='Katalogda sonuç bulunamadı';return;}
+                            if(selectedArtist){
+                              const back=document.createElement('button');
+                              back.textContent='← Sanatçılara dön';
+                              back.style.cssText='padding:8px;color:#9af0ba;';
+                              back.addEventListener('click',function(){selectedArtist='';runSearch();});
+                              list.appendChild(back);
+                            }
+                            items.forEach(function(item){
+                              const row=document.createElement('button');
+                              row.type='button';row.style.cssText='display:block;width:100%;text-align:left;padding:12px 4px;border-bottom:1px solid #313539;color:#e0e3e7;';
+                              const title=document.createElement('strong');title.textContent=item.title;
+                              const desc=document.createElement('div');desc.textContent=item.subtitle||'';
+                              desc.style.cssText='color:#b4c1c9;font-size:13px;margin-top:4px;';
+                              row.append(title,desc);
+                              if(!selectedArtist){
+                                row.addEventListener('click',function(){selectedArtist=item.id;runSearch();});
+                              }else{row.disabled=true;}
+                              list.appendChild(row);
+                            });
+                          }
+                          window.__xmusicVerifiedCatalog=showVerified;
+                          official.addEventListener('click',function(){
+                            verifiedMode=!verifiedMode;selectedArtist='';
+                            official.style.background=verifiedMode?'#36584d':'transparent';
+                            categories.style.display=verifiedMode?'none':'flex';
+                            heading.textContent=verifiedMode?'MusicBrainz sanatçı ve albümleri':'Audius topluluk araması';
+                            disclaimer.textContent=verifiedMode?
+                              'Sanatçı seçip kayıtlı albümlerini görebilirsin. Bu yalnızca katalog bilgisidir; ses dosyası veya oynatma hakkı içermez.':
+                              'Bu sonuçlar Audius kullanıcı yüklemeleridir; resmî sanatçı diskografisi veya doğrulanmış albümler değildir.';
+                            runSearch();
+                          });
+
                           const renderCatalog=function(id,type,payload){
                             if(id!==currentId || type!==mode)return;
                             list.replaceChildren();
@@ -161,7 +205,8 @@ class MainActivity : ComponentActivity() {
                             if(!q){panel.style.display='none';return;}
                             panel.style.display='block';list.textContent='Aranıyor...';
                             debounce=setTimeout(function(){
-                              if(mode==='tracks')window.Android.searchMusic(q,id);
+                              if(verifiedMode)window.Android.searchVerifiedCatalog(q,selectedArtist,id);
+                              else if(mode==='tracks')window.Android.searchMusic(q,id);
                               else window.Android.searchAudiusCatalog(q,mode,id);
                             },350);
                           }
