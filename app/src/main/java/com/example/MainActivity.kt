@@ -50,7 +50,19 @@ class MainActivity : ComponentActivity() {
                         button.style.cssText = 'flex-shrink:0;width:40px;height:40px;color:#bbcbb8;background:transparent;border:0;display:flex;align-items:center;justify-content:center;';
                         button.innerHTML = '<span class="material-symbols-outlined" style="font-size:26px">settings</span>';
                         button.addEventListener('click',function(e){e.stopPropagation();go('ayarlar_ve_profil_y_netimi');});
-                        header.appendChild(button);
+                        // Sağ grup içindeki çan + profilin sonuna ekle; üçüncü flex sütunu oluşturma.
+                        const rightGroup = header.querySelector('button[aria-label="Profil ve Aile Alanı"]')?.parentElement;
+                        if (rightGroup) {
+                          rightGroup.appendChild(button);
+                          rightGroup.style.setProperty('margin-left','auto','important');
+                          rightGroup.style.setProperty('flex-shrink','0','important');
+                          rightGroup.style.setProperty('justify-content','flex-end','important');
+                          const bell = rightGroup.querySelector('button[aria-label="Bildirimler"]');
+                          if (bell) bell.innerHTML = '<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>';
+                          button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.9 1.9-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-.96 1.57V21h-2.7v-.09a1.7 1.7 0 0 0-1.1-1.58 1.7 1.7 0 0 0-1.88.34l-.06.06-1.9-1.9.06-.06a1.7 1.7 0 0 0 .34-1.88A1.7 1.7 0 0 0 6.2 15H6v-3h.2a1.7 1.7 0 0 0 1.58-1.1 1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.9-1.9.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 12.3 6V5h2.7v1a1.7 1.7 0 0 0 1.1 1.58 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.9 1.9-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 21 12h.1v3z" transform="translate(-1.5 -1.5)"/></svg>';
+                        } else {
+                          header.appendChild(button);
+                        }
                       }
                       // Ayarlar ekranındaki anahtarları Android SharedPreferences ile sakla.
                       // Gerçek işlevi olmayan anahtarın görüntüsü değişse de özellik tamamlandı sayılmaz.
