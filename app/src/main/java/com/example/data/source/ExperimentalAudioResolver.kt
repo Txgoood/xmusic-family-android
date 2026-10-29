@@ -7,7 +7,7 @@ import java.net.URI
 
 /** Geçici akış adreslerini yalnızca oynatma anında çözer; kalıcı bağlantı olarak saklanmaz. */
 class ExperimentalAudioResolver(private val context: Context) {
-    data class Stream(val title: String, val url: String)
+    data class Stream(val title: String, val url: String, val headers: Map<String, String>)
 
     fun resolve(sourceUrl: String): Stream {
         val uri = URI(sourceUrl)
@@ -21,6 +21,9 @@ class ExperimentalAudioResolver(private val context: Context) {
         val info = YoutubeDL.getInstance().getInfo(request)
         val url = requireNotNull(info.url) { "Ses akışı bulunamadı" }
         require(URI(url).scheme == "https") { "Güvensiz akış adresi" }
-        return Stream(info.title ?: "İsimsiz", url)
+        val allowed = setOf("user-agent", "accept", "accept-language", "referer", "origin")
+        val headers = info.httpHeaders.orEmpty().filterKeys { it.lowercase() in allowed }
+            .filterValues { !it.contains('\n') && !it.contains('\r') }
+        return Stream(info.title ?: "İsimsiz", url, headers)
     }
 }
