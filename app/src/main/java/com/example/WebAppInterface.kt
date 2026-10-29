@@ -12,6 +12,8 @@ import androidx.media3.common.MediaItem
  * JavaScript ve Native Android kodu arasındaki köprü.
  */
 class WebAppInterface(private val context: Context, private val webView: WebView, private var mediaController: MediaController?) {
+    private val musicBrainzRequestLock = Any()
+    private var lastMusicBrainzRequest = 0L
 
     @JavascriptInterface
     fun showToast(message: String) {
@@ -131,6 +133,61 @@ class WebAppInterface(private val context: Context, private val webView: WebView
                 webView.evaluateJavascript(
                     "window.__xmusicCatalogResult && window.__xmusicCatalogResult(" +
                         requestId + "," + org.json.JSONObject.quote(category) + "," + result.toString() + ")", null
+                )
+            }
+        }.start()
+    }
+
+    // MusicBrainz metadata is separate from Audius community audio uploads.
+    @JavascriptInterface
+    fun searchVerifiedCatalog(query: String, artistId: String, requestId: Int) {
+        if (query.length > 100 || (artistId.isNotEmpty() && !artistId.matches(Regex("[0-9a-fA-F-]{36}")))) return
+        Thread {
+            val result = try {
+                // Limit MusicBrainz requests across both search and discography calls.
+                synchronized(musicBrainzRequestLock) {
+                    val waitMs = 1100 - (System.currentTimeMillis() - lastMusicBrainzRequest)
+                    if (waitMs > 0) Thread.sleep(waitMs)
+                    lastMusicBrainzRequest = System.currentTimeMillis()
+                }
+                val url = if (artistId.isEmpty()) {
+                    "https://musicbrainz.org/ws/2/artist/?query=" +
+                        java.net.URLEncoder.encode("artist:\"" + query.trim() + "\"", "UTF-8") + "&fmt=json&limit=15"
+                } else {
+                    "https://musicbrainz.org/ws/2/release-group?artist=" + artistId +
+                        "&type=album&fmt=json&limit=50"
+                }
+                val conn = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
+                    connectTimeout = 10000
+                    readTimeout = 12000
+                    setRequestProperty("User-Agent", "XMusicFamily/0.1 (https://github.com/Txgoood/xmusic-family-android)")
+                    setRequestProperty("Accept", "application/json")
+                }
+                try {
+                    if (conn.responseCode !in 200..299) throw java.io.IOException("MusicBrainz HTTP " + conn.responseCode)
+                    val raw = org.json.JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+                    val array = raw.optJSONArray(if (artistId.isEmpty()) "artists" else "release-groups") ?: org.json.JSONArray()
+                    val items = org.json.JSONArray()
+                    for (i in 0 until array.length()) {
+                        val record = array.optJSONObject(i) ?: continue
+                        items.put(org.json.JSONObject().apply {
+                            put("id", record.optString("id"))
+                            put("title", if (artistId.isEmpty()) record.optString("name") else record.optString("title"))
+                            put("subtitle", if (artistId.isEmpty()) {
+                                listOf(record.optString("country"), record.optString("disambiguation"))
+                                    .filter { it.isNotBlank() }.joinToString(" · ")
+                            } else record.optString("first-release-date"))
+                        })
+                    }
+                    org.json.JSONObject().put("items", items)
+                } finally { conn.disconnect() }
+            } catch (e: Exception) {
+                org.json.JSONObject().put("error", "Müzik kataloğuna ulaşılamadı. Daha sonra tekrar dene.")
+            }
+            webView.post {
+                webView.evaluateJavascript(
+                    "window.__xmusicVerifiedCatalog && window.__xmusicVerifiedCatalog(" +
+                        requestId + "," + result.toString() + ")", null
                 )
             }
         }.start()
