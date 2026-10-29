@@ -70,7 +70,17 @@ class PlaybackWebBridge(private val webView: WebView) {
             put("seekable", player?.isCurrentMediaItemSeekable == true && duration > 0)
             put("hasNext", player?.hasNextMediaItem() == true)
             put("error", player?.playerError?.let {
-                "Ses açılamadı. İnternet bağlantısını ve kaynağın erişimini kontrol et. (" + it.errorCodeName + ")"
+                var cause: Throwable? = it
+                var httpCode: Int? = null
+                while (cause != null) {
+                    if (cause is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
+                        httpCode = cause.responseCode
+                        break
+                    }
+                    cause = cause.cause
+                }
+                "Ses açılamadı. Kaynak erişimini kontrol et. (" + it.errorCodeName +
+                    (httpCode?.let { code -> ", HTTP $code" } ?: "") + ")"
             }.orEmpty())
         }
         webView.evaluateJavascript("window.__xmusicPlayback && window.__xmusicPlayback($state)", null)
