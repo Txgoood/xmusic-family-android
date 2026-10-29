@@ -43,3 +43,11 @@ Durumları yalnız doğrulanan işin ardından güncelle.
 - 18 ekran tarandı. 61 oynatıcı + 34 uygulama DOM kontrolü geçti; profil ve RSS için 6 Android birim testi eklendi.
 - Engelli kontroller tamamlandı sayılmadı. Güvenli çocuk modu, bulut, ticari müzik kaynak izinleri, kalite ve gerçek sanatçı/album detay bağları açık.
 - Kaynak seçilmemiş demo kartlar gerçek aramaya yönlenir; sahte parça oynatılmaz. Kullanıcı cihaz kabulü bekliyor.
+
+
+## Kaynak motoru cihaz testi — 30 Ekim 2026
+- #53: Arama sonuçları göründü; gerçek ses başarısız.
+- #55: Kullanıcı ses isteğinde HTTP 403 bildirdi. Başlık aktarımı sorunu çözmedi.
+- #56: Kullanıcı kaynak çözümlemede genel hata bildirdi. HLS yalnız başına doğrulanmadı.
+- Yeni deneme: Kurulu yt-dlp için günlük kararlı sürüm kontrolü, ayrı HLS/varsayılan denemeleri, motor sürümü ve hata ayrıntısı.
+- Oynatma, indirme ve Drive aktarımı tamamlandı sayılmaz. Geri dönüş: fd51e66716f0cf7b90f3006ab899a1d68210a197.
