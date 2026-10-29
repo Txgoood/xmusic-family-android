@@ -7,6 +7,9 @@ import java.net.URI
 
 /** Geçici akış adreslerini yalnızca oynatma anında çözer; kalıcı bağlantı olarak saklanmaz. */
 class ExperimentalAudioResolver(private val context: Context) {
+    companion object {
+        private val updateLock = Any()
+    }
     data class Stream(val title: String, val url: String, val headers: Map<String, String>)
 
     fun resolve(sourceUrl: String): Stream {
@@ -14,18 +17,54 @@ class ExperimentalAudioResolver(private val context: Context) {
         require(uri.scheme == "https" && uri.host?.lowercase() in setOf("youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be")) {
             "Desteklenmeyen kaynak bağlantısı"
         }
-        YoutubeDL.getInstance().init(context.applicationContext)
-        val request = YoutubeDLRequest(sourceUrl)
-        request.addOption("--no-playlist")
-        // HTTP 403 sonrası HLS akışını öncele; uygun değilse mevcut ses seçeneğine dön.
-        request.addOption("--extractor-args", "youtube:player_client=web_safari")
-        request.addOption("-f", "bestaudio[protocol^=m3u8]/best[protocol^=m3u8]/bestaudio/best")
-        val info = YoutubeDL.getInstance().getInfo(request)
-        val url = requireNotNull(info.url) { "Ses akışı bulunamadı" }
-        require(URI(url).scheme == "https") { "Güvensiz akış adresi" }
-        val allowed = setOf("user-agent", "accept", "accept-language", "referer", "origin")
-        val headers = info.httpHeaders.orEmpty().filterKeys { it.lowercase() in allowed }
-            .filterValues { !it.contains('\n') && !it.contains('\r') }
-        return Stream(info.title ?: "İsimsiz", url, headers)
+        val engine = YoutubeDL.getInstance()
+        engine.init(context.applicationContext)
+        var updateStatus = "güncelleme kontrol edilmedi"
+        synchronized(updateLock) {
+            val prefs = context.getSharedPreferences("xmusic_source_engine", Context.MODE_PRIVATE)
+            val last = prefs.getLong("lastSuccessfulUpdate", 0L)
+            if (System.currentTimeMillis() - last > 24 * 60 * 60 * 1000L) {
+                try {
+                    engine.updateYoutubeDL(context.applicationContext)
+                    prefs.edit().putLong("lastSuccessfulUpdate", System.currentTimeMillis()).apply()
+                    updateStatus = "güncel"
+                } catch (_: Exception) {
+                    // Güncelleme erişimi yoksa kurulu motorla devam et.
+                    updateStatus = "güncelleme alınamadı"
+                }
+            } else updateStatus = "güncel"
+        }
+        val failures = mutableListOf<String>()
+        for (hls in listOf(true, false)) {
+            try {
+                val request = YoutubeDLRequest(sourceUrl)
+                request.addOption("--no-playlist")
+                request.addOption("--socket-timeout", "15")
+                request.addOption("--retries", "1")
+                if (hls) {
+                    request.addOption("--extractor-args", "youtube:player_client=web_safari")
+                    request.addOption("-f", "bestaudio[protocol^=m3u8]/best[protocol^=m3u8]")
+                } else {
+                    // HLS elde edilemezse varsayılan istemciyi ayrıca dene.
+                    request.addOption("-f", "bestaudio/best")
+                }
+                val info = engine.getInfo(request)
+                val url = requireNotNull(info.url) { "Ses akışı bulunamadı" }
+                require(URI(url).scheme == "https") { "Güvensiz akış adresi" }
+                val allowed = setOf("user-agent", "accept", "accept-language", "referer", "origin")
+                val headers = info.httpHeaders.orEmpty().filterKeys { it.lowercase() in allowed }
+                    .filterValues { !it.contains('\n') && !it.contains('\r') }
+                return Stream(info.title ?: "İsimsiz", url, headers)
+            } catch (e: Exception) {
+                // Akış URL'leri ve sorgu parametrelerini kullanıcı raporuna taşıma.
+                val detail = (e.message ?: e.javaClass.simpleName)
+                    .replace(Regex("https?://\\S+"), "[bağlantı]")
+                    .replace(Regex("\\u001B\\[[0-9;]*m"), "")
+                    .take(700)
+                failures.add((if (hls) "HLS" else "Varsayılan") + ": " + detail)
+            }
+        }
+        throw java.io.IOException("Motor: " + engine.version(context.applicationContext).orEmpty() +
+            " (" + updateStatus + ")\n\n" + failures.joinToString("\n\n"))
     }
 }
