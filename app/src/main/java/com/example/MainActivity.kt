@@ -226,6 +226,10 @@ class MainActivity : ComponentActivity() {
                             payload.items.forEach(function(item){
                               const row=document.createElement('button');row.type='button';
                               row.style.cssText='display:block;width:100%;text-align:left;padding:12px 4px;border-bottom:1px solid #313539;color:#e0e3e7;';
+                              const image=document.createElement('img');
+                              image.src='https://i.ytimg.com/vi/'+item.id+'/mqdefault.jpg';image.alt='';
+                              image.style.cssText='width:72px;height:48px;object-fit:cover;border-radius:8px;float:left;margin-right:12px;';
+                              row.appendChild(image);
                               const name=document.createElement('strong');name.textContent=item.title||'İsimsiz';
                               const artist=document.createElement('div');artist.textContent=item.artist||'Yükleyen bilinmiyor';artist.style.color='#b4c1c9';
                               row.append(name,artist);
