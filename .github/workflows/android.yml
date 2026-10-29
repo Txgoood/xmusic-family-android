@@ -11,6 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test playback UI against original Stitch screens
+        run: |
+          npm install --prefix "$RUNNER_TEMP/xmusic-ui-test" jsdom@26.1.0 --no-audit --no-fund
+          NODE_PATH="$RUNNER_TEMP/xmusic-ui-test/node_modules" node scripts/playback-ui.test.cjs
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -31,3 +38,4 @@ jobs:
           name: xmusic-family-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+

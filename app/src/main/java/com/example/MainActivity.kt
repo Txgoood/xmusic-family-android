@@ -7,15 +7,20 @@ import androidx.activity.ComponentActivity
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.example.playback.PlaybackService
-import com.google.common.util.concurrent.MoreExecutors
 
 class MainActivity : ComponentActivity() {
     private var mediaController: MediaController? = null
+    private var controllerFuture: com.google.common.util.concurrent.ListenableFuture<MediaController>? = null
+    private lateinit var playbackBridge: PlaybackWebBridge
+    private lateinit var appWebView: WebView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
         val webView = WebView(this)
+        appWebView = webView
+        playbackBridge = PlaybackWebBridge(webView)
+        val playbackScript = assets.open("playback.js").bufferedReader().use { it.readText() }
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.settings.useWideViewPort = true
@@ -30,6 +35,7 @@ class MainActivity : ComponentActivity() {
             }
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                view?.evaluateJavascript(playbackScript, null)
                 // Stitch HTML/CSS'yi değiştirmeden ekranlara etkileşim ekle.
                 view?.evaluateJavascript("""
                     (function() {
@@ -114,8 +120,8 @@ class MainActivity : ComponentActivity() {
                               const caption=document.createElement('div');
                               const name=document.createElement('strong');name.textContent=item.title||'İsimsiz parça';
                               const artist=document.createElement('div');artist.textContent=item.artist||'Bilinmeyen sanatçı';artist.style.color='#bbcbb8';
-                              caption.append(name,artist);line.appendChild(caption);
-                              if(item.id && /^[a-zA-Z0-9]{1,64}$/.test(item.id)){
+                              const access=document.createElement('small');access.textContent=item.playable?'Audius · Akış denenebilir':'Bu kayıt için oynatma erişimi yok';caption.append(name,artist,access);line.appendChild(caption);
+                              if(item.playable && item.id && /^[a-zA-Z0-9]{1,64}$/.test(item.id)){
                                 const play=document.createElement('button');play.type='button';
                                 play.textContent='▶ Dinle';play.setAttribute('aria-label',item.title+' oynat');
                                 play.style.cssText='margin-left:auto;flex-shrink:0;color:#9af0ba;border:1px solid #36584d;padding:8px;border-radius:12px;font-size:12px;';
@@ -210,7 +216,7 @@ class MainActivity : ComponentActivity() {
                               }
                               const cell=document.createElement('div');
                               const title=document.createElement('strong');title.textContent=item.title||'İsimsiz';
-                              const sub=document.createElement('div');sub.textContent=(appleStage==='albums'?((item.category||'Albüm')+' · '):'')+(item.subtitle||'');sub.style.cssText='color:#b4c1c9;font-size:13px;';
+                              const sub=document.createElement('div');sub.textContent=(appleStage==='albums'?((item.category||'Albüm')+' · '):appleStage==='songs'?'Yalnızca katalog · ':'')+(item.subtitle||'');sub.style.cssText='color:#b4c1c9;font-size:13px;';
                               cell.append(title,sub);row.appendChild(cell);
                               row.addEventListener('click',function(){
                                 if(appleStage==='artists'){
@@ -220,7 +226,7 @@ class MainActivity : ComponentActivity() {
                                   appleId=item.id;appleStage='songs';runSearch();
                                 }else{
                                   // Apple katalog kayıtları ses akışı değildir: yanlışlıkla Apple Music'e yönlendirme.
-                                  if(window.Android)window.Android.showToast('Bu şarkı katalog bilgisidir. Dinlemek için Audius Şarkılar bölümünü kullan.');
+                                  if(window.Android)window.Android.showToast('Bu şarkı katalog bilgisidir. Bu kayıt için yetkili ses kaynağı henüz bağlı değil.');
                                 }
                               });
                               list.appendChild(row);
@@ -416,28 +422,49 @@ class MainActivity : ComponentActivity() {
                         }
                       }, true);
                     })();
-                """.trimIndent()) { view?.post { view.alpha = 1f } }
+                """.trimIndent()) { playbackBridge.publish(); view?.post { view.alpha = 1f } }
             }
         }
 
-        val sessionToken = SessionToken(this, ComponentName(this, PlaybackService::class.java))
-        val controllerFuture = MediaController.Builder(this, sessionToken).buildAsync()
-        controllerFuture.addListener({
-            try {
-                val controller = controllerFuture.get()
-                this.mediaController = controller
-                (webView.tag as? WebAppInterface)?.setMediaController(controller)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }, MoreExecutors.directExecutor())
-
-        // Yerel Stitch dosyalarına erişim
+        // Köprü, asenkron bağlantı tamamlanmadan önce hazır olmalı.
         val webAppInterface = WebAppInterface(this, webView, null)
         webView.tag = webAppInterface
         webView.addJavascriptInterface(webAppInterface, "Android")
+        val sessionToken = SessionToken(this, ComponentName(this, PlaybackService::class.java))
+        val future = MediaController.Builder(this, sessionToken).buildAsync()
+        controllerFuture = future
+        future.addListener({
+            if (!isDestroyed) {
+                try {
+                    val controller = future.get()
+                    mediaController = controller
+                    webAppInterface.setMediaController(controller)
+                    playbackBridge.attach(controller)
+                } catch (e: Exception) {
+                    android.util.Log.w("XMusicPlayback", "Oynatıcı bağlantısı kurulamadı", e)
+                    playbackBridge.publish()
+                }
+            }
+        }, androidx.core.content.ContextCompat.getMainExecutor(this))
         webView.loadUrl("file:///android_asset/stitch/ana_sayfa/code.html")
         
         setContentView(webView)
+    }
+    override fun onStart() {
+        super.onStart()
+        playbackBridge.start()
+    }
+
+    override fun onStop() {
+        playbackBridge.stop()
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        playbackBridge.close()
+        controllerFuture?.let { MediaController.releaseFuture(it) }
+        appWebView.removeJavascriptInterface("Android")
+        appWebView.destroy()
+        super.onDestroy()
     }
 }

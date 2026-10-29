@@ -12,12 +12,13 @@ import androidx.media3.common.MediaItem
  * JavaScript ve Native Android kodu arasındaki köprü.
  */
 class WebAppInterface(private val context: Context, private val webView: WebView, private var mediaController: MediaController?) {
+    private val audiusTracks = java.util.concurrent.ConcurrentHashMap<String, MediaItem>()
     private val musicBrainzRequestLock = Any()
     private var lastMusicBrainzRequest = 0L
 
     @JavascriptInterface
     fun showToast(message: String) {
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        webView.post { Toast.makeText(context, message, Toast.LENGTH_SHORT).show() }
     }
 
     @JavascriptInterface
@@ -75,7 +76,23 @@ class WebAppInterface(private val context: Context, private val webView: WebView
                         val track = tracks.optJSONObject(i) ?: continue
                         val user = track.optJSONObject("user")
                         val artwork = track.optJSONObject("artwork")
+                        val id = track.optString("id")
+                        val playable = track.optBoolean("is_streamable", false) &&
+                            !track.optBoolean("is_stream_gated", false) &&
+                            !track.optBoolean("is_delete", false) &&
+                            track.optBoolean("is_available", true)
+                        if (playable && id.matches(Regex("[a-zA-Z0-9]{1,64}"))) {
+                            val metadata = androidx.media3.common.MediaMetadata.Builder()
+                                .setTitle(track.optString("title").take(180))
+                                .setArtist(user?.optString("name")?.take(180))
+                            val image = artwork?.optString("150x150").orEmpty()
+                            if (image.startsWith("https://")) metadata.setArtworkUri(android.net.Uri.parse(image))
+                            audiusTracks[id] = MediaItem.Builder().setMediaId("audius:$id")
+                                .setUri("https://discoveryprovider.audius.co/v1/tracks/$id/stream?app_name=XMusicFamily")
+                                .setMediaMetadata(metadata.build()).build()
+                        } else { audiusTracks.remove(id) }
                         items.put(org.json.JSONObject().apply {
+                            put("playable", playable)
                             put("title", track.optString("title"))
                             put("artist", user?.optString("name") ?: "")
                             put("id", track.optString("id"))
@@ -281,9 +298,13 @@ class WebAppInterface(private val context: Context, private val webView: WebView
             val controller = mediaController
             if (controller == null) {
                 Toast.makeText(context, "Oynatıcı henüz hazır değil", Toast.LENGTH_SHORT).show()
-            } else if (controller.isPlaying) {
+            } else if (controller.mediaItemCount == 0) {
+                Toast.makeText(context, "Önce dinlenecek bir parça seç", Toast.LENGTH_SHORT).show()
+            } else if (controller.playWhenReady && controller.playbackState != androidx.media3.common.Player.STATE_ENDED && controller.playerError == null) {
                 controller.pause()
             } else {
+                if (controller.playbackState == androidx.media3.common.Player.STATE_ENDED) controller.seekTo(0)
+                if (controller.playerError != null || controller.playbackState == androidx.media3.common.Player.STATE_IDLE) controller.prepare()
                 controller.play()
             }
         }
@@ -301,17 +322,12 @@ class WebAppInterface(private val context: Context, private val webView: WebView
                 Toast.makeText(context, "Müzik oynatıcı hazır değil", Toast.LENGTH_SHORT).show()
                 return@post
             }
-            val streamUrl = "https://discoveryprovider.audius.co/v1/tracks/$trackId/stream?app_name=XMusicFamily"
-            val item = MediaItem.Builder()
-                .setUri(streamUrl)
-                .setMediaId("audius:$trackId")
-                .setMediaMetadata(
-                    androidx.media3.common.MediaMetadata.Builder()
-                        .setTitle(title.take(180))
-                        .setArtist(artist.take(180))
-                        .build()
-                )
-                .build()
+            // Yalnızca API'nin erişilebilir bildirdiği arama kaydını kullan; başlığa göre eşleştirme yapma.
+            val item = audiusTracks[trackId]
+            if (item == null) {
+                Toast.makeText(context, "Bu kayıt için oynatma erişimi doğrulanamadı. Yeniden ara.", Toast.LENGTH_SHORT).show()
+                return@post
+            }
             controller.setMediaItem(item)
             controller.prepare()
             controller.play()
@@ -371,30 +387,36 @@ class WebAppInterface(private val context: Context, private val webView: WebView
 
     @JavascriptInterface
     fun play() {
-        mediaController?.play()
+        webView.post { mediaController?.let { if (it.mediaItemCount > 0) it.play() } }
     }
 
     @JavascriptInterface
     fun pause() {
-        mediaController?.pause()
+        webView.post { mediaController?.pause() }
     }
 
     @JavascriptInterface
     fun next() {
-        mediaController?.seekToNext()
+        webView.post { mediaController?.let { if (it.hasNextMediaItem()) it.seekToNextMediaItem() } }
     }
 
     @JavascriptInterface
     fun previous() {
-        mediaController?.seekToPrevious()
+        webView.post { mediaController?.let { if (it.mediaItemCount > 0) it.seekToPrevious() } }
     }
 
     @JavascriptInterface
     fun seekTo(positionMs: Long) {
-        mediaController?.seekTo(positionMs)
+        webView.post {
+            mediaController?.let {
+                if (it.isCurrentMediaItemSeekable && it.duration > 0)
+                    it.seekTo(positionMs.coerceIn(0L, it.duration))
+            }
+        }
     }
 
     fun setMediaController(controller: MediaController) {
         this.mediaController = controller
     }
 }
+
