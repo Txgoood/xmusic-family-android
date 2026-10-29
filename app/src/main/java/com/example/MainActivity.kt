@@ -84,14 +84,14 @@ class MainActivity : ComponentActivity() {
                         if (input && window.Android) {
                           const panel = document.createElement('section');
                           panel.id = 'xmusic-live-search';
-                          panel.style.cssText = 'display:none;margin:16px 16px 24px;padding:16px;background:#181c1f;border-radius:16px;color:#e0e3e7;';
+                          panel.style.cssText = 'display:none;margin:8px 16px 18px;padding:12px;background:#181c1f;border-radius:16px;color:#e0e3e7;';
                           const heading = document.createElement('h2');
                           heading.textContent = 'Audius topluluk araması';
-                          heading.style.cssText = 'font-weight:700;font-size:18px;margin-bottom:12px;';
+                          heading.style.cssText = 'font-weight:700;font-size:16px;margin-bottom:6px;';
                           const list = document.createElement('div');
                           const disclaimer=document.createElement('p');
                           disclaimer.textContent='Bu sonuçlar Audius kullanıcı yüklemeleridir; resmî sanatçı diskografisi veya doğrulanmış albümler değildir.';
-                          disclaimer.style.cssText='color:#b4c1c9;font-size:12px;line-height:1.5;margin-bottom:12px;';
+                          disclaimer.style.cssText='color:#b4c1c9;font-size:11px;line-height:1.4;margin-bottom:8px;';;
                           panel.append(heading,disclaimer,list);
                           const main = document.querySelector('main');
                           if (main) main.insertBefore(panel,main.firstChild);
@@ -136,12 +136,18 @@ class MainActivity : ComponentActivity() {
                           panel.insertBefore(categories,list);
                           const official=document.createElement('button');
                           official.type='button';official.textContent='Doğrulanabilir sanatçı / albüm kataloğu';
-                          official.style.cssText='width:100%;padding:10px;margin-bottom:12px;border:1px solid #62796f;border-radius:12px;color:#e0e3e7;text-align:left;';
+                          official.style.cssText='flex:1;padding:8px;border:1px solid #62796f;border-radius:10px;color:#e0e3e7;text-align:center;font-size:12px;';
                           panel.insertBefore(official,list);
                           const appleButton=document.createElement('button');
                           appleButton.type='button';appleButton.textContent='Apple Türkiye müzik kataloğu';
-                          appleButton.style.cssText='width:100%;padding:10px;margin:0 0 12px;border:1px solid #62796f;border-radius:12px;color:#e0e3e7;text-align:left;';
+                          appleButton.style.cssText='flex:1;padding:8px;border:1px solid #62796f;border-radius:10px;color:#e0e3e7;text-align:center;font-size:12px;';
                           panel.insertBefore(appleButton,official);
+                          // Kaynak anahtarları iki büyük satır yerine kompakt yatay sekmeler.
+                          const sourceRow=document.createElement('div');
+                          sourceRow.style.cssText='display:flex;gap:8px;margin:4px 0 8px;';
+                          const sourceAnchor=appleButton.parentNode;
+                          sourceAnchor.insertBefore(sourceRow,appleButton);
+                          sourceRow.append(appleButton,official);
                           let appleMode=false, appleId='', appleStage='artists', appleName='';
                           function showApple(id,payload){
                             if(id!==currentId || !appleMode)return;
@@ -159,6 +165,18 @@ class MainActivity : ComponentActivity() {
                                 runSearch();
                               });list.appendChild(back);
                             }
+                            if(appleStage==='albums'){
+                              const counts={};
+                              items.forEach(function(item){const c=item.category||'Albüm';counts[c]=(counts[c]||0)+1;});
+                              const summary=document.createElement('div');
+                              summary.textContent=Object.keys(counts).map(function(k){return k+': '+counts[k];}).join('  ·  ');
+                              summary.style.cssText='color:#9af0ba;font-size:12px;padding:6px 0 10px;';
+                              list.appendChild(summary);
+                              items.sort(function(a,b){
+                                const order={'Albüm':0,'EP':1,'Single':2};
+                                return (order[a.category]??3)-(order[b.category]??3);
+                              });
+                            }
                             items.forEach(function(item){
                               const row=document.createElement('button');
                               row.type='button';row.style.cssText='display:flex;gap:12px;align-items:center;text-align:left;width:100%;padding:10px 0;color:#e0e3e7;border-bottom:1px solid #313539;';
@@ -169,7 +187,7 @@ class MainActivity : ComponentActivity() {
                               }
                               const cell=document.createElement('div');
                               const title=document.createElement('strong');title.textContent=item.title||'İsimsiz';
-                              const sub=document.createElement('div');sub.textContent=item.subtitle||'';sub.style.cssText='color:#b4c1c9;font-size:13px;';
+                              const sub=document.createElement('div');sub.textContent=(appleStage==='albums'?((item.category||'Albüm')+' · '):'')+(item.subtitle||'');sub.style.cssText='color:#b4c1c9;font-size:13px;';
                               cell.append(title,sub);row.appendChild(cell);
                               row.addEventListener('click',function(){
                                 if(appleStage==='artists'){
