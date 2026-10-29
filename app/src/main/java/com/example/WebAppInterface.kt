@@ -51,6 +51,50 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     }
 
     @JavascriptInterface
+    fun searchMusic(query: String, requestId: Int) {
+        if (query.isBlank() || query.length > 120) return
+        Thread {
+            val result = try {
+                val encoded = java.net.URLEncoder.encode(query.trim(), "UTF-8")
+                val endpoint = java.net.URL("https://discoveryprovider.audius.co/v1/tracks/search?query=$encoded&app_name=XMusicFamily")
+                val connection = (endpoint.openConnection() as java.net.HttpURLConnection).apply {
+                    connectTimeout = 10000
+                    readTimeout = 12000
+                    setRequestProperty("Accept", "application/json")
+                }
+                try {
+                    val code = connection.responseCode
+                    if (code !in 200..299) throw java.io.IOException("HTTP $code")
+                    val payload = connection.inputStream.bufferedReader().use { it.readText() }
+                    val json = org.json.JSONObject(payload)
+                    val tracks = json.optJSONArray("data") ?: org.json.JSONArray()
+                    val items = org.json.JSONArray()
+                    for (i in 0 until minOf(tracks.length(), 30)) {
+                        val track = tracks.optJSONObject(i) ?: continue
+                        val user = track.optJSONObject("user")
+                        val artwork = track.optJSONObject("artwork")
+                        items.put(org.json.JSONObject().apply {
+                            put("title", track.optString("title"))
+                            put("artist", user?.optString("name") ?: "")
+                            put("id", track.optString("id"))
+                            put("artwork", artwork?.optString("150x150") ?: "")
+                        })
+                    }
+                    org.json.JSONObject().put("items", items)
+                } finally {
+                    connection.disconnect()
+                }
+            } catch (e: Exception) {
+                org.json.JSONObject().put("error", "Arama bağlantısı kurulamadı. İnterneti kontrol et.")
+            }
+            webView.post {
+                val script = "window.__xmusicSearchResult && window.__xmusicSearchResult(" + requestId + "," + result.toString() + ")"
+                webView.evaluateJavascript(script, null)
+            }
+        }.start()
+    }
+
+    @JavascriptInterface
     fun goBack() {
         webView.post {
             if (webView.canGoBack()) webView.goBack()
