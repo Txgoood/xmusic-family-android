@@ -149,6 +149,7 @@ class MainActivity : ComponentActivity() {
                           sourceAnchor.insertBefore(sourceRow,appleButton);
                           sourceRow.append(appleButton,official);
                           let appleMode=false, appleId='', appleStage='artists', appleName='';
+                          let releaseFilter='Albüm';
                           function showApple(id,payload){
                             if(id!==currentId || !appleMode)return;
                             list.replaceChildren();
@@ -172,12 +173,23 @@ class MainActivity : ComponentActivity() {
                               summary.textContent=Object.keys(counts).map(function(k){return k+': '+counts[k];}).join('  ·  ');
                               summary.style.cssText='color:#9af0ba;font-size:12px;padding:6px 0 10px;';
                               list.appendChild(summary);
+                              const filters=document.createElement('div');
+                              filters.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;';
+                              ['Albüm','EP','Single','Tümü'].forEach(function(category){
+                                const chip=document.createElement('button');
+                                chip.type='button';chip.textContent=category+' ('+(category==='Tümü'?items.length:(counts[category]||0))+')';
+                                chip.style.cssText='border-radius:16px;padding:7px 11px;font-size:12px;border:1px solid #62796f;color:#e0e3e7;background:'+(releaseFilter===category?'#36584d':'transparent');
+                                chip.addEventListener('click',function(){releaseFilter=category;showApple(id,payload);});
+                                filters.appendChild(chip);
+                              });
+                              list.appendChild(filters);
                               items.sort(function(a,b){
                                 const order={'Albüm':0,'EP':1,'Single':2};
                                 return (order[a.category]??3)-(order[b.category]??3);
                               });
                             }
                             items.forEach(function(item){
+                              if(appleStage==='albums' && releaseFilter!=='Tümü' && item.category!==releaseFilter)return;
                               const row=document.createElement('button');
                               row.type='button';row.style.cssText='display:flex;gap:12px;align-items:center;text-align:left;width:100%;padding:10px 0;color:#e0e3e7;border-bottom:1px solid #313539;';
                               if(item.artwork && item.artwork.startsWith('https://')){
