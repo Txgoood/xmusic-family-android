@@ -238,6 +238,17 @@ class WebAppInterface(private val context: Context, private val webView: WebView
                             put("subtitle", if (type == "artist") entry.optString("primaryGenreName")
                                 else entry.optString("artistName"))
                             put("artwork", entry.optString("artworkUrl100"))
+                            put("releaseDate", entry.optString("releaseDate"))
+                            put("trackCount", entry.optInt("trackCount", 0))
+                            put("category", if (type == "collection") {
+                                val name = entry.optString("collectionName")
+                                val count = entry.optInt("trackCount", 0)
+                                when {
+                                    name.contains(" - Single", ignoreCase = true) || count in 1..3 -> "Single"
+                                    name.contains(" - EP", ignoreCase = true) || count in 4..6 -> "EP"
+                                    else -> "Albüm"
+                                }
+                            } else "")
                             put("type", type)
                             put("url", entry.optString("artistViewUrl", entry.optString("collectionViewUrl", entry.optString("trackViewUrl"))))
                         })
