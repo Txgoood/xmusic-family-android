@@ -56,6 +56,11 @@ class MainActivity : ComponentActivity() {
                       const sheet = document.createElement('style');
                       sheet.textContent = 'html,body{overflow-x:hidden;max-width:100%;}header{max-width:100vw;}header .h-16{min-width:0;}';
                       document.head.appendChild(sheet);
+                      // WebView: tüm ekranlarda dikey dokunmatik kaydırmayı etkinleştir.
+                      const scrollStyle = document.createElement('style');
+                      scrollStyle.id = 'xmusic-scroll-fix';
+                      scrollStyle.textContent = 'html,body{height:auto!important;min-height:100%!important;overflow-y:auto!important;overscroll-behavior-y:auto!important;touch-action:pan-y!important;-webkit-overflow-scrolling:touch!important;}main{height:auto!important;min-height:100vh!important;overflow-y:visible!important;touch-action:pan-y!important;}';
+                      document.head.appendChild(scrollStyle);
                       // Sabit üst çubuğun sayfa başlığını örtmesini önle.
                       // Başlık ve içerik düzeni yalnızca çalışma anında ayarlanır.
                       const fixedHeader = document.querySelector('header.fixed, header.sticky');
