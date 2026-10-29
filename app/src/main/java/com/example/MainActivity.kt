@@ -208,9 +208,9 @@ class MainActivity : ComponentActivity() {
                           experimentalButton.type='button';experimentalButton.textContent='YouTube · Deneme';
                           experimentalButton.style.cssText='flex:1;padding:8px;border:1px solid #62796f;border-radius:10px;color:#e0e3e7;font-size:12px;';
                           sourceRow.appendChild(experimentalButton);
-                          let experimentalMode=false;
+                          let experimentalMode=false, experimentalQuery='', fromAlbum=false;
                           experimentalButton.addEventListener('click',function(){
-                            experimentalMode=!experimentalMode;appleMode=false;verifiedMode=false;
+                            experimentalMode=!experimentalMode;experimentalQuery='';fromAlbum=false;appleMode=false;verifiedMode=false;
                             appleButton.style.background='transparent';official.style.background='transparent';
                             experimentalButton.style.background=experimentalMode?'#36584d':'transparent';
                             categories.style.display=experimentalMode?'none':'flex';
@@ -221,8 +221,17 @@ class MainActivity : ComponentActivity() {
                           window.__xmusicExperimentalResult=function(id,payload){
                             if(id!==currentId || !experimentalMode)return;
                             list.replaceChildren();
-                            if(payload.error){list.textContent=payload.error;return;}
-                            if(!(payload.items||[]).length){list.textContent='Sonuç bulunamadı';return;}
+                            if(fromAlbum){
+                              const back=document.createElement('button');back.type='button';back.textContent='← Albüm şarkılarına dön';
+                              back.style.cssText='display:block;padding:9px;color:#9af0ba;';
+                              back.addEventListener('click',function(){
+                                fromAlbum=false;experimentalMode=false;experimentalQuery='';appleMode=true;
+                                experimentalButton.style.background='transparent';appleButton.style.background='#36584d';
+                                heading.textContent='Albüm şarkıları';runSearch();
+                              });list.appendChild(back);
+                            }
+                            if(payload.error){const error=document.createElement('p');error.textContent=payload.error;list.appendChild(error);return;}
+                            if(!(payload.items||[]).length){const empty=document.createElement('p');empty.textContent='Sonuç bulunamadı';list.appendChild(empty);return;}
                             payload.items.forEach(function(item){
                               const row=document.createElement('button');row.type='button';
                               row.style.cssText='display:block;width:100%;text-align:left;padding:12px 4px;border-bottom:1px solid #313539;color:#e0e3e7;';
@@ -237,7 +246,10 @@ class MainActivity : ComponentActivity() {
                               list.appendChild(row);
                             });
                           };
-                          let appleMode=false, appleId='', appleStage='artists', appleName='';
+                          let appleMode=true, appleId='', appleStage='artists', appleName='';
+                          categories.style.display='none';appleButton.style.background='#36584d';
+                          heading.textContent='Sanatçı ve albüm ara';
+                          disclaimer.textContent='Sanatçı seç, albümlerini ve şarkılarını gör.';
                           let releaseFilter='Albüm';
                           function showApple(id,payload){
                             if(id!==currentId || !appleMode)return;
@@ -297,8 +309,13 @@ class MainActivity : ComponentActivity() {
                                 }else if(appleStage==='albums'){
                                   appleId=item.id;appleStage='songs';runSearch();
                                 }else{
-                                  // Apple katalog kayıtları ses akışı değildir: yanlışlıkla Apple Music'e yönlendirme.
-                                  if(window.Android)window.Android.showToast('Bu şarkı katalog bilgisidir. Bu kayıt için yetkili ses kaynağı henüz bağlı değil.');
+                                  // Katalog kaydını ses kaynağı sanma; olası sürümler arasından kullanıcı seçsin.
+                                  experimentalQuery=(appleName+' '+(item.title||'')).trim();
+                                  fromAlbum=true;appleMode=false;experimentalMode=true;
+                                  appleButton.style.background='transparent';experimentalButton.style.background='#36584d';
+                                  heading.textContent='Şarkı için YouTube sonuçları';
+                                  disclaimer.textContent='Doğru sürümü ve yükleyeni kontrol ederek seç.';
+                                  runSearch();
                                 }
                               });
                               list.appendChild(row);
@@ -388,7 +405,7 @@ class MainActivity : ComponentActivity() {
                               if(verifiedMode){
                                 setTimeout(function(){if(verifiedMode && id===currentId && list.textContent==='Aranıyor...'){list.textContent='Katalog yanıt vermedi. Aramayı yeniden dene.';}},16000);
                               }
-                              if(experimentalMode)window.Android.searchExperimentalSource(q,id);
+                              if(experimentalMode)window.Android.searchExperimentalSource(experimentalQuery||q,id);
                               else if(appleMode)window.Android.searchAppleCatalog(q,appleId,appleStage,id);
                               else if(verifiedMode)window.Android.searchVerifiedCatalog(q,selectedArtist,id);
                               else if(mode==='tracks')window.Android.searchMusic(q,id);
@@ -396,6 +413,7 @@ class MainActivity : ComponentActivity() {
                             },350);
                           }
                           input.addEventListener('input',function() {
+                            experimentalQuery='';fromAlbum=false;
                             runSearch();
                           });
                         }
