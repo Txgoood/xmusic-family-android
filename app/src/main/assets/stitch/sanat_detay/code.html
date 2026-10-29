@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="tr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#101417;color:#e0e3e7;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "surface-container-high": "#262a2e", "tertiary-fixed-dim": "#4cd7f6", "on-tertiary-container": "#005868", "error-container": "#93000a", "on-tertiary-fixed": "#001f26", "on-background": "#e0e3e7", "error": "#ffb4ab", "inverse-on-surface": "#2d3134", "surface-variant": "#313539", "on-tertiary": "#003640", "primary": "#4efd7d", "on-secondary": "#3c0091", "on-secondary-fixed": "#23005c", "background": "#101417", "secondary": "#d0bcff", "surface-container-low": "#181c1f", "outline-variant": "#3c4a3c", "on-primary-fixed-variant": "#00531f", "primary-container": "#20df64", "on-surface-variant": "#bbcbb8", "tertiary-fixed": "#acedff", "tertiary": "#9eeaff", "secondary-container": "#571bc1", "on-primary-fixed": "#002108", "on-secondary-container": "#c4abff", "surface-container-lowest": "#0b0f12", "surface-dim": "#101417", "inverse-surface": "#e0e3e7", "on-primary-container": "#005d24", "surface-container": "#1c2023", "primary-fixed-dim": "#29e368", "surface-tint": "#29e368", "secondary-fixed-dim": "#d0bcff", "secondary-fixed": "#e9ddff", "on-tertiary-fixed-variant": "#004e5c", "on-secondary-fixed-variant": "#5516be", "on-primary": "#003913", "surface": "#101417", "on-error-container": "#ffdad6", "on-surface": "#e0e3e7", "primary-fixed": "#68ff89", "surface-bright": "#363a3d", "tertiary-container": "#46d3f2", "inverse-primary": "#006e2c", "on-error": "#690005", "surface-container-highest": "#313539", "outline": "#859583" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-xl": "2rem", "margin": "1rem", "gutter": "1rem", "space-md": "1rem", "space-sm": "0.5rem", "gutter-tablet": "1.5rem", "margin-tablet": "2rem", "space-xs": "0.25rem", "space-lg": "1.5rem" }, fontFamily: { "body-md": ["Inter"], "body-lg": ["Inter"], "label-md": ["Plus Jakarta Sans"], "display-lg": ["Plus Jakarta Sans"], "label-lg": ["Plus Jakarta Sans"], "label-sm": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"], "body-sm": ["Inter"], "display-lg-mobile": ["Plus Jakarta Sans"], "headline-sm": ["Plus Jakarta Sans"], "headline-md": ["Plus Jakarta Sans"] }, fontSize: { "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "-0.005em", "fontWeight": "400" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "400" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600" }], "display-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "800" }], "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }], "label-sm": ["10px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "700" }], "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.015em", "fontWeight": "700" }], "body-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0em", "fontWeight": "400" }], "display-lg-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "800" }], "headline-sm": ["18px", { "lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "600" }], "headline-md": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "700" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface antialiased select-none"><header class="fixed top-0 inset-x-0 z-50 bg-surface/85 backdrop-blur-xl pt-safe"><div class="h-16 px-4 flex items-center justify-between"><div class="flex items-center gap-3 min-w-0"><button aria-label="Geri" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface hover:bg-surface-variant transition-colors" onclick="history.back()"><span class="material-symbols-outlined text-[24px]">arrow_back</span></button><div class="flex items-center gap-2 min-w-0"><img alt="XMusic Logo" class="h-6 w-auto object-contain flex-shrink-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBrWZDrxHoXNVVGg5RjDRQDvAty4HCp9Nyxy64CM28ffdlijheUpSUg7rqN3DPtP8KtNK3i1TZLw5k2vqjeVOLlPM52WxY90syNWwvQKhnxaIrZoPFX37bnxUp-DGWlIPQF-qbz81SaX-MvBpID9cocdu623jB6pMxwCYIxWeu7zAJL-OdrOllowwjWByRkzGL0UzHPnrHYKFryRFdn4_iKSti1I6ApYoxUxt_dyu2z"/><h1 class="font-headline-sm text-headline-sm text-on-surface truncate">Şimdi Çalıyor</h1></div></div><div class="flex items-center gap-2"><button aria-label="Paylaş" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">share</span></button><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOiuEy4HwUu4gnhfZ9gDLVzcIQ1XnA9nVIkjfn3Af0zxJmXmJoeIS-OLb9W4FXwc-kR9LbT2wn_1Hegl4n60-veWtKjmBPvEOTwVUyn3t1z6zBO_cRnUYUUJ0LS1dSe5IJvRMa7UOwIJyFQisJtoO8jOUxK1k_elyWamvyl5yOb9GSjFUyyFJydaggv-Cp3PEECn9qkuD6N0UpZUg-AqS2awKpmf3_jZm7wNJ3iaWY"/></div></div></header><main class="flex flex-col relative w-full pt-16 pb-safe bg-surface min-h-screen"><div class="flex flex-col w-full pb-32">
+<!-- Hero Section -->
+<div class="relative w-full h-80 overflow-hidden bg-surface-container-lowest">
+<div class="absolute inset-0 bg-cover bg-center w-full h-full transform scale-105" data-alt="Vintage psychedelic rock Turkish legend Baris Manco with iconic long hair, silver rings, mustache, and velvet stage attire, bathed in moody neon cyan and mint acoustic concert stage spotlights against an obsidian night ambiance." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCIepgT94Ct7N953N9xmxQpwbtNceJN3R_tNWLQTtel8Hxg1fwXNpgap90maB9LKKXBgovCZgQCr92wyK8ZnAozMtxHla2wjBaMDfiO3EK4qdhg0RE7T3v58KCbRiXbOwcy0JK4fJJK9FLKeN1WXhFrIh1EBP39MatmsgbIuhrv3ksrcEuBjw3Pmg2t3yFJ9pj_I37Apxd3_X2hq_P9vmJ2TZpedza1pnCm6zHIf47N')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-surface via-surface/60 to-transparent"></div>
+<div class="absolute inset-0 bg-gradient-to-b from-surface/40 via-transparent to-transparent"></div>
+<!-- Artist Quick Floating Control bar -->
+<div class="absolute top-4 right-4 flex items-center gap-2">
+<button aria-label="Sanatçı Bildirimleri" class="w-10 h-10 rounded-full bg-surface-container/60 backdrop-blur-md flex items-center justify-center text-on-surface hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+</button>
+<button aria-label="Sanatçı Seçenekleri" class="w-10 h-10 rounded-full bg-surface-container/60 backdrop-blur-md flex items-center justify-center text-on-surface hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+<!-- Artist Identity Overlay -->
+<div class="absolute bottom-4 left-4 right-4 flex flex-col gap-1">
+<div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-high/80 backdrop-blur-md w-fit">
+<span class="material-symbols-outlined text-primary text-[14px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-wider">Doğrulanmış Sanatçı</span>
+</div>
+<h1 class="font-display-lg-mobile text-display-lg-mobile text-on-surface font-extrabold tracking-tight drop-shadow-md">Barış Manço</h1>
+<p class="font-body-md text-body-md text-on-surface-variant flex items-center gap-2">
+<span>3.814.920 aylık dinleyici</span>
+<span class="w-1 h-1 rounded-full bg-outline"></span>
+<span class="text-primary font-medium">Türkiye #4</span>
+</p>
+</div>
+</div>
+<!-- Action Bar -->
+<div class="px-4 py-3 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<button class="px-5 py-2 rounded-full bg-surface-container-high hover:bg-surface-bright text-primary font-label-md text-label-md flex items-center gap-1.5 transition-all active:scale-95 shadow-sm" id="followBtn">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">check</span>
+<span>Takip Ediliyor</span>
+</button>
+<button aria-label="Radyo Başlat" class="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant hover:text-on-surface active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[20px]">sensors</span>
+</button>
+<button aria-label="İndirilenleri Yönet" class="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant hover:text-on-surface active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[20px]">download</span>
+</button>
+</div>
+<!-- Shuffle Play FAB -->
+<div class="flex items-center gap-3">
+<button aria-label="Karışık Çalma Modu" class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[24px]">shuffle</span>
+</button>
+<button aria-label="Oynat" class="w-14 h-14 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shadow-lg hover:brightness-110 active:scale-90 transition-all">
+<span class="material-symbols-outlined text-[32px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<!-- Section 1: Popular Tracks -->
+<section class="mt-4 px-4 flex flex-col gap-2">
+<div class="flex items-center justify-between mb-1">
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold">Popüler Şarkılar</h2>
+<button class="font-label-md text-label-md text-primary hover:underline">Tümünü Gör</button>
+</div>
+<!-- Track 1 (Active/Playing) -->
+<div class="flex items-center justify-between p-2 rounded-xl bg-surface-container-low hover:bg-surface-container transition-all">
+<div class="flex items-center gap-3 min-w-0">
+<div class="w-6 flex items-center justify-center flex-shrink-0">
+<!-- Animated Equalizer Bars -->
+<div class="flex items-end gap-0.5 h-4">
+<span class="w-0.5 h-4 bg-primary animate-pulse rounded-full"></span>
+<span class="w-0.5 h-2 bg-primary rounded-full"></span>
+<span class="w-0.5 h-3 bg-primary animate-pulse rounded-full"></span>
+</div>
+</div>
+<div class="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 relative">
+<img class="w-full h-full object-cover" data-alt="Album cover artwork for Baris Manco classic album Sozum Meclisten Disari with dark mystical 80s typography and electric cosmic neon motifs." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCkvxrUs_nfrPZOk9A4H_qik9AlKTpBC6oZ9_TNriSBNzsNMMcbEz3vBBy98cByXpnjaQTUzn--EZ5bYLy0y_uOn3d7GIpp5HPFq0QDJ8ibS0sdMlffrmKry1H7FeLKIu84uC3pZVvLrMaQvyc4Qm9QlO-kN-xUYiGbyeFk3ZgiKaGC838PHMmx5ybyNeHQ8bWeg2nYPLeXo9sxm3DUnX5d3jsgAEcHC0HJv48ALZlX"/>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-label-lg text-label-lg text-primary truncate font-bold">Dönence</span>
+<span class="px-1.5 py-0.2 rounded bg-tertiary-container/30 text-tertiary text-[10px] font-label-sm font-bold uppercase tracking-wider">FLAC</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">Sözüm Meclisten Dışarı • 18.2M</span>
+</div>
+</div>
+<div class="flex items-center gap-2 flex-shrink-0">
+<span class="material-symbols-outlined text-primary text-[18px]" style="font-variation-settings: 'FILL' 1;">download_done</span>
+<span class="font-label-sm text-label-sm text-primary font-semibold">4:21</span>
+<button aria-label="Şarkı Seçenekleri" class="text-on-surface-variant hover:text-on-surface p-1">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Track 2 -->
+<div class="flex items-center justify-between p-2 rounded-xl hover:bg-surface-container-low transition-all">
+<div class="flex items-center gap-3 min-w-0">
+<span class="w-6 text-center font-label-md text-label-md text-on-surface-variant flex-shrink-0">2</span>
+<div class="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Album artwork of Baris Manco Hal Hal record, moody nostalgic Turkish psych pop visual aesthetic with dark midnight teal tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCpI-h7FVuloTSaSN4ZmYQLzwKOpEEJQEfWA2tAVsjY9SHON_TvcnSnxVxVLhUtJ2ffUfeEArx7A9InXjLrsxnEr8D2o5yu6coQtWOuXWV3nRSqYTf7M9NgoYtbk1EiKEgQ76wXgGtkeeFCjwa9_1szJ9d8hQkqw3rI1kMvY8lohKvQmRmce-HXft-YSTmPcIoZube3QJtmp6MjdJM0jMmEImllfFismKhtDBCY8xPz"/>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg text-on-surface truncate">Gülpembe</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">Sözüm Meclisten Dışarı • 24.5M</span>
+</div>
+</div>
+<div class="flex items-center gap-2 flex-shrink-0">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]" style="font-variation-settings: 'FILL' 1;">download_done</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">4:46</span>
+<button aria-label="Şarkı Seçenekleri" class="text-on-surface-variant hover:text-on-surface p-1">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Track 3 -->
+<div class="flex items-center justify-between p-2 rounded-xl hover:bg-surface-container-low transition-all">
+<div class="flex items-center gap-3 min-w-0">
+<span class="w-6 text-center font-label-md text-label-md text-on-surface-variant flex-shrink-0">3</span>
+<div class="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Baris Manco 24 Ayar vinyl record artwork with gold foil details against an onyx dark backdrop, retro minimalist acoustic design." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCl_jWzMQ7F3qMqVPxrqFNVI2ggL9M2RATABFkizbk9tDu_zxEz2CUFcSePIFMPpwnbyC4mv8FSbuxWRMPT7eJ4algoctrIflWfzneGaC_zjYj_uqmUaZpxhuUQio8MVtzEI3SEWXsKnBy9ItufKimfpyV4i8fFR7-LC37ei5GWHkkaxMqtjpjaMJ-MSwkwzT18r6lv1oJiMyshPc9ANDkzTccbGpinsBqI9K6gUOir"/>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg text-on-surface truncate">Arkadaşım Eşek</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">Sözüm Meclisten Dışarı • 15.1M</span>
+</div>
+</div>
+<div class="flex items-center gap-2 flex-shrink-0">
+<span class="font-label-sm text-label-sm text-on-surface-variant">3:18</span>
+<button aria-label="Şarkı Seçenekleri" class="text-on-surface-variant hover:text-on-surface p-1">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Track 4 -->
+<div class="flex items-center justify-between p-2 rounded-xl hover:bg-surface-container-low transition-all">
+<div class="flex items-center gap-3 min-w-0">
+<span class="w-6 text-center font-label-md text-label-md text-on-surface-variant flex-shrink-0">4</span>
+<div class="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Album cover for Baris Manco Mancoloji double retrospective compilation album with glowing green typography and dark background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBE3o4smRJvut8AU_Q09oBCOuDjdojfGTNAuZQ8iqDV4Yw-qsMmys-LgMfpD-Jmhl3x5b-A7Ws6lQ5s2XmGqy2lLB0vUB_22JeYD5fyiEgRjr9238HLT813IN7pqNmAvxhiPuuEV5_bMNdi10rWE3S0aggmmHWnSFHKIa9SBtlsXWA1OVCLk7AijQP9LcJNcnWP-pgyBFr4jGKc80oSQXbecjV2Vc8k0KaG3yky8nJR"/>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-label-lg text-label-lg text-on-surface truncate">Kara Sevda</span>
+<span class="px-1.5 py-0.2 rounded bg-tertiary-container/30 text-tertiary text-[10px] font-label-sm font-bold uppercase tracking-wider">FLAC</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">Darısı Başınıza • 14.8M</span>
+</div>
+</div>
+<div class="flex items-center gap-2 flex-shrink-0">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]" style="font-variation-settings: 'FILL' 1;">download_done</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">4:14</span>
+<button aria-label="Şarkı Seçenekleri" class="text-on-surface-variant hover:text-on-surface p-1">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Track 5 -->
+<div class="flex items-center justify-between p-2 rounded-xl hover:bg-surface-container-low transition-all">
+<div class="flex items-center gap-3 min-w-0">
+<span class="w-6 text-center font-label-md text-label-md text-on-surface-variant flex-shrink-0">5</span>
+<div class="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Atmospheric vintage album art for Dunden Bugune by Baris Manco featuring Anatolian rock instruments, mystic dusk color palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8TDtHL8YZwplt3ve8AWJ7kL0XNlSBiLKbnXdeHQ5FPDxu5kQnjvt298QyLedf0JrEw87GAxysIhOWobU-uY9pvAbkqYKOibXouw0IYTYI15Pn4Id1PBukuQXkaf77qESh_Wivs3J4lOVAdagZCKOpMliUYopTsLuTyRkul-GwCcmAprpIphTvLl3g9XPgC5Fe7vyKNogloZ0G3IdbdGWmSlbL98CIxkz5m_N7vxp_"/>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg text-on-surface truncate">Dağlar Dağlar</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">Dünden Bugüne • 12.3M</span>
+</div>
+</div>
+<div class="flex items-center gap-2 flex-shrink-0">
+<span class="font-label-sm text-label-sm text-on-surface-variant">3:22</span>
+<button aria-label="Şarkı Seçenekleri" class="text-on-surface-variant hover:text-on-surface p-1">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Section 2: Discography / Albums -->
+<section class="mt-6 flex flex-col gap-3">
+<div class="px-4 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold">Diskografi</h2>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm">Albümler</span>
+</div>
+<button class="font-label-md text-label-md text-primary hover:underline">Tümü</button>
+</div>
+<!-- Horizontal Albums Carousel -->
+<div class="flex gap-4 overflow-x-auto px-4 pb-2 scrollbar-none snap-x">
+<!-- Album 1 -->
+<div class="flex-shrink-0 w-36 snap-start flex flex-col gap-2 group cursor-pointer">
+<div class="relative w-36 h-36 rounded-2xl overflow-hidden bg-surface-container shadow-md group-hover:shadow-primary/10 transition-shadow">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Cover artwork for Mancoloji 1999 compilation double album by Baris Manco with futuristic neon green aesthetic on deep obsidian glass background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA7vN5erMxcozsJZ5eujtntQKkK1s2tjgphkAEIofCuAGWS7EYwJO8vtvrx5G1tEf7qWFk-Kfi6BPMjo5RkltNdVrWeXTkrBfmcr8L7j_SJWFxZKHfpfKugomgujArLutD8GwKKFIkLU1lzcgMdOlXxnOQiQdgZF6RdkHle9XL7WSNZZ6aLTSRquawIEjELh1lZwiDRlMpGcvQKDJ5f12v-Bg0dvMavnHWGLKbNnwTJ"/>
+<div class="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface truncate group-hover:text-primary transition-colors">Mançoloji</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">1999 • Albüm</span>
+</div>
+</div>
+<!-- Album 2 -->
+<div class="flex-shrink-0 w-36 snap-start flex flex-col gap-2 group cursor-pointer">
+<div class="relative w-36 h-36 rounded-2xl overflow-hidden bg-surface-container shadow-md group-hover:shadow-primary/10 transition-shadow">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Vinyl album cover for Sozum Meclisten Disari 1981 by Baris Manco with iconic psychedelic Anatolian art deco style in moody nighttime atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBXye6S5-0HFGA5q9fNPI1m3Ny2Roynwp1fNfLZCUNw9TLd7OS5t8bVYb23uHXgvUJXzxW8p2Yo4gZtxvfbrQUumMEMqw_k6eG_sgmE0eq8LgN8htRzEbg3kd9CSBnutS7ctt0mquvyOatvLAZDe6ka6JGJbBR7_649QRedLFllQe1pOi09FD-fva62R44U7-eUd6XSHMsKZ4UbKEWyLkn0O-dUmz_4MeXDVMF6gniB"/>
+<div class="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface truncate group-hover:text-primary transition-colors">Sözüm Meclisten Dışarı</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">1981 • Albüm</span>
+</div>
+</div>
+<!-- Album 3 -->
+<div class="flex-shrink-0 w-36 snap-start flex flex-col gap-2 group cursor-pointer">
+<div class="relative w-36 h-36 rounded-2xl overflow-hidden bg-surface-container shadow-md group-hover:shadow-primary/10 transition-shadow">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Artistic cover art for Hal Hal 1989 studio release by Baris Manco with traditional Turkish silver jewelry and synthesizer motifs against dark background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB36nqADy_lPZ7iVvwaQou0AYYi7uRpon1Khv5rldW2NIKalp8rlw5kfTIH9f8nKDcv0fdiXhleGqA6qyUj529yQ6AdK9VXemSLd0MEr03FMYdvJuhDg4CUSELy_EC4kZ52f6PzwKMxT9-uik8WrenvXDiXjxEeSWImAf8Ri0kL4pAJePzK1u2wwQ9okr40ZVlcDzGxZAYBpLvo3qeZGQrTg1ODbSAMHk2a0UXUuPdK"/>
+<div class="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface truncate group-hover:text-primary transition-colors">Hal Hal</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">1989 • Albüm</span>
+</div>
+</div>
+<!-- Album 4 -->
+<div class="flex-shrink-0 w-36 snap-start flex flex-col gap-2 group cursor-pointer">
+<div class="relative w-36 h-36 rounded-2xl overflow-hidden bg-surface-container shadow-md group-hover:shadow-primary/10 transition-shadow">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Cover artwork for Baris Manco 24 Ayar studio album featuring gold metallic record textures and ambient retro lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDZjEf7-y8V8G9u7drKZggvPuX_HigkjEBJa0oNZlUEOYt39dcSK0dMAtAoYBpYw6of-9Oe4-VDkDTzJUSUtYp0u1rnYmvcLyvULEgNbYeBXrFl1mvo_0QAdqx_X_h6RFtYkys5KcXVT5H7isrhMn0KhbuY3wmNw1YQr_LtqrMk-VBpNOoV2DpEQqXhb_8PXNMBS8s1AwNqSJECyAJ6CmtcwoiD1ULMtWaly6JBQ_pS"/>
+<div class="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface truncate group-hover:text-primary transition-colors">24 Ayar</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">1986 • Albüm</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 3: Singles & EPs -->
+<section class="mt-6 px-4 flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold">Single ve EP'ler</h2>
+<button class="font-label-md text-label-md text-primary hover:underline">Tümünü Gör</button>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<!-- Single Card 1 -->
+<div class="p-3 rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all flex flex-col gap-2.5">
+<div class="relative aspect-square w-full rounded-xl overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Cover art for iconic single Kol Dugmeleri by Baris Manco with antique silver cuff links laid on black velvet fabric with subtle mint green backlighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCehIF3AiPUJHFmq3VA5tYkZc23r6ley9GO286g_Ie6zE2ELO26MM9ru1MS6UhyZ6Cs_ZqKZ_MKJYbW0cSdK2YiWQYsz9wmHWgCh_wPr56gqMR64fCjHd4XMvhvbFoxaK_ezFgau2Gt8Bq6xrtBumcPqBWZ4grk_t22hu8B7my7Sn4VRvCIGiHoqEpkPeEDnkjAfbuZOvINQSdwI16NjF5sTd6zE1U3-CEWw4yPcUP3"/>
+<div class="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-surface-container-lowest/80 backdrop-blur-md">
+<span class="font-label-sm text-label-sm text-primary">EP</span>
+</div>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface truncate font-semibold">Kol Düğmeleri</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">1968 • 4 Şarkı</span>
+</div>
+</div>
+<!-- Single Card 2 -->
+<div class="p-3 rounded-2xl bg-surface-container-low hover:bg-surface-container transition-all flex flex-col gap-2.5">
+<div class="relative aspect-square w-full rounded-xl overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Cover artwork for Baris Manco single Sari Cizmeli Mehmet Aga with colorful psychedelic pop typography against an obsidian dark soundstage setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBohfdyqDod4vXeaVxBg61XBKRsvTTjeR0ihIcuXyOoVkQhMnYhenfIWUozS4JS-Lp-quEL6TJp0UD0sWzxd15VgMIZz0iwWE9rvzvnHnqGNQHwIl4hdzpO9yDlDuOnP2WkFCMVZuqmcvLxsf40wJUjEQMcubhFNNAOpysdd-j_KX_waRFcaM5CcuTfvPnxh47bQcXYFFg5SCQ3bAlEe7A4JPoxMHsjeR7ggtkI-1WO"/>
+<div class="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-surface-container-lowest/80 backdrop-blur-md">
+<span class="font-label-sm text-label-sm text-tertiary">Single</span>
+</div>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface truncate font-semibold">Sarı Çizmeli Mehmet Ağa</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">1979 • 1 Şarkı</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 4: Similar Artists -->
+<section class="mt-6 flex flex-col gap-3">
+<div class="px-4 flex items-center justify-between">
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold">Benzer Sanatçılar</h2>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Anadolu Rock Ekolü</span>
+</div>
+<div class="flex gap-4 overflow-x-auto px-4 pb-2 scrollbar-none snap-x">
+<!-- Artist 1: Cem Karaca -->
+<div class="flex-shrink-0 w-28 snap-start flex flex-col items-center text-center gap-2">
+<div class="relative w-24 h-24 rounded-full overflow-hidden p-0.5 bg-surface-container-high">
+<img class="w-full h-full rounded-full object-cover" data-alt="Close up dramatic portrait of legendary Turkish rock pioneer Cem Karaca with classic spectacles, fedora hat and thick beard in cool cyan ambient spotlight." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAKDqMFcD-ELWdHsQDoE6ovpDXTVoScOIVCp5BZj11B8Jlwlcqcn9QRD95LTPHM_5Fr-VZzcJePl5mlK3-wLiecisMdEmz5f7B7qf08CDHbMJ54FKHH9kDQM8witquIDc13klgY_Nhmg-zFsrN_ujcxzZlsShYSiSZ_29_hPZ-E_KEkJyJGniGVbNHjK8Ic3RtHiEdJl0y5V2D5FDmyrdHZk0t0eT_MGkneTI8XTX6u"/>
+</div>
+<div class="flex flex-col w-full">
+<span class="font-label-md text-label-md text-on-surface truncate">Cem Karaca</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">2.9M Dinleyici</span>
+</div>
+<button class="w-full py-1.5 rounded-full bg-surface-container hover:bg-surface-bright text-on-surface text-label-sm font-label-sm active:scale-95 transition-all">Takip Et</button>
+</div>
+<!-- Artist 2: Erkin Koray -->
+<div class="flex-shrink-0 w-28 snap-start flex flex-col items-center text-center gap-2">
+<div class="relative w-24 h-24 rounded-full overflow-hidden p-0.5 bg-surface-container-high">
+<img class="w-full h-full rounded-full object-cover" data-alt="Portrait of Anatolian rock guitarist Erkin Koray holding a vintage electric guitar on dark background with moody neon mint rim light." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSHY_Kys6Fv16U40IMeCzMq899R23YsVO8TKO0iP8HPtq0o1BZuTb3bIYskiQWkELtBwFO2ouxQsXSrjyRypIKElW6IOkHk7498RhpqWtz3oesnWxqd4mNAQqH4yYdS1pO_WCc-l4O3MEZ0nTuI2HdukBvj3dSTlJ10i1AzhQm35WpFDiIYaInddwdwyney3tuxM37Vnmo-yCZrGQEx0WJLtA_PLBSc69TC0rfLyms"/>
+</div>
+<div class="flex flex-col w-full">
+<span class="font-label-md text-label-md text-on-surface truncate">Erkin Koray</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">2.1M Dinleyici</span>
+</div>
+<button class="w-full py-1.5 rounded-full bg-surface-container hover:bg-surface-bright text-on-surface text-label-sm font-label-sm active:scale-95 transition-all">Takip Et</button>
+</div>
+<!-- Artist 3: Moğollar -->
+<div class="flex-shrink-0 w-28 snap-start flex flex-col items-center text-center gap-2">
+<div class="relative w-24 h-24 rounded-full overflow-hidden p-0.5 bg-surface-container-high">
+<img class="w-full h-full rounded-full object-cover" data-alt="Turkish progressive rock pioneer band Mogollar stage photo with acoustic instruments in dark atmospheric studio session." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDqyaIP5wH4JLFYMK5uhJ0Dl0Lqr9CrokIBKN4PLr5200AQLy8JrvX3uGRZ7Y511lHvlK9rDR-DtY_LGR5fRY_V3aFIfx8vWKNEmjQBtlmnod3vmL_wePIs141BmRQwdoUkKhgPcGjrH7VF6XQwD2oIe2lugI9sMMzKqd1kly82eEOzibWNvhwpEnHPbYhFwyRHCTSj0zHiK4gzaJq23CKnYwEJNQWDCeGLCMHSJds3"/>
+</div>
+<div class="flex flex-col w-full">
+<span class="font-label-md text-label-md text-on-surface truncate">Moğollar</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">890K Dinleyici</span>
+</div>
+<button class="w-full py-1.5 rounded-full bg-surface-container hover:bg-surface-bright text-on-surface text-label-sm font-label-sm active:scale-95 transition-all">Takip Et</button>
+</div>
+<!-- Artist 4: Fikret Kızılok -->
+<div class="flex-shrink-0 w-28 snap-start flex flex-col items-center text-center gap-2">
+<div class="relative w-24 h-24 rounded-full overflow-hidden p-0.5 bg-surface-container-high">
+<img class="w-full h-full rounded-full object-cover" data-alt="Moody poetic black and white inspired portrait of Turkish acoustic singer-songwriter Fikret Kizilok with guitar in dim spotlight." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBLxDMFzIeoNDb0jNdmI687IUzHZy7791Uz8qtC1svQhOnRUF5f9rcWsC6C276eiLN-w3Fjj062nWIDvu1MV293uiaq2RVX8-AOn9f9PmUiwBmFAgzRNcsIVWd92-Vx2PzFZFVB6bedkS2FR6zaz1dOc83HFMsbPsdcIiuu0NnOdo5nHRkbBz1v-iCTieUqFezoDoePegPwqoAgkhcP821oyJCjPwoMf9Bm_oASntp1"/>
+</div>
+<div class="flex flex-col w-full">
+<span class="font-label-md text-label-md text-on-surface truncate">Fikret Kızılok</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">1.4M Dinleyici</span>
+</div>
+<button class="w-full py-1.5 rounded-full bg-surface-container hover:bg-surface-bright text-on-surface text-label-sm font-label-sm active:scale-95 transition-all">Takip Et</button>
+</div>
+</div>
+</section>
+<!-- Section 5: About Artist Preview Card -->
+<section class="mt-6 px-4">
+<div class="relative w-full rounded-3xl overflow-hidden bg-surface-container-low p-5 flex flex-col gap-3 shadow-md">
+<div class="absolute inset-0 bg-cover bg-center opacity-25" data-alt="Baris Manco performing live on stage surrounded by Kurtalan Ekspres band with vintage synthesizers, rich stage atmosphere, deep dark colors and emerald neon aura." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCwpD94b8wObcD6ny2skkEMaM4yj3-DSWvzjb-b7BvZdAlVTHpkgGMKp7KdoezdV4zQHdpghvQRaIIqx7ozJHojpqIZabHTXQFyxlI3Xq0FdCrs988-op4IBIRKPU3mwfbdBVU5QObgEMx-iFfE1YGmBNRO0pW2EiLrowrshN_qM1YAYv_d_-aocAvio1-2gECg0cMTcArBZvQ7UHZPioSxUvUJiOVS9DzBnWHGlKB5')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-low via-surface-container-low/80 to-transparent"></div>
+<div class="relative z-10 flex items-center justify-between">
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold">Sanatçı Hakkında</h2>
+<span class="px-2.5 py-0.5 rounded-full bg-primary/20 text-primary font-label-sm text-label-sm font-bold">Kültür Elçisi</span>
+</div>
+<p class="relative z-10 font-body-md text-body-md text-on-surface-variant line-clamp-3 leading-relaxed">
+        Mehmet Barış Manço (1943 - 1999), Türk besteci, şarkıcı, söz yazarı, televizyon programı yapımcısı ve kültür elçisi. Anadolu Rock türünün öncülerinden biri olarak Türk müzik tarihine 200'ün üzerinde beste ve sayısız altın plak armağan etmiştir.
+      </p>
+<div class="relative z-10 flex items-center justify-between pt-2">
+<div class="flex items-center gap-4">
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-primary font-extrabold">#1</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Rock Klasikleri</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-on-surface font-extrabold">85+</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Ödül &amp; Nişan</span>
+</div>
+</div>
+<button class="px-4 py-2 rounded-full bg-surface-container-high text-on-surface hover:text-primary font-label-md text-label-md flex items-center gap-1 active:scale-95 transition-all">
+<span>Daha Fazla</span>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Persistent Floating Mini-Player -->
+<div class="fixed bottom-4 left-3 right-3 z-40 bg-surface-container-high/90 backdrop-blur-xl rounded-2xl p-2 shadow-2xl flex flex-col overflow-hidden">
+<div class="flex items-center justify-between px-1">
+<div class="flex items-center gap-3 min-w-0">
+<div class="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 relative shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Active track artwork of Sozum Meclisten Disari for mini player with cosmic turquoise accents." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA4ROr3gBVbKX_cMUoSJgco-YxukMDA2nXGZIaXcUD8D8LAuDMox6H7Gx8I9a1CLSIlQ2g0o5D_tlshEU9UisIJ-P-WAMwy-fNiLtq4d33VRAxq0cYNbqtMQvpGQnahxajbQqkU6GpnK_XBYRZ2hxMZUWqazZFwSW-zI8M5USCxcB2zpvEzGEtKiAlZo5FNGzbKJBluvAnUdNleTMrgOH1tYURnb2pfVPDz0eZLC_TC"/>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-2">
+<span class="font-label-lg text-label-lg text-on-surface truncate font-semibold">Dönence</span>
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-ping"></span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">Barış Manço</span>
+</div>
+</div>
+<div class="flex items-center gap-2 flex-shrink-0">
+<button aria-label="Favorilere Ekle" class="w-9 h-9 flex items-center justify-center text-primary transition-transform active:scale-125" id="likeBtn">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">favorite</span>
+</button>
+<button aria-label="Cihaza Bağlan" class="w-9 h-9 flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[20px]">speaker_group</span>
+</button>
+<button aria-label="Duraklat veya Çal" class="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shadow-md active:scale-90 transition-all" id="playPauseBtn">
+<span class="material-symbols-outlined text-[24px]" id="playIcon" style="font-variation-settings: 'FILL' 1;">pause</span>
+</button>
+</div>
+</div>
+<!-- Pinned Micro Progress Bar -->
+<div class="w-full bg-surface-variant h-1 mt-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full transition-all duration-300" style="width: 48%;"></div>
+</div>
+</div>
+</div>
+<script>
+  // Follow/Unfollow toggle
+  const followBtn = document.getElementById('followBtn');
+  if (followBtn) {
+    let following = true;
+    followBtn.addEventListener('click', () => {
+      following = !following;
+      if (following) {
+        followBtn.className = 'px-5 py-2 rounded-full bg-surface-container-high hover:bg-surface-bright text-primary font-label-md text-label-md flex items-center gap-1.5 transition-all active:scale-95 shadow-sm';
+        followBtn.innerHTML = '<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: \'FILL\' 1;">check</span><span>Takip Ediliyor</span>';
+      } else {
+        followBtn.className = 'px-5 py-2 rounded-full bg-primary-container text-on-primary-container font-label-md text-label-md flex items-center gap-1.5 transition-all active:scale-95 shadow-md';
+        followBtn.innerHTML = '<span class="material-symbols-outlined text-[18px]">add</span><span>Takip Et</span>';
+      }
+    });
+  }
+
+  // Mini player play/pause toggle
+  const playPauseBtn = document.getElementById('playPauseBtn');
+  const playIcon = document.getElementById('playIcon');
+  if (playPauseBtn && playIcon) {
+    let isPlaying = true;
+    playPauseBtn.addEventListener('click', () => {
+      isPlaying = !isPlaying;
+      playIcon.textContent = isPlaying ? 'pause' : 'play_arrow';
+    });
+  }
+
+  // Favorite toggle
+  const likeBtn = document.getElementById('likeBtn');
+  if (likeBtn) {
+    let isLiked = true;
+    likeBtn.addEventListener('click', () => {
+      isLiked = !isLiked;
+      const icon = likeBtn.querySelector('.material-symbols-outlined');
+      if (isLiked) {
+        likeBtn.classList.add('text-primary');
+        likeBtn.classList.remove('text-on-surface-variant');
+        icon.style.fontVariationSettings = "'FILL' 1";
+      } else {
+        likeBtn.classList.remove('text-primary');
+        likeBtn.classList.add('text-on-surface-variant');
+        icon.style.fontVariationSettings = "'FILL' 0";
+      }
+    });
+  }
+</script></main></body></html>

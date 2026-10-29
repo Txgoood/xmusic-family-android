@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="tr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#101417;color:#e0e3e7;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "surface-container-high": "#262a2e", "tertiary-fixed-dim": "#4cd7f6", "on-tertiary-container": "#005868", "error-container": "#93000a", "on-tertiary-fixed": "#001f26", "on-background": "#e0e3e7", "error": "#ffb4ab", "inverse-on-surface": "#2d3134", "surface-variant": "#313539", "on-tertiary": "#003640", "primary": "#4efd7d", "on-secondary": "#3c0091", "on-secondary-fixed": "#23005c", "background": "#101417", "secondary": "#d0bcff", "surface-container-low": "#181c1f", "outline-variant": "#3c4a3c", "on-primary-fixed-variant": "#00531f", "primary-container": "#20df64", "on-surface-variant": "#bbcbb8", "tertiary-fixed": "#acedff", "tertiary": "#9eeaff", "secondary-container": "#571bc1", "on-primary-fixed": "#002108", "on-secondary-container": "#c4abff", "surface-container-lowest": "#0b0f12", "surface-dim": "#101417", "inverse-surface": "#e0e3e7", "on-primary-container": "#005d24", "surface-container": "#1c2023", "primary-fixed-dim": "#29e368", "surface-tint": "#29e368", "secondary-fixed-dim": "#d0bcff", "secondary-fixed": "#e9ddff", "on-tertiary-fixed-variant": "#004e5c", "on-secondary-fixed-variant": "#5516be", "on-primary": "#003913", "surface": "#101417", "on-error-container": "#ffdad6", "on-surface": "#e0e3e7", "primary-fixed": "#68ff89", "surface-bright": "#363a3d", "tertiary-container": "#46d3f2", "inverse-primary": "#006e2c", "on-error": "#690005", "surface-container-highest": "#313539", "outline": "#859583" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-xl": "2rem", "margin": "1rem", "gutter": "1rem", "space-md": "1rem", "space-sm": "0.5rem", "gutter-tablet": "1.5rem", "margin-tablet": "2rem", "space-xs": "0.25rem", "space-lg": "1.5rem" }, fontFamily: { "body-md": ["Inter"], "body-lg": ["Inter"], "label-md": ["Plus Jakarta Sans"], "display-lg": ["Plus Jakarta Sans"], "label-lg": ["Plus Jakarta Sans"], "label-sm": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"], "body-sm": ["Inter"], "display-lg-mobile": ["Plus Jakarta Sans"], "headline-sm": ["Plus Jakarta Sans"], "headline-md": ["Plus Jakarta Sans"] }, fontSize: { "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "-0.005em", "fontWeight": "400" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "400" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600" }], "display-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "800" }], "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }], "label-sm": ["10px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "700" }], "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.015em", "fontWeight": "700" }], "body-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0em", "fontWeight": "400" }], "display-lg-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "800" }], "headline-sm": ["18px", { "lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "600" }], "headline-md": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "700" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface antialiased select-none"><header class="fixed top-0 inset-x-0 z-50 bg-surface/85 backdrop-blur-xl pt-safe"><div class="h-16 px-4 flex items-center justify-between"><div class="flex items-center gap-3 min-w-0"><button aria-label="Geri" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface hover:bg-surface-variant transition-colors" onclick="history.back()"><span class="material-symbols-outlined text-[24px]">arrow_back</span></button><div class="flex items-center gap-2 min-w-0"><img alt="XMusic Logo" class="h-6 w-auto object-contain flex-shrink-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBrWZDrxHoXNVVGg5RjDRQDvAty4HCp9Nyxy64CM28ffdlijheUpSUg7rqN3DPtP8KtNK3i1TZLw5k2vqjeVOLlPM52WxY90syNWwvQKhnxaIrZoPFX37bnxUp-DGWlIPQF-qbz81SaX-MvBpID9cocdu623jB6pMxwCYIxWeu7zAJL-OdrOllowwjWByRkzGL0UzHPnrHYKFryRFdn4_iKSti1I6ApYoxUxt_dyu2z"/><h1 class="font-headline-sm text-headline-sm text-on-surface truncate">Şimdi Çalıyor</h1></div></div><div class="flex items-center gap-2"><button aria-label="Paylaş" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">share</span></button><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOiuEy4HwUu4gnhfZ9gDLVzcIQ1XnA9nVIkjfn3Af0zxJmXmJoeIS-OLb9W4FXwc-kR9LbT2wn_1Hegl4n60-veWtKjmBPvEOTwVUyn3t1z6zBO_cRnUYUUJ0LS1dSe5IJvRMa7UOwIJyFQisJtoO8jOUxK1k_elyWamvyl5yOb9GSjFUyyFJydaggv-Cp3PEECn9qkuD6N0UpZUg-AqS2awKpmf3_jZm7wNJ3iaWY"/></div></div></header><main class="flex flex-col relative w-full pt-16 pb-safe bg-surface min-h-screen"><div class="flex flex-col w-full px-4 pb-12 pt-2">
+<!-- Progress Header & Brand Aura -->
+<div class="flex flex-col items-center text-center mb-6 relative">
+<div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3 shadow-lg shadow-primary/5">
+<div class="flex items-center gap-1">
+<span class="w-1 h-5 bg-primary rounded-full animate-pulse"></span>
+<span class="w-1 h-8 bg-primary rounded-full animate-pulse delay-75"></span>
+<span class="w-1 h-10 bg-primary-container rounded-full animate-pulse delay-150"></span>
+<span class="w-1 h-6 bg-primary rounded-full animate-pulse delay-100"></span>
+<span class="w-1 h-4 bg-primary/70 rounded-full animate-pulse"></span>
+</div>
+</div>
+<!-- Step Badge -->
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container-high text-primary mb-2 shadow-sm">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="font-label-md text-label-md text-primary">Adım 2 / 3 • Aile Profillerini Oluştur</span>
+</div>
+<!-- Step Progress Bar -->
+<div class="w-48 h-1.5 bg-surface-container rounded-full overflow-hidden mt-1 mb-4">
+<div class="w-2/3 h-full bg-primary rounded-full"></div>
+</div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface tracking-tight mb-2">
+      XMusic Ailesine Hoş Geldiniz! 👨‍👩‍👧‍👦
+    </h2>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-sm">
+      Aboneliksiz, tamamen ailenize özel yüksek kaliteli müzik ve podcast deneyimi.
+    </p>
+</div>
+<!-- Primary Card: Profile Creation -->
+<div class="w-full bg-surface-container-low rounded-xl p-5 mb-5 shadow-xl flex flex-col gap-5">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[22px]" style="font-variation-settings: 'FILL' 1;">account_circle</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">İlk Profil Kurulumu</span>
+</div>
+<span class="font-label-sm text-label-sm bg-primary-container/20 text-primary px-2.5 py-0.5 rounded-full">Yönetici</span>
+</div>
+<!-- Profile Name Input -->
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface-variant" for="profile-name">Profil Adı</label>
+<div class="flex items-center bg-surface-container-highest rounded-xl px-3.5 py-2.5 focus-within:ring-2 focus-within:ring-primary transition-all">
+<span class="material-symbols-outlined text-on-surface-variant mr-2.5 text-[20px]">badge</span>
+<input class="w-full bg-transparent text-on-surface font-body-md text-body-md focus:outline-none placeholder:text-outline" id="profile-name" placeholder="Örn: Baba veya Kendi Adınız" type="text" value="Selim (Baba)"/>
+</div>
+</div>
+<!-- Role Selector -->
+<div class="flex flex-col gap-2">
+<span class="font-label-md text-label-md text-on-surface-variant">Hesap Rolü &amp; Koruması</span>
+<div class="grid grid-cols-2 gap-3" id="role-selector">
+<button class="flex flex-col items-start p-3 rounded-xl bg-surface-container-high transition-all text-left group" id="role-adult" onclick="setRole('adult')" type="button">
+<div class="flex items-center justify-between w-full mb-2">
+<span class="material-symbols-outlined text-primary text-[24px]">verified_user</span>
+<span class="w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary text-[12px] font-bold">check</span>
+</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface">Yetişkin</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Tam Erişim &amp; Yönetici</span>
+</button>
+<button class="flex flex-col items-start p-3 rounded-xl bg-surface-container transition-all text-left opacity-70 group" id="role-kids" onclick="setRole('kids')" type="button">
+<div class="flex items-center justify-between w-full mb-2">
+<span class="material-symbols-outlined text-secondary text-[24px]">child_care</span>
+<span class="w-4 h-4 rounded-full bg-surface-variant flex items-center justify-center"></span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface">Çocuk</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Kids Safe Modu</span>
+</button>
+</div>
+</div>
+<!-- Avatar Picker -->
+<div class="flex flex-col gap-2.5">
+<div class="flex justify-between items-center">
+<span class="font-label-md text-label-md text-on-surface-variant">Avatar Seçin (6 Hazır Karakter)</span>
+<span class="font-label-sm text-label-sm text-primary">Seçildi</span>
+</div>
+<div class="grid grid-cols-6 gap-2" id="avatar-grid">
+<!-- Avatar 1 (Selected) -->
+<button class="avatar-btn relative aspect-square rounded-full p-0.5 bg-primary transition-transform scale-105" onclick="selectAvatar(0)" type="button">
+<img class="w-full h-full rounded-full object-cover" data-alt="Stylized 3D modern digital character avatar of an approachable father wearing sleek emerald green studio headphones on a dark moody violet backdrop" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBBgS2mb9yZCwU1JsC4i0qgmA0yLQsXKyVajAgvsDZd1TU5EI7nvTAdmpej091fazNWDEksnYS5TfYdkgPe9I7T4Aw60ORZSVgEaehDaAmDGo-1LEjvStskDTOUnL_cRsmKlyjGe_fa_3cDABP3iFq0u604fNLpNa5zTsv3Z6Yg7qIDn6bUdpt72WHOg8J4HhhgEnfW9NJDQyPhKkjac2Npe7Go3Sj1y3WXuiw_TUI6"/>
+<span class="absolute bottom-0 right-0 bg-primary text-on-primary rounded-full p-0.5 flex items-center justify-center">
+<span class="material-symbols-outlined text-[10px]">check</span>
+</span>
+</button>
+<!-- Avatar 2 -->
+<button class="avatar-btn aspect-square rounded-full p-0.5 bg-transparent opacity-60 hover:opacity-100 transition-transform" onclick="selectAvatar(1)" type="button">
+<img class="w-full h-full rounded-full object-cover" data-alt="Charming modern 3D mother portrait with stylish coral red glasses and audio headset smiling softly in warm ambient neon lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA3hVUONZf1EEDpaGe8nxhg8S8ev-LoZgRfCNe4ZQSG4Redohs_H2vT0B9YujdW8Jq7LuuktD9FuwgkK1CxCfT0A61mfgku44WflzjHWHX_2MsMYYvtXAD6V2B5hJRedKF_zG-uc6gxZT5dBPIPfKK2ARj9mTAYMJjcVqNmHEMq2PwfvHUG9iFMdlm809bm_7ZCyQn4xkNC9jWTUY0JkCkawoF-kTXt7iKwpO-Fltja"/>
+</button>
+<!-- Avatar 3 -->
+<button class="avatar-btn aspect-square rounded-full p-0.5 bg-transparent opacity-60 hover:opacity-100 transition-transform" onclick="selectAvatar(2)" type="button">
+<img class="w-full h-full rounded-full object-cover" data-alt="Trendy teenage boy character with vibrant purple beanie and over-ear wireless music headphones in futuristic neon cyber style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD98FfD26ML8oZswl1sDzQ1DW_m30rL82GMQkTra4nnoV0TuezUecLj9LzsCGsfDG6gr8yv1hLkVa89YZY4eGPgIF33O3DnhMpJBXvdHDZjrk9H32GNThW-kEAJiItJ_f1pAUDgzMd81VR2wpEQXRBeXlC6nb4LHyBRmuGlbCCMC5vpk7A-GDisConGvGH5H2Ce7rPSvzF1LEiIRkA7En49La6l6pVt4VcGT53BEQoy"/>
+</button>
+<!-- Avatar 4 -->
+<button class="avatar-btn aspect-square rounded-full p-0.5 bg-transparent opacity-60 hover:opacity-100 transition-transform" onclick="selectAvatar(3)" type="button">
+<img class="w-full h-full rounded-full object-cover" data-alt="Playful cute young girl character wearing luminous cat-ear headphones with gentle soft pastel glow in 3D character design" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDBUO28ZQk2DYYYIU12r5VwGrwvTU52QS_PXbeicKcpcnLb-_rtWkS2-tqq922qqfIBiXfLGGKE8-cnyyQCtKG9SSBWAyTJZCe0nwOi7FOUeKT1yfV6f4ZwCpmT5Lt-Spxxg78Xzz62vipxD_ENQveIq8xLrx3CJ6a4XL7STOS88IYsmv0hJhADvXbrCcbb6ovK2gX1Bp2Y9_QsJq9bB4oSv0vAQYkukvfJV5Ipzl4N"/>
+</button>
+<!-- Avatar 5 -->
+<button class="avatar-btn aspect-square rounded-full p-0.5 bg-transparent opacity-60 hover:opacity-100 transition-transform" onclick="selectAvatar(4)" type="button">
+<img class="w-full h-full rounded-full object-cover" data-alt="Friendly wise grandfather character with classic retro headphones listening to vintage acoustic recordings on deep dark slate background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDesQoxi2XBhE1ZMGM9FcXhV03RFvnGdtrS0ECMbpC8NsGfh0isDqXTrdXnxxnXAICpioUb8Y9DR5Wa-fyoUkikttS9nEOgQRkj62TDGCY0ln5NRTwz19S8QjNZw8EOKpAddZEIYkKHk2VJW1Q0v0vp2HVy16fy9HT4yv3TGP_imYuS_38k1RcRwTniW0B4e16Hw5m0PKtkO4w2sAr8d1k2idP9R3JyhLRJaT7Nl_RF"/>
+</button>
+<!-- Avatar 6 -->
+<button class="avatar-btn aspect-square rounded-full p-0.5 bg-transparent opacity-60 hover:opacity-100 transition-transform" onclick="selectAvatar(5)" type="button">
+<img class="w-full h-full rounded-full object-cover" data-alt="Adorable animated little boy toddler listening to musical storybook with oversized cozy ear cushions in cute digital clay art style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCFRAXf5KsZ76A1WVZuFaZDThYbsQJGsIh_GFK32zMe0xJMDgQaqnkp1cWKaADYqfFrYR5fCuua_wzmzfcmC4hD0HSjCnHBBj-oTFGZCDOfMVf-qKL2GP1TJVhyqZI20f0VvxpsHcWKZ1QGtzaEu6f1Jc2-hi2McRwDLkLlgSOLC_1suMrQ8QJmG6JQsMKx-_erxWx7idNSUUMqWSCe93swVEH0346bcme0vK8kc6BK"/>
+</button>
+</div>
+</div>
+<!-- Optional Parental PIN Code -->
+<div class="flex flex-col gap-2 pt-1">
+<div class="flex items-center justify-between">
+<label class="font-label-md text-label-md text-on-surface flex items-center gap-1.5" for="pin-toggle">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">lock</span>
+          Ebeveyn PIN Kodu Belirle
+        </label>
+<span class="font-label-sm text-label-sm text-on-surface-variant">İsteğe Bağlı</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex gap-2">
+<input class="w-10 h-11 bg-surface-container-highest rounded-lg text-center font-headline-sm text-headline-sm text-primary focus:outline-none focus:bg-surface-variant" maxlength="1" placeholder="•" type="password" value="1"/>
+<input class="w-10 h-11 bg-surface-container-highest rounded-lg text-center font-headline-sm text-headline-sm text-primary focus:outline-none focus:bg-surface-variant" maxlength="1" placeholder="•" type="password" value="9"/>
+<input class="w-10 h-11 bg-surface-container-highest rounded-lg text-center font-headline-sm text-headline-sm text-primary focus:outline-none focus:bg-surface-variant" maxlength="1" placeholder="•" type="password"/>
+<input class="w-10 h-11 bg-surface-container-highest rounded-lg text-center font-headline-sm text-headline-sm text-primary focus:outline-none focus:bg-surface-variant" maxlength="1" placeholder="•" type="password"/>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-tight">
+          Çocuk profillerinin erişimini sınırlandırmak için 4 haneli kod.
+        </p>
+</div>
+</div>
+</div>
+<!-- Music & Podcast Preferences (Chips) -->
+<div class="w-full bg-surface-container-low rounded-xl p-5 mb-5 shadow-lg flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[22px]">auto_awesome</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Müzik &amp; Podcast Zevkleri</span>
+</div>
+<span class="font-label-sm text-label-sm text-primary" id="genre-count">Seçildi (3/3)</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+      Aile akışınızı şekillendirmek için en az 3 ilgi alanı işaretleyin:
+    </p>
+<!-- Genre Chips List -->
+<div class="flex flex-wrap gap-2 pt-1" id="genre-list">
+<button class="genre-chip px-3.5 py-1.5 rounded-full bg-primary text-on-primary font-label-md text-label-md flex items-center gap-1.5 shadow-sm transition-transform active:scale-95" onclick="toggleGenre(this)" type="button">
+<span class="material-symbols-outlined text-[16px]">music_note</span>
+        Pop
+      </button>
+<button class="genre-chip px-3.5 py-1.5 rounded-full bg-primary text-on-primary font-label-md text-label-md flex items-center gap-1.5 shadow-sm transition-transform active:scale-95" onclick="toggleGenre(this)" type="button">
+<span class="material-symbols-outlined text-[16px]">electric_bolt</span>
+        Anadolu Rock
+      </button>
+<button class="genre-chip px-3.5 py-1.5 rounded-full bg-surface-container-highest text-on-surface-variant font-label-md text-label-md flex items-center gap-1.5 transition-transform active:scale-95" onclick="toggleGenre(this)" type="button">
+<span class="material-symbols-outlined text-[16px]">graphic_eq</span>
+        Hip-Hop
+      </button>
+<button class="genre-chip px-3.5 py-1.5 rounded-full bg-primary text-on-primary font-label-md text-label-md flex items-center gap-1.5 shadow-sm transition-transform active:scale-95" onclick="toggleGenre(this)" type="button">
+<span class="material-symbols-outlined text-[16px]">menu_book</span>
+        Çocuk Masalları
+      </button>
+<button class="genre-chip px-3.5 py-1.5 rounded-full bg-surface-container-highest text-on-surface-variant font-label-md text-label-md flex items-center gap-1.5 transition-transform active:scale-95" onclick="toggleGenre(this)" type="button">
+<span class="material-symbols-outlined text-[16px]">piano</span>
+        Klasik
+      </button>
+<button class="genre-chip px-3.5 py-1.5 rounded-full bg-surface-container-highest text-on-surface-variant font-label-md text-label-md flex items-center gap-1.5 transition-transform active:scale-95" onclick="toggleGenre(this)" type="button">
+<span class="material-symbols-outlined text-[16px]">podcasts</span>
+        Felsefe Podcastleri
+      </button>
+<button class="genre-chip px-3.5 py-1.5 rounded-full bg-surface-container-highest text-on-surface-variant font-label-md text-label-md flex items-center gap-1.5 transition-transform active:scale-95" onclick="toggleGenre(this)" type="button">
+<span class="material-symbols-outlined text-[16px]">nightlife</span>
+        Caz
+      </button>
+</div>
+</div>
+<!-- Android Native Permissions Notice Box -->
+<div class="w-full bg-surface-container-low rounded-xl p-4 mb-6 shadow-md flex flex-col gap-3">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-[22px]">security_update_good</span>
+<span class="font-label-lg text-label-lg text-on-surface">Gerekli Android Sistem İzinleri</span>
+</div>
+<div class="flex flex-col gap-2.5">
+<!-- Notification Permission -->
+<div class="flex items-start gap-3 p-2.5 rounded-lg bg-surface-container-high/60">
+<div class="p-2 rounded-lg bg-surface-container text-primary">
+<span class="material-symbols-outlined text-[20px]">notifications_active</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Bildirimler</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Yeni podcast bölümleri ve aile dinleme paylaşımları için.</span>
+</div>
+</div>
+<!-- Storage Permission -->
+<div class="flex items-start gap-3 p-2.5 rounded-lg bg-surface-container-high/60">
+<div class="p-2 rounded-lg bg-surface-container text-tertiary">
+<span class="material-symbols-outlined text-[20px]">cloud_download</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Depolama &amp; Medya</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Çevrimdışı müzik ve yüksek çözünürlüklü podcast indirmeleri için.</span>
+</div>
+</div>
+<!-- Nearby Devices -->
+<div class="flex items-start gap-3 p-2.5 rounded-lg bg-surface-container-high/60">
+<div class="p-2 rounded-lg bg-surface-container text-secondary">
+<span class="material-symbols-outlined text-[20px]">cast</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Yakındaki Cihazlar</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Google Cast, akıllı TV ve Bluetooth ev hoparlör bağlantıları için.</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Persistent Action Container -->
+<div class="w-full flex flex-col gap-3">
+<!-- Primary Green Action Button -->
+<button class="w-full h-14 rounded-full bg-primary text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:brightness-105 active:scale-[0.98] transition-all" type="button">
+<span class="material-symbols-outlined text-[22px]">check_circle</span>
+<span>Kurulumu Tamamla ve Başla</span>
+</button>
+<!-- Secondary Ghost Action -->
+<button class="w-full h-11 rounded-full text-on-surface-variant hover:text-on-surface font-label-md text-label-md flex items-center justify-center transition-colors" type="button">
+      Daha Sonra Ayarla
+    </button>
+</div>
+</div>
+<script>
+  function setRole(role) {
+    const adultBtn = document.getElementById('role-adult');
+    const kidsBtn = document.getElementById('role-kids');
+    
+    if (role === 'adult') {
+      adultBtn.classList.remove('opacity-70', 'bg-surface-container');
+      adultBtn.classList.add('bg-surface-container-high');
+      adultBtn.querySelector('span.rounded-full').innerHTML = '<span class="material-symbols-outlined text-on-primary text-[12px] font-bold">check</span>';
+      adultBtn.querySelector('span.rounded-full').className = 'w-4 h-4 rounded-full bg-primary flex items-center justify-center';
+      
+      kidsBtn.classList.add('opacity-70', 'bg-surface-container');
+      kidsBtn.classList.remove('bg-surface-container-high');
+      kidsBtn.querySelector('span.rounded-full').innerHTML = '';
+      kidsBtn.querySelector('span.rounded-full').className = 'w-4 h-4 rounded-full bg-surface-variant flex items-center justify-center';
+    } else {
+      kidsBtn.classList.remove('opacity-70', 'bg-surface-container');
+      kidsBtn.classList.add('bg-surface-container-high');
+      kidsBtn.querySelector('span.rounded-full').innerHTML = '<span class="material-symbols-outlined text-on-secondary text-[12px] font-bold">check</span>';
+      kidsBtn.querySelector('span.rounded-full').className = 'w-4 h-4 rounded-full bg-secondary flex items-center justify-center';
+      
+      adultBtn.classList.add('opacity-70', 'bg-surface-container');
+      adultBtn.classList.remove('bg-surface-container-high');
+      adultBtn.querySelector('span.rounded-full').innerHTML = '';
+      adultBtn.querySelector('span.rounded-full').className = 'w-4 h-4 rounded-full bg-surface-variant flex items-center justify-center';
+    }
+  }
+
+  function selectAvatar(index) {
+    const buttons = document.querySelectorAll('.avatar-btn');
+    buttons.forEach((btn, idx) => {
+      if (idx === index) {
+        btn.className = 'avatar-btn relative aspect-square rounded-full p-0.5 bg-primary transition-transform scale-105';
+        if (!btn.querySelector('.badge-selected')) {
+          const badge = document.createElement('span');
+          badge.className = 'badge-selected absolute bottom-0 right-0 bg-primary text-on-primary rounded-full p-0.5 flex items-center justify-center';
+          badge.innerHTML = '<span class="material-symbols-outlined text-[10px]">check</span>';
+          btn.appendChild(badge);
+        }
+      } else {
+        btn.className = 'avatar-btn aspect-square rounded-full p-0.5 bg-transparent opacity-60 hover:opacity-100 transition-transform';
+        const existing = btn.querySelector('.badge-selected');
+        if (existing) existing.remove();
+      }
+    });
+  }
+
+  function toggleGenre(element) {
+    const isSelected = element.classList.contains('bg-primary');
+    if (isSelected) {
+      element.classList.remove('bg-primary', 'text-on-primary', 'shadow-sm');
+      element.classList.add('bg-surface-container-highest', 'text-on-surface-variant');
+    } else {
+      element.classList.add('bg-primary', 'text-on-primary', 'shadow-sm');
+      element.classList.remove('bg-surface-container-highest', 'text-on-surface-variant');
+    }
+    
+    const count = document.querySelectorAll('.genre-chip.bg-primary').length;
+    document.getElementById('genre-count').textContent = `Seçildi (${count} / 3)`;
+  }
+</script></main></body></html>

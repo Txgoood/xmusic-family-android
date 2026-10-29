@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="tr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#101417;color:#e0e3e7;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "surface-container-high": "#262a2e", "tertiary-fixed-dim": "#4cd7f6", "on-tertiary-container": "#005868", "error-container": "#93000a", "on-tertiary-fixed": "#001f26", "on-background": "#e0e3e7", "error": "#ffb4ab", "inverse-on-surface": "#2d3134", "surface-variant": "#313539", "on-tertiary": "#003640", "primary": "#4efd7d", "on-secondary": "#3c0091", "on-secondary-fixed": "#23005c", "background": "#101417", "secondary": "#d0bcff", "surface-container-low": "#181c1f", "outline-variant": "#3c4a3c", "on-primary-fixed-variant": "#00531f", "primary-container": "#20df64", "on-surface-variant": "#bbcbb8", "tertiary-fixed": "#acedff", "tertiary": "#9eeaff", "secondary-container": "#571bc1", "on-primary-fixed": "#002108", "on-secondary-container": "#c4abff", "surface-container-lowest": "#0b0f12", "surface-dim": "#101417", "inverse-surface": "#e0e3e7", "on-primary-container": "#005d24", "surface-container": "#1c2023", "primary-fixed-dim": "#29e368", "surface-tint": "#29e368", "secondary-fixed-dim": "#d0bcff", "secondary-fixed": "#e9ddff", "on-tertiary-fixed-variant": "#004e5c", "on-secondary-fixed-variant": "#5516be", "on-primary": "#003913", "surface": "#101417", "on-error-container": "#ffdad6", "on-surface": "#e0e3e7", "primary-fixed": "#68ff89", "surface-bright": "#363a3d", "tertiary-container": "#46d3f2", "inverse-primary": "#006e2c", "on-error": "#690005", "surface-container-highest": "#313539", "outline": "#859583" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-xl": "2rem", "margin": "1rem", "gutter": "1rem", "space-md": "1rem", "space-sm": "0.5rem", "gutter-tablet": "1.5rem", "margin-tablet": "2rem", "space-xs": "0.25rem", "space-lg": "1.5rem" }, fontFamily: { "body-md": ["Inter"], "body-lg": ["Inter"], "label-md": ["Plus Jakarta Sans"], "display-lg": ["Plus Jakarta Sans"], "label-lg": ["Plus Jakarta Sans"], "label-sm": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"], "body-sm": ["Inter"], "display-lg-mobile": ["Plus Jakarta Sans"], "headline-sm": ["Plus Jakarta Sans"], "headline-md": ["Plus Jakarta Sans"] }, fontSize: { "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "-0.005em", "fontWeight": "400" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "400" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600" }], "display-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "800" }], "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }], "label-sm": ["10px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "700" }], "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.015em", "fontWeight": "700" }], "body-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0em", "fontWeight": "400" }], "display-lg-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "800" }], "headline-sm": ["18px", { "lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "600" }], "headline-md": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "700" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface antialiased select-none"><header class="fixed top-0 inset-x-0 z-50 bg-surface/85 backdrop-blur-xl pt-safe"><div class="h-16 px-4 flex items-center justify-between"><div class="flex items-center gap-2"><img alt="XMusic Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBrWZDrxHoXNVVGg5RjDRQDvAty4HCp9Nyxy64CM28ffdlijheUpSUg7rqN3DPtP8KtNK3i1TZLw5k2vqjeVOLlPM52WxY90syNWwvQKhnxaIrZoPFX37bnxUp-DGWlIPQF-qbz81SaX-MvBpID9cocdu623jB6pMxwCYIxWeu7zAJL-OdrOllowwjWByRkzGL0UzHPnrHYKFryRFdn4_iKSti1I6ApYoxUxt_dyu2z"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm text-on-surface tracking-tight leading-none">XMusic</span><span class="font-label-sm text-label-sm text-primary leading-none mt-1">Family</span></div></div><div class="flex items-center gap-1"><button aria-label="Bildirimler" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span></button><button aria-label="Profil ve Aile Alanı" class="flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-full bg-surface-container-high/80 hover:bg-surface-variant transition-colors min-h-[36px]" type="button"><div class="relative flex items-center justify-center"><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOiuEy4HwUu4gnhfZ9gDLVzcIQ1XnA9nVIkjfn3Af0zxJmXmJoeIS-OLb9W4FXwc-kR9LbT2wn_1Hegl4n60-veWtKjmBPvEOTwVUyn3t1z6zBO_cRnUYUUJ0LS1dSe5IJvRMa7UOwIJyFQisJtoO8jOUxK1k_elyWamvyl5yOb9GSjFUyyFJydaggv-Cp3PEECn9qkuD6N0UpZUg-AqS2awKpmf3_jZm7wNJ3iaWY"/><span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-primary rounded-full"></span></div><div class="flex flex-col text-left"><span class="font-label-md text-label-md text-on-surface leading-tight">Burak</span><span class="font-label-sm text-label-sm text-secondary leading-tight">Aile</span></div></button></div></div></header><main class="flex flex-col relative w-full pt-16 pb-40 bg-surface min-h-screen"><div class="flex flex-col w-full px-4 pb-12 select-none">
+<!-- System Status Banner -->
+<div class="relative overflow-hidden rounded-2xl bg-surface-container-high/90 p-4 mb-5 shadow-xl">
+<div class="flex items-start justify-between gap-3">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-error-container/20 flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-error text-[22px]" style="font-variation-settings: 'FILL' 1;">cloud_off</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Sistem &amp; Ağ Merkezi</h2>
+<span class="px-2 py-0.5 rounded-full bg-error/15 text-error font-label-sm text-label-sm uppercase tracking-wider">Durum Kaydı</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">XMusic Nocturne hata yönetimi ve çevrimdışı önbellek paneli</p>
+</div>
+</div>
+<button class="w-8 h-8 rounded-full bg-surface-variant flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors" id="toggle-sim" title="Durum Bilgisi">
+<span class="material-symbols-outlined text-[18px]">info</span>
+</button>
+</div>
+</div>
+<!-- Interactive Scenario Selector (Tabs) -->
+<div class="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-none">
+<button class="state-tab px-3.5 py-2 rounded-full font-label-md text-label-md flex items-center gap-2 transition-all duration-200 bg-primary text-on-primary shadow-sm shadow-primary/20 flex-shrink-0" id="tab-offline" onclick="switchState('offline')">
+<span class="material-symbols-outlined text-[18px]">wifi_off</span>
+<span>Çevrimdışı</span>
+</button>
+<button class="state-tab px-3.5 py-2 rounded-full font-label-md text-label-md flex items-center gap-2 transition-all duration-200 bg-surface-container-high text-on-surface-variant hover:text-on-surface flex-shrink-0" id="tab-playback" onclick="switchState('playback')">
+<span class="material-symbols-outlined text-[18px]">motion_photos_off</span>
+<span>Oynatma Hatası</span>
+</button>
+<button class="state-tab px-3.5 py-2 rounded-full font-label-md text-label-md flex items-center gap-2 transition-all duration-200 bg-surface-container-high text-on-surface-variant hover:text-on-surface flex-shrink-0" id="tab-download" onclick="switchState('download')">
+<span class="material-symbols-outlined text-[18px]">downloading</span>
+<span>Ağ Zaman Aşımı</span>
+</button>
+<button class="state-tab px-3.5 py-2 rounded-full font-label-md text-label-md flex items-center gap-2 transition-all duration-200 bg-surface-container-high text-on-surface-variant hover:text-on-surface flex-shrink-0" id="tab-storage" onclick="switchState('storage')">
+<span class="material-symbols-outlined text-[18px]">disc_full</span>
+<span>Depolama Dolu</span>
+</button>
+<button class="state-tab px-3.5 py-2 rounded-full font-label-md text-label-md flex items-center gap-2 transition-all duration-200 bg-surface-container-high text-on-surface-variant hover:text-on-surface flex-shrink-0" id="tab-empty" onclick="switchState('empty')">
+<span class="material-symbols-outlined text-[18px]">search_off</span>
+<span>Arama / Boş</span>
+</button>
+</div>
+<!-- STATE 1: İnternet Bağlantısı Yok (Çevrimdışı) -->
+<section class="state-panel flex flex-col gap-4" id="panel-offline">
+<div class="relative overflow-hidden rounded-3xl bg-surface-container-low p-6 shadow-xl flex flex-col items-center text-center">
+<!-- Glow ambient background -->
+<div class="absolute -top-16 inset-x-0 h-40 bg-gradient-to-b from-primary/10 via-transparent to-transparent pointer-events-none"></div>
+<!-- Icon Frame with Sound Ring Wave -->
+<div class="relative w-24 h-24 mb-5 flex items-center justify-center">
+<div class="absolute inset-0 rounded-full bg-primary/10 animate-ping opacity-75"></div>
+<div class="relative w-20 h-20 rounded-2xl bg-surface-container-high flex items-center justify-center shadow-lg">
+<span class="material-symbols-outlined text-primary text-[42px]">wifi_off</span>
+</div>
+</div>
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm mb-2">
+<span class="w-1.5 h-1.5 rounded-full bg-error animate-pulse"></span>
+        Çevrimdışı Protokolü Devrede
+      </span>
+<h3 class="font-headline-md text-headline-md text-on-surface">İnternet Bağlantısı Yok</h3>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-xs mt-2">
+        Bağlantı koptu. İndirdiğin <span class="font-semibold text-primary">342 parçayı</span> ve podcast bölümlerini çevrimdışı dinlemeye devam edebilirsin.
+      </p>
+<!-- Action Buttons -->
+<div class="flex flex-col w-full gap-2.5 mt-6">
+<button class="w-full py-3.5 px-5 rounded-full bg-primary text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-lg shadow-primary/25 hover:bg-primary-fixed active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined text-[20px]">offline_pin</span>
+<span>İndirilenlere Git (Çevrimdışı Mod)</span>
+</button>
+<button class="w-full py-3 px-5 rounded-full bg-surface-container-high text-on-surface font-label-md text-label-md flex items-center justify-center gap-2 hover:bg-surface-variant active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined text-[18px]">refresh</span>
+<span>Tekrar Dene</span>
+</button>
+</div>
+</div>
+<!-- Offline Family Availability Widget -->
+<div class="rounded-2xl bg-surface-container-high/60 p-4 shadow-md flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-surface-variant flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">group</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Aile Kitaplığı Önbelleği</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Burak, Elif ve Kaan ortak listeleri cihazda saklı</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+</div>
+</section>
+<!-- STATE 2: Müzik Kaynağına Erişilemiyor (Oynatma Hatası) -->
+<section class="state-panel hidden flex-col gap-4" id="panel-playback">
+<div class="relative overflow-hidden rounded-3xl bg-surface-container-low p-6 shadow-xl flex flex-col items-center text-center">
+<div class="absolute -top-16 inset-x-0 h-40 bg-gradient-to-b from-error-container/20 via-transparent to-transparent pointer-events-none"></div>
+<!-- Disc with warning scratch -->
+<div class="relative w-24 h-24 mb-5 flex items-center justify-center">
+<div class="w-20 h-20 rounded-full bg-surface-container-high flex items-center justify-center shadow-lg relative overflow-hidden">
+<span class="material-symbols-outlined text-on-surface-variant/40 text-[48px]">album</span>
+<div class="absolute inset-0 bg-gradient-to-tr from-error-container/40 to-transparent flex items-center justify-center">
+<span class="material-symbols-outlined text-error text-[28px]" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+</div>
+</div>
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-error-container/25 text-error font-label-sm text-label-sm mb-2">
+        Hata Kodu: ERR_AUDIO_STREAM_TIMEOUT
+      </span>
+<h3 class="font-headline-md text-headline-md text-on-surface">Müzik Kaynağına Erişilemiyor</h3>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-xs mt-2">
+        Bu şarkı şu an sunucudan yüklenemiyor. Alternatif yüksek kaliteli stüdyo kaynağı deneniyor...
+      </p>
+<!-- Waveform Attempt Simulation -->
+<div class="w-full bg-surface-container-high/80 rounded-2xl p-3 my-4 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]">graphic_eq</span>
+<span class="font-label-sm text-label-sm text-on-surface">Yedek Akış: FLAC 24-bit (96kHz)</span>
+</div>
+<span class="font-label-sm text-label-sm text-primary font-bold">Hazır</span>
+</div>
+<!-- Action Buttons -->
+<div class="flex flex-col w-full gap-2.5">
+<button class="w-full py-3.5 px-5 rounded-full bg-primary text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-lg shadow-primary/25 hover:bg-primary-fixed active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+<span>Alternatif Kaynağı Çal</span>
+</button>
+<button class="w-full py-3 px-5 rounded-full bg-surface-container-high text-on-surface font-label-md text-label-md flex items-center justify-center gap-2 hover:bg-surface-variant active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined text-[18px]">bug_report</span>
+<span>Sorunu Bildir</span>
+</button>
+</div>
+</div>
+<!-- Help Card -->
+<div class="rounded-2xl bg-surface-container-high/50 p-4 flex items-center gap-3">
+<span class="material-symbols-outlined text-tertiary text-[20px]">spatial_audio</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Ses kalitesini <span class="text-on-surface font-semibold">Ayarlar &gt; Akış Kalitesi</span> üzerinden Normal moda alarak veri yükünü azaltabilirsin.</p>
+</div>
+</section>
+<!-- STATE 3: İndirme Başarısız (Ağ Zaman Aşımı) -->
+<section class="state-panel hidden flex-col gap-4" id="panel-download">
+<div class="relative overflow-hidden rounded-3xl bg-surface-container-low p-6 shadow-xl flex flex-col items-center text-center">
+<div class="absolute -top-16 inset-x-0 h-40 bg-gradient-to-b from-secondary/15 via-transparent to-transparent pointer-events-none"></div>
+<!-- Download Error Icon -->
+<div class="relative w-24 h-24 mb-5 flex items-center justify-center">
+<div class="relative w-20 h-20 rounded-2xl bg-surface-container-high flex items-center justify-center shadow-lg">
+<span class="material-symbols-outlined text-secondary text-[40px]">download_for_offline</span>
+<span class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-error flex items-center justify-center text-on-error">
+<span class="material-symbols-outlined text-[14px]">priority_high</span>
+</span>
+</div>
+</div>
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-high text-secondary font-label-sm text-label-sm mb-2">
+        Ağ İletişim Hatası
+      </span>
+<h3 class="font-headline-md text-headline-md text-on-surface">İndirme Başarısız Oldu</h3>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-xs mt-2">
+<span class="text-on-surface font-semibold">3 parça</span> indirilemedi. Wi-Fi bağlantısı bekleniyor veya veri kotası kısıtlaması devrede.
+      </p>
+<!-- Queue Snippet Preview -->
+<div class="w-full flex flex-col gap-2 mt-4 mb-2">
+<div class="flex items-center justify-between p-2.5 rounded-xl bg-surface-container-high/70 text-left">
+<div class="flex items-center gap-2.5 min-w-0">
+<span class="material-symbols-outlined text-error text-[18px]">error</span>
+<div class="truncate">
+<p class="font-label-md text-label-md text-on-surface truncate">Gülpembe - Barış Manço</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Zaman aşımı (14.2 MB)</p>
+</div>
+</div>
+<span class="font-label-sm text-label-sm text-error font-semibold flex-shrink-0">%48'de Durdu</span>
+</div>
+<div class="flex items-center justify-between p-2.5 rounded-xl bg-surface-container-high/70 text-left">
+<div class="flex items-center gap-2.5 min-w-0">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">hourglass_top</span>
+<div class="truncate">
+<p class="font-label-md text-label-md text-on-surface truncate">Fırtınadayım - Mabel Matiz</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Sırada bekliyor</p>
+</div>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant flex-shrink-0">Bekliyor</span>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="flex flex-col w-full gap-2.5 mt-2">
+<button class="w-full py-3.5 px-5 rounded-full bg-primary text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-lg shadow-primary/25 hover:bg-primary-fixed active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined text-[20px]">cell_wifi</span>
+<span>Hücresel Veri ile İndir</span>
+</button>
+<button class="w-full py-3 px-5 rounded-full bg-surface-container-high text-error font-label-md text-label-md flex items-center justify-center gap-2 hover:bg-surface-variant active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined text-[18px]">clear_all</span>
+<span>Kuyruğu Temizle</span>
+</button>
+</div>
+</div>
+</section>
+<!-- STATE 4: Cihaz Depolama Alanı Dolu -->
+<section class="state-panel hidden flex-col gap-4" id="panel-storage">
+<div class="relative overflow-hidden rounded-3xl bg-surface-container-low p-6 shadow-xl flex flex-col items-center text-center">
+<div class="absolute -top-16 inset-x-0 h-40 bg-gradient-to-b from-error-container/20 via-transparent to-transparent pointer-events-none"></div>
+<!-- Storage Gauge Graphic -->
+<div class="relative w-24 h-24 mb-4 flex items-center justify-center">
+<svg class="w-24 h-24 -rotate-90" viewbox="0 0 36 36">
+<path class="text-surface-variant" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.5"></path>
+<path class="text-error" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="98, 100" stroke-linecap="round" stroke-width="3.5"></path>
+</svg>
+<div class="absolute flex flex-col items-center justify-center">
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold leading-none">%98</span>
+<span class="font-label-sm text-label-sm text-error leading-none mt-1">Dolu</span>
+</div>
+</div>
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-error-container/20 text-error font-label-sm text-label-sm mb-2">
+        Kritik Seviye: 128 MB Boş Kaldı
+      </span>
+<h3 class="font-headline-md text-headline-md text-on-surface">Depolama Alanı Yetersiz</h3>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-xs mt-2">
+        İndirme tamamlanamadı. Yeni çevrimdışı parçalar için en az <span class="font-semibold text-on-surface">450 MB</span> boş alana ihtiyaç var.
+      </p>
+<!-- Storage Bar Breakdown -->
+<div class="w-full bg-surface-container-high/80 rounded-2xl p-4 my-4 text-left">
+<div class="flex justify-between items-center mb-2">
+<span class="font-label-sm text-label-sm text-on-surface">XMusic Önbelleği &amp; İndirmeler</span>
+<span class="font-label-sm text-label-sm text-primary font-bold">14.8 GB</span>
+</div>
+<div class="w-full h-2 rounded-full bg-surface-variant flex overflow-hidden">
+<div class="h-full bg-primary" style="width: 65%;"></div>
+<div class="h-full bg-secondary" style="width: 25%;"></div>
+<div class="h-full bg-error" style="width: 8%;"></div>
+</div>
+<div class="flex items-center gap-4 mt-3">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Şarkılar</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Podcastler</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Geçici Önbellek</span>
+</div>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="flex flex-col w-full gap-2.5">
+<button class="w-full py-3.5 px-5 rounded-full bg-primary text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-lg shadow-primary/25 hover:bg-primary-fixed active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined text-[20px]">cleaning_services</span>
+<span>Önbelleği Temizle (1.2 GB Kazan)</span>
+</button>
+<button class="w-full py-3 px-5 rounded-full bg-surface-container-high text-on-surface font-label-md text-label-md flex items-center justify-center gap-2 hover:bg-surface-variant active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined text-[18px]">folder_managed</span>
+<span>İndirilen Şarkıları Yönet</span>
+</button>
+</div>
+</div>
+</section>
+<!-- STATE 5: Arama Sonucu Bulunamadı & Boş Kitaplık -->
+<section class="state-panel hidden flex-col gap-4" id="panel-empty">
+<div class="relative overflow-hidden rounded-3xl bg-surface-container-low p-6 shadow-xl flex flex-col items-center text-center">
+<div class="absolute -top-16 inset-x-0 h-40 bg-gradient-to-b from-tertiary-container/15 via-transparent to-transparent pointer-events-none"></div>
+<!-- Whimsical Empty State Frame -->
+<div class="relative w-24 h-24 mb-4 flex items-center justify-center">
+<div class="w-20 h-20 rounded-2xl bg-surface-container-high flex items-center justify-center shadow-lg relative">
+<span class="material-symbols-outlined text-on-surface-variant/50 text-[42px]">search</span>
+<span class="material-symbols-outlined text-tertiary absolute top-2 right-2 text-[20px] animate-bounce">music_off</span>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-surface-container-high text-tertiary font-label-sm text-label-sm mb-2">
+        Sıfır Eşleşme
+      </span>
+<h3 class="font-headline-md text-headline-md text-on-surface">Sonuç Bulunamadı</h3>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-xs mt-2">
+        "<span class="text-on-surface font-semibold">x92837</span>" terimi ile eşleşen şarkı veya albüm bulunamadı. Yazımı kontrol et veya Aile Keşif Listelerine göz at.
+      </p>
+<!-- Recommendation Chips -->
+<div class="w-full mt-5 mb-3 text-left">
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-2 text-center">Önerilen Popüler Aramalar</p>
+<div class="flex flex-wrap gap-2 justify-center">
+<button class="px-3 py-1.5 rounded-full bg-surface-container-high hover:bg-surface-variant text-on-surface font-label-md text-label-md flex items-center gap-1.5 transition-colors">
+<span class="material-symbols-outlined text-primary text-[16px]">trending_up</span>
+<span>Anadolu Rock 70'ler</span>
+</button>
+<button class="px-3 py-1.5 rounded-full bg-surface-container-high hover:bg-surface-variant text-on-surface font-label-md text-label-md flex items-center gap-1.5 transition-colors">
+<span class="material-symbols-outlined text-secondary text-[16px]">family_restroom</span>
+<span>Aile Ortak Miksi</span>
+</button>
+<button class="px-3 py-1.5 rounded-full bg-surface-container-high hover:bg-surface-variant text-on-surface font-label-md text-label-md flex items-center gap-1.5 transition-colors">
+<span class="material-symbols-outlined text-tertiary text-[16px]">podcasts</span>
+<span>Haftalık Bilim Sohbetleri</span>
+</button>
+</div>
+</div>
+<!-- Action Button -->
+<div class="w-full mt-3">
+<button class="w-full py-3.5 px-5 rounded-full bg-primary text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-lg shadow-primary/25 hover:bg-primary-fixed active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined text-[20px]">explore</span>
+<span>Popüler Şarkıları Göster</span>
+</button>
+</div>
+</div>
+<!-- Empty Family Space Invitation -->
+<div class="rounded-2xl bg-surface-container-high/60 p-4 flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-secondary-container/30 flex items-center justify-center text-secondary flex-shrink-0">
+<span class="material-symbols-outlined text-[20px]">playlist_add</span>
+</div>
+<div class="flex-1">
+<p class="font-label-md text-label-md text-on-surface">Kendi Aile Çalma Listeni Oluştur</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Boş bir sayfa yeni müzik keşifleri için en iyi başlangıçtır.</p>
+</div>
+</div>
+</section>
+<!-- Interactive Sandbox Quick Switcher Toast (Material 3 SnackBar trigger) -->
+<div class="mt-8 p-3.5 rounded-2xl bg-surface-container-lowest/80 backdrop-blur-md flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-primary text-[20px]">tune</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Önizlenen Durum: <strong class="text-on-surface" id="current-state-text">Çevrimdışı Mod</strong></span>
+</div>
+<span class="font-label-sm text-label-sm text-primary font-semibold uppercase tracking-wider">Aktif</span>
+</div>
+</div>
+<script>
+  function switchState(stateName) {
+    // Hide all panels
+    const panels = document.querySelectorAll('.state-panel');
+    panels.forEach(p => p.classList.add('hidden'));
+
+    // Reset tab buttons
+    const tabs = document.querySelectorAll('.state-tab');
+    tabs.forEach(t => {
+      t.classList.remove('bg-primary', 'text-on-primary', 'shadow-sm', 'shadow-primary/20');
+      t.classList.add('bg-surface-container-high', 'text-on-surface-variant');
+    });
+
+    // Activate targeted panel
+    const targetPanel = document.getElementById('panel-' + stateName);
+    if (targetPanel) {
+      targetPanel.classList.remove('hidden');
+    }
+
+    // Activate targeted tab
+    const targetTab = document.getElementById('tab-' + stateName);
+    if (targetTab) {
+      targetTab.classList.remove('bg-surface-container-high', 'text-on-surface-variant');
+      targetTab.classList.add('bg-primary', 'text-on-primary', 'shadow-sm', 'shadow-primary/20');
+    }
+
+    // Update bottom label
+    const labelMapping = {
+      'offline': 'Çevrimdışı Mod (Bağlantı Yok)',
+      'playback': 'Oynatma Hatası (Yedek Kaynak)',
+      'download': 'Ağ Zaman Aşımı (İndirme Beklemede)',
+      'storage': 'Depolama Dolu (%98)',
+      'empty': 'Sonuç Bulunamadı (Boş Ekran)'
+    };
+    const infoText = document.getElementById('current-state-text');
+    if (infoText && labelMapping[stateName]) {
+      infoText.innerText = labelMapping[stateName];
+    }
+  }
+</script></main><aside class="fixed bottom-16 inset-x-0 z-40 px-3 pb-2 pointer-events-none"><div class="pointer-events-auto relative overflow-hidden rounded-2xl bg-surface-container-high/90 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex items-center justify-between p-2"><div class="flex items-center gap-3 min-w-0 flex-1"><div class="relative w-12 h-12 rounded-xl overflow-hidden bg-surface-container-lowest flex-shrink-0 flex items-center justify-center"><span class="material-symbols-outlined text-primary text-[28px]">album</span><div class="absolute inset-0 bg-primary/10 mix-blend-overlay"></div></div><div class="flex flex-col min-w-0 pr-2"><div class="flex items-center gap-1.5"><p class="font-label-lg text-label-lg text-on-surface truncate">Dönence</p><span class="font-label-sm text-label-sm bg-primary/15 text-primary px-1 py-0.2 rounded font-bold uppercase tracking-wider">Hi-Res</span></div><p class="font-body-sm text-body-sm text-on-surface-variant truncate">Barış Manço</p></div></div><div class="flex items-center gap-1 flex-shrink-0"><button aria-label="Favorilere Ekle" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-primary transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">favorite</span></button><button aria-label="Oynat veya Duraklat" class="w-11 h-11 flex items-center justify-center rounded-full bg-primary text-on-primary hover:bg-primary-fixed shadow-md shadow-primary/20 transition-transform active:scale-95" type="button"><span class="material-symbols-outlined text-[24px]">play_arrow</span></button></div><div class="absolute bottom-0 inset-x-0 h-[2.5px] bg-surface-variant"><div class="h-full bg-primary rounded-full" style="width: 42%;"></div></div></div></aside><nav class="fixed bottom-0 inset-x-0 z-50 pb-safe bg-surface-container-lowest/90 backdrop-blur-2xl" data-active-classes="text-primary font-bold"><div class="flex justify-around items-center h-16 px-1"><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] gap-0.5 text-on-surface-variant hover:text-on-surface transition-colors" data-path="ana-sayfa" href="#"><span class="material-symbols-outlined text-[22px]">home</span><span class="font-label-sm text-label-sm tracking-tight">Ana Sayfa</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] gap-0.5 text-on-surface-variant hover:text-on-surface transition-colors" data-path="kesfet-ara" href="#"><span class="material-symbols-outlined text-[22px]">search</span><span class="font-label-sm text-label-sm tracking-tight">Keşfet</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] gap-0.5 text-on-surface-variant hover:text-on-surface transition-colors" data-path="muzik" href="#"><span class="material-symbols-outlined text-[22px]">album</span><span class="font-label-sm text-label-sm tracking-tight">Müzik</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] gap-0.5 text-on-surface-variant hover:text-on-surface transition-colors" data-path="podcast" href="#"><span class="material-symbols-outlined text-[22px]">podcasts</span><span class="font-label-sm text-label-sm tracking-tight">Podcast</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] gap-0.5 text-on-surface-variant hover:text-on-surface transition-colors" data-path="kitapligim" href="#"><span class="material-symbols-outlined text-[22px]">library_music</span><span class="font-label-sm text-label-sm tracking-tight">Kitaplığım</span></a></div></nav></body></html>

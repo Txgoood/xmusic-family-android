@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="tr"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#101417;color:#e0e3e7;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "surface-container-high": "#262a2e", "tertiary-fixed-dim": "#4cd7f6", "on-tertiary-container": "#005868", "error-container": "#93000a", "on-tertiary-fixed": "#001f26", "on-background": "#e0e3e7", "error": "#ffb4ab", "inverse-on-surface": "#2d3134", "surface-variant": "#313539", "on-tertiary": "#003640", "primary": "#4efd7d", "on-secondary": "#3c0091", "on-secondary-fixed": "#23005c", "background": "#101417", "secondary": "#d0bcff", "surface-container-low": "#181c1f", "outline-variant": "#3c4a3c", "on-primary-fixed-variant": "#00531f", "primary-container": "#20df64", "on-surface-variant": "#bbcbb8", "tertiary-fixed": "#acedff", "tertiary": "#9eeaff", "secondary-container": "#571bc1", "on-primary-fixed": "#002108", "on-secondary-container": "#c4abff", "surface-container-lowest": "#0b0f12", "surface-dim": "#101417", "inverse-surface": "#e0e3e7", "on-primary-container": "#005d24", "surface-container": "#1c2023", "primary-fixed-dim": "#29e368", "surface-tint": "#29e368", "secondary-fixed-dim": "#d0bcff", "secondary-fixed": "#e9ddff", "on-tertiary-fixed-variant": "#004e5c", "on-secondary-fixed-variant": "#5516be", "on-primary": "#003913", "surface": "#101417", "on-error-container": "#ffdad6", "on-surface": "#e0e3e7", "primary-fixed": "#68ff89", "surface-bright": "#363a3d", "tertiary-container": "#46d3f2", "inverse-primary": "#006e2c", "on-error": "#690005", "surface-container-highest": "#313539", "outline": "#859583" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-xl": "2rem", "margin": "1rem", "gutter": "1rem", "space-md": "1rem", "space-sm": "0.5rem", "gutter-tablet": "1.5rem", "margin-tablet": "2rem", "space-xs": "0.25rem", "space-lg": "1.5rem" }, fontFamily: { "body-md": ["Inter"], "body-lg": ["Inter"], "label-md": ["Plus Jakarta Sans"], "display-lg": ["Plus Jakarta Sans"], "label-lg": ["Plus Jakarta Sans"], "label-sm": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"], "body-sm": ["Inter"], "display-lg-mobile": ["Plus Jakarta Sans"], "headline-sm": ["Plus Jakarta Sans"], "headline-md": ["Plus Jakarta Sans"] }, fontSize: { "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "-0.005em", "fontWeight": "400" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "400" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600" }], "display-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "800" }], "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }], "label-sm": ["10px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "700" }], "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.015em", "fontWeight": "700" }], "body-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0em", "fontWeight": "400" }], "display-lg-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "800" }], "headline-sm": ["18px", { "lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "600" }], "headline-md": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "700" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface antialiased select-none"><header class="fixed top-0 inset-x-0 z-50 bg-surface/85 backdrop-blur-xl pt-safe"><div class="h-16 px-4 flex items-center justify-between"><div class="flex items-center gap-2"><img alt="XMusic Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBrWZDrxHoXNVVGg5RjDRQDvAty4HCp9Nyxy64CM28ffdlijheUpSUg7rqN3DPtP8KtNK3i1TZLw5k2vqjeVOLlPM52WxY90syNWwvQKhnxaIrZoPFX37bnxUp-DGWlIPQF-qbz81SaX-MvBpID9cocdu623jB6pMxwCYIxWeu7zAJL-OdrOllowwjWByRkzGL0UzHPnrHYKFryRFdn4_iKSti1I6ApYoxUxt_dyu2z"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm text-on-surface tracking-tight leading-none">XMusic</span><span class="font-label-sm text-label-sm text-primary leading-none mt-1">Family</span></div></div><div class="flex items-center gap-1"><button aria-label="Bildirimler" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span></button><button aria-label="Profil ve Aile Alanı" class="flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-full bg-surface-container-high/80 hover:bg-surface-variant transition-colors min-h-[36px]" type="button"><div class="relative flex items-center justify-center"><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOiuEy4HwUu4gnhfZ9gDLVzcIQ1XnA9nVIkjfn3Af0zxJmXmJoeIS-OLb9W4FXwc-kR9LbT2wn_1Hegl4n60-veWtKjmBPvEOTwVUyn3t1z6zBO_cRnUYUUJ0LS1dSe5IJvRMa7UOwIJyFQisJtoO8jOUxK1k_elyWamvyl5yOb9GSjFUyyFJydaggv-Cp3PEECn9qkuD6N0UpZUg-AqS2awKpmf3_jZm7wNJ3iaWY"/><span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-primary rounded-full"></span></div><div class="flex flex-col text-left"><span class="font-label-md text-label-md text-on-surface leading-tight">Burak</span><span class="font-label-sm text-label-sm text-secondary leading-tight">Aile</span></div></button></div></div></header><main class="flex flex-col relative w-full pt-16 pb-40 bg-surface min-h-screen"><div class="flex flex-col w-full px-4 gap-6">
+<!-- Header Title & Filter Chips -->
+<section class="flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Podcast &amp; Sohbetler</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Aile boyu ilham verici sesli dünyalar</p>
+</div>
+<button aria-label="Podcast Tercihleri" class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[20px]">tune</span>
+</button>
+</div>
+<!-- Category Filter Pills -->
+<div class="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 no-scrollbar" id="podcast-chips">
+<button class="podcast-filter-chip flex-shrink-0 px-4 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md active:scale-95 transition-all" type="button">Tümü</button>
+<button class="podcast-filter-chip flex-shrink-0 px-4 py-2 rounded-full bg-surface-container-high text-on-surface-variant font-label-md text-label-md hover:text-on-surface active:scale-95 transition-all" type="button">Teknoloji</button>
+<button class="podcast-filter-chip flex-shrink-0 px-4 py-2 rounded-full bg-surface-container-high text-on-surface-variant font-label-md text-label-md hover:text-on-surface active:scale-95 transition-all flex items-center gap-1.5" type="button">
+<span class="material-symbols-outlined text-[15px] text-primary">verified_user</span>
+        Ebeveyn &amp; Çocuk
+      </button>
+<button class="podcast-filter-chip flex-shrink-0 px-4 py-2 rounded-full bg-surface-container-high text-on-surface-variant font-label-md text-label-md hover:text-on-surface active:scale-95 transition-all" type="button">Haber &amp; Gündem</button>
+<button class="podcast-filter-chip flex-shrink-0 px-4 py-2 rounded-full bg-surface-container-high text-on-surface-variant font-label-md text-label-md hover:text-on-surface active:scale-95 transition-all" type="button">Kişisel Gelişim</button>
+</div>
+</section>
+<!-- Dinlemeye Devam Et (Continue Listening) Card -->
+<section class="flex flex-col gap-2.5">
+<div class="flex items-center justify-between">
+<span class="font-headline-sm text-headline-sm text-on-surface">Dinlemeye Devam Et</span>
+<span class="font-label-sm text-label-sm text-primary flex items-center gap-0.5">
+<span class="material-symbols-outlined text-[14px]">history</span> Son Kaldığın Yer
+      </span>
+</div>
+<div class="relative overflow-hidden rounded-2xl bg-surface-container-high p-4 flex flex-col gap-3.5 shadow-lg shadow-surface-container-lowest/40">
+<div class="flex items-center gap-3">
+<div class="relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-surface-container-lowest shadow-md">
+<img class="w-full h-full object-cover" data-alt="Warm studio portrait of psychologist Beyhan Budak with studio warm ring light, deep obsidian navy tones and gentle emerald ambiance, cinematic audio recording atmosphere" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAaquCDj3stWN-WfACyJ3XF7HavFR0CIJIxzc5E-IGJYPH8o__wFS09LqGUBQe84ZxX6RJWJNIX5na94_Zj--g-wbwkNUvLdlDeE6sY0Hl9v2JVcPX8reGXd4MphJV7DRWMKkCGRhN26Yf_cWuKqOA4oq0Ecj8WfK8O8JmqEZqrUEs8oxOh4n691gril4mHDJdAAG985DIkSUPmUhrJ6_SpFsUVaR2joiaq_ivd6SML"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest/80 via-transparent to-transparent"></div>
+<span class="absolute bottom-1 right-1 material-symbols-outlined text-primary text-[16px]">podcasts</span>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center gap-1.5">
+<span class="font-label-sm text-label-sm uppercase tracking-wide bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded-full">Kişisel Gelişim</span>
+<span class="font-label-sm text-label-sm text-primary">#142</span>
+</div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface truncate mt-0.5">Zihinsel Yorgunlukla Başa Çıkma</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Kendine İyi Davran • Beyhan Budak</p>
+</div>
+</div>
+<!-- Scrubbing & Time Indicators -->
+<div class="flex flex-col gap-1.5">
+<div class="w-full h-1.5 rounded-full bg-surface-variant overflow-hidden">
+<div class="h-full bg-primary rounded-full transition-all duration-300" style="width: 60%;"></div>
+</div>
+<div class="flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant">
+<span class="text-primary font-semibold">24:00 dinlendi</span>
+<span>18 dk kaldı (42 dk toplam)</span>
+</div>
+</div>
+<!-- Quick Interactive Actions -->
+<div class="flex items-center justify-between pt-1">
+<div class="flex items-center gap-2">
+<button aria-label="15 Saniye Geri Sar" class="h-10 px-3.5 rounded-full bg-surface-container flex items-center gap-1 text-on-surface hover:text-primary active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">export_notes</span>
+<span class="font-label-sm text-label-sm font-semibold">15sn</span>
+</button>
+<button aria-label="30 Saniye İleri Sar" class="h-10 px-3.5 rounded-full bg-surface-container flex items-center gap-1 text-on-surface hover:text-primary active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">forward_30</span>
+<span class="font-label-sm text-label-sm font-semibold">30sn</span>
+</button>
+</div>
+<div class="flex items-center gap-2">
+<button aria-label="Oynatma Hızı" class="h-10 px-2.5 rounded-full bg-surface-container text-on-surface font-label-sm text-label-sm font-semibold hover:text-primary active:scale-95 transition-all" type="button">
+            1.2x
+          </button>
+<button aria-label="Devam Et" class="h-11 px-5 rounded-full bg-primary text-on-primary flex items-center gap-2 font-label-md text-label-md active:scale-95 transition-transform shadow-md shadow-primary/25" type="button">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+<span>Dinle</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Kids Safe Section (Family Showcase) -->
+<section class="flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-7 h-7 rounded-lg bg-primary-container/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Aile &amp; Çocuk Podcastleri</h2>
+<span class="font-label-sm text-label-sm bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold">Kids Safe 🛡️</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Ebeveyn onaylı, reklamsız ve huzurlu yayınlar</p>
+</div>
+</div>
+<button class="font-label-md text-label-md text-primary hover:underline" type="button">Tümü</button>
+</div>
+<!-- 2 Horizontal Cards for Kids Safe -->
+<div class="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 no-scrollbar">
+<!-- Item 1: Uyku Öncesi Masallar -->
+<div class="flex-shrink-0 w-64 rounded-2xl bg-surface-container p-3.5 flex flex-col gap-3 shadow-md">
+<div class="relative w-full aspect-video rounded-xl overflow-hidden bg-surface-container-lowest">
+<img class="w-full h-full object-cover" data-alt="Charming bedtime story scene with soft pastel glowing moon, floating friendly origami stars, quiet midnight blue tones and tender mint accents, storybook digital illustration style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCyIho0RUAJjpKhg8VmbUO7JvhCcGktuUsck1njm_HAc12hzRkaRDQpUFooKfbzvkw3yvklgpCMn3G3rH09jaY70T3GxGdgPj2q_a0IUyJ1K5doXlXdMurkrPnAEIK0tl8ASUyNivu3vqJ2OCsAMok4hmeLKh2oXnDnaI1f5DGB9_mfIVOz6ex8a6doxHV-buJK7I2C0swr1wWZlipbaa9M6kIpsQaSHZehC53NyhOd"/>
+<div class="absolute top-2 left-2 flex items-center gap-1 bg-surface-container-lowest/80 backdrop-blur-md px-2 py-1 rounded-full text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">shield</span>
+<span>Ebeveyn Onaylı</span>
+</div>
+<div class="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-surface-container-lowest/80 backdrop-blur-sm text-on-surface font-label-sm text-label-sm">
+            3-7 Yaş
+          </div>
+</div>
+<div class="flex flex-col">
+<h3 class="font-label-lg text-label-lg text-on-surface truncate">Uyku Öncesi Masallar</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Masal Sandığı • Nilüfer Öğretmen</p>
+</div>
+<div class="flex items-center justify-between pt-1">
+<div class="flex items-center gap-1 text-tertiary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">bedtime</span>
+<span>45 Bölüm</span>
+</div>
+<button aria-label="Masalı Başlat" class="w-9 h-9 rounded-full bg-surface-container-high hover:bg-primary hover:text-on-primary text-primary flex items-center justify-center transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<!-- Item 2: Meraklı Minikler Bilim Saati -->
+<div class="flex-shrink-0 w-64 rounded-2xl bg-surface-container p-3.5 flex flex-col gap-3 shadow-md">
+<div class="relative w-full aspect-video rounded-xl overflow-hidden bg-surface-container-lowest">
+<img class="w-full h-full object-cover" data-alt="Playful cartoon science laboratory with friendly planets, microscope, swirling green safe chemical bubbles, dark cyan background with vivid emerald neon lighting, child education style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBpMMnXW4uv8q8moA0E_qZLXVtHgo26V8oTFgAzRYzQ953TyMmW0Jt4ikh-FoArIUdsJjQzJkXuJZChm7RZL9KQ4IcdW-IoFw66Sm0JvS6uALoV71M5RvPTjgIO3YYVIWa02O6kVfGeJs3nws1bUKjYADmTiZlenIOIaTRyNwOlcSIQ_CTVR_8KuicwtEys8rLY3plGT9y2AU53kERuMxGt6dpQE1i5A_-iTKv8szzU"/>
+<div class="absolute top-2 left-2 flex items-center gap-1 bg-surface-container-lowest/80 backdrop-blur-md px-2 py-1 rounded-full text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">shield</span>
+<span>Kids Safe</span>
+</div>
+<div class="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-surface-container-lowest/80 backdrop-blur-sm text-on-surface font-label-sm text-label-sm">
+            8-12 Yaş
+          </div>
+</div>
+<div class="flex flex-col">
+<h3 class="font-label-lg text-label-lg text-on-surface truncate">Meraklı Minikler Bilim Saati</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Evrenin Sırları • Dr. Kaan Taş</p>
+</div>
+<div class="flex items-center justify-between pt-1">
+<div class="flex items-center gap-1 text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">science</span>
+<span>28 Bölüm</span>
+</div>
+<button aria-label="Bölümü Başlat" class="w-9 h-9 rounded-full bg-surface-container-high hover:bg-primary hover:text-on-primary text-primary flex items-center justify-center transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Popüler Programlar (Popular Shows Horizontal Carousel) -->
+<section class="flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Popüler Programlar</h2>
+<button class="font-label-md text-label-md text-primary hover:underline" type="button">Tümünü Gör</button>
+</div>
+<div class="flex gap-4 overflow-x-auto pb-1 -mx-4 px-4 no-scrollbar">
+<!-- Show 1 -->
+<div class="flex-shrink-0 w-44 flex flex-col gap-2.5">
+<div class="relative w-44 h-44 rounded-2xl overflow-hidden bg-surface-container-lowest shadow-md group">
+<img class="w-full h-full object-cover" data-alt="High contrast studio recording microphone on sleek metal arm, moody dark room with neon green LED backlights and audio frequency displays, sleek tech podcast cover artwork" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBqKaK0zx2VGHn-LGm2nN7aGq0VGhLTP7qUD4tIdSoN38F9uNHPg6XJDgQRzZyMb734VRwl7fSA_GqKGLMMIzZRpfsAuCQIaBL7tmlIowFsprje6DFgvk28MyQyeYlvLkNMk0um8bDjxy3fJJeCmLCJKXE7wiDrOWlBQAZ1JjGvbr8utAUZ5R67TZ4g_vCdoB9-CM8m76TnVf1uC-O28Qu6Pc917XEjAVOBnDjJIGDb"/>
+<span class="absolute top-2.5 left-2.5 bg-primary text-on-primary font-label-sm text-label-sm font-bold px-2 py-0.5 rounded-full shadow-sm">
+            YENİ BÖLÜM
+          </span>
+<button aria-label="Hızlı Dinle" class="absolute bottom-2.5 right-2.5 w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-lg active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<div class="flex flex-col">
+<h3 class="font-label-lg text-label-lg text-on-surface truncate">Geleceğin Kodları</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Sertac Doğanay • Teknoloji</p>
+</div>
+<button class="podcast-follow-btn w-full py-1.5 px-3 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm flex items-center justify-center gap-1 active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">check</span>
+<span>Takip Ediliyor</span>
+</button>
+</div>
+<!-- Show 2 -->
+<div class="flex-shrink-0 w-44 flex flex-col gap-2.5">
+<div class="relative w-44 h-44 rounded-2xl overflow-hidden bg-surface-container-lowest shadow-md">
+<img class="w-full h-full object-cover" data-alt="Moody coffee cup steaming next to vintage headphones on dark rustic walnut desk, glowing neon violet and emerald ambient accents, intimate conversational talk show aesthetics" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfTeGPbAw6xpdN1p9NuP3jeq12afRXxqpk8g8kcagKiJEnRQdird-8aMvUK6S6g38Sd1P3cGgm9m9R5F2PUuHEdD_Ec_aBxcl_gErjoGnM96LprUuAclk-P8CtMCU5cqsR9yRbJeMMcno-zxkc6A3mYXFeA4fB0eFfbr79DBxaccM-bNkYotTkZmVSlsQDUQvkrnfRZVbtIte2kGp0G0wUZOtGRXaw-a7ZR2VP7vtI"/>
+<span class="absolute top-2.5 left-2.5 bg-primary text-on-primary font-label-sm text-label-sm font-bold px-2 py-0.5 rounded-full shadow-sm">
+            YENİ BÖLÜM
+          </span>
+<button aria-label="Hızlı Dinle" class="absolute bottom-2.5 right-2.5 w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-lg active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<div class="flex flex-col">
+<h3 class="font-label-lg text-label-lg text-on-surface truncate">Nasıl Olunur?</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Nilay Örnek • Kültür</p>
+</div>
+<button class="podcast-follow-btn w-full py-1.5 px-3 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm flex items-center justify-center gap-1 active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">add</span>
+<span>Takip Et</span>
+</button>
+</div>
+<!-- Show 3 -->
+<div class="flex-shrink-0 w-44 flex flex-col gap-2.5">
+<div class="relative w-44 h-44 rounded-2xl overflow-hidden bg-surface-container-lowest shadow-md">
+<img class="w-full h-full object-cover" data-alt="Futuristic world globe made of digital fiber optics and data streams, deep black space ambiance with emerald green aura, global journalism and world news podcast visual" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3Zy0gkzOKojZkBEi46wfFE_BurflnQYt-We6loK6hACERdYHjAQgWjDzD5I63QGDAaItmB4SUKVz3GYO_7yWW9DOF_9jj8FqpDmEpj85hluZeUlWnTLR-NFtnjPIcG6Rx-Ws-JgGUCT68uz9B8aC5UfDC5XQpAcxvN871ZyMpMY0Ns7M1fB8eQ0s_iUkBvo4lzGoxnnOiALlv6IxUOMM9JfvOYQMfsKC5evZszsO5"/>
+<button aria-label="Hızlı Dinle" class="absolute bottom-2.5 right-2.5 w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-lg active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+<div class="flex flex-col">
+<h3 class="font-label-lg text-label-lg text-on-surface truncate">Aposto Gündem</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Aposto Ekibi • Haber</p>
+</div>
+<button class="podcast-follow-btn w-full py-1.5 px-3 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm flex items-center justify-center gap-1 active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">add</span>
+<span>Takip Et</span>
+</button>
+</div>
+</div>
+</section>
+<!-- En Son Yayınlanan Bölümler (Vertical Episode Browser) -->
+<section class="flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">En Son Yayınlanan Bölümler</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Takip ettiğin kanallardan taze içerikler</p>
+</div>
+<button aria-label="Sıralama" class="flex items-center gap-1 font-label-md text-label-md text-primary" type="button">
+<span>En Yeni</span>
+<span class="material-symbols-outlined text-[18px]">expand_more</span>
+</button>
+</div>
+<div class="flex flex-col gap-2.5">
+<!-- Episode Row 1 -->
+<div class="flex items-center justify-between p-3 rounded-2xl bg-surface-container hover:bg-surface-container-high transition-colors">
+<div class="flex items-center gap-3 min-w-0 flex-1">
+<div class="relative w-14 h-14 rounded-xl overflow-hidden bg-surface-container-lowest flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Artificial intelligence glowing silicon processor chip with intricate luminous green micro pathways on midnight backdrop, technology podcast artwork" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDjhC-dDYEAXcsC4oDiJE_R4coPJ95ANX6TCix_3KUhMYlg3d7JFtgm8-sLIGKT7ZKb4aOuKvVm1OFbKrH00FnaUiCbfXijVadu6SNUczE-wPnkVNNVsM_QyqDSkrvMNd5lDoA0-n5IlSXIgXhwWwq6y1nCEdvIP7TtPw9IpQTw7se8naOCswc3oVBeqXS4yCxE3aE7Yp9cbdhWc88vQ3xZTeniB3mMxi4uKnsJ5cFj"/>
+</div>
+<div class="flex flex-col min-w-0 pr-2">
+<span class="font-label-sm text-label-sm text-primary">Bugün • 08:30</span>
+<h3 class="font-label-lg text-label-lg text-on-surface truncate">Yapay Zeka ve Geleceğin Meslekleri</h3>
+<div class="flex items-center gap-2 mt-0.5">
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">Geleceğin Kodları</span>
+<span class="font-label-sm text-label-sm bg-surface-container-highest px-1.5 py-0.5 rounded text-on-surface">48 dk</span>
+<span class="font-label-sm text-label-sm bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">1.5x</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-1 flex-shrink-0">
+<button aria-label="Bölümü İndir" class="episode-download-btn w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary active:scale-95 transition-colors" type="button">
+<span class="material-symbols-outlined text-[20px]">download</span>
+</button>
+<button aria-label="Oynat" class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-md active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<!-- Episode Row 2 -->
+<div class="flex items-center justify-between p-3 rounded-2xl bg-surface-container hover:bg-surface-container-high transition-colors">
+<div class="flex items-center gap-3 min-w-0 flex-1">
+<div class="relative w-14 h-14 rounded-xl overflow-hidden bg-surface-container-lowest flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="A telescope pointing at a luminous green spiral galaxy in deep outer space, educational astronomy podcast episode graphic" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWjZBDs1ON8ymEux5qAxNld7C__cL2wKSKsAgQ2hykOoQkPfySaM2IvKhN6Uu9vCHTCYAtGahcX3FhrQTrDI2n1q3IDZ0QhCQXPR0lvWceuoAOE1B7aUx03x04jiJPY_R_KzF4v6Ko7h-ebpkjrwMUX2gg-i1VnqmDAtsC9aoF_zDnpEa12gOgWFsv5EwayQuFMSKEcCjei_ApOjasW1fRBqJPXMBqcXBq-5lezzFy"/>
+</div>
+<div class="flex flex-col min-w-0 pr-2">
+<div class="flex items-center gap-1.5">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Dün • 19:00</span>
+<span class="font-label-sm text-label-sm bg-primary/20 text-primary px-1 rounded">🛡️ Çocuk</span>
+</div>
+<h3 class="font-label-lg text-label-lg text-on-surface truncate">Karadelikler Nasıl Oluşur?</h3>
+<div class="flex items-center gap-2 mt-0.5">
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">Meraklı Minikler</span>
+<span class="font-label-sm text-label-sm bg-surface-container-highest px-1.5 py-0.5 rounded text-on-surface">22 dk</span>
+<span class="font-label-sm text-label-sm bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">1.0x</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-1 flex-shrink-0">
+<button aria-label="İndirildi" class="w-10 h-10 rounded-full flex items-center justify-center text-primary active:scale-95 transition-colors" type="button">
+<span class="material-symbols-outlined text-[20px]">download_done</span>
+</button>
+<button aria-label="Oynat" class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-md active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<!-- Episode Row 3 -->
+<div class="flex items-center justify-between p-3 rounded-2xl bg-surface-container hover:bg-surface-container-high transition-colors">
+<div class="flex items-center gap-3 min-w-0 flex-1">
+<div class="relative w-14 h-14 rounded-xl overflow-hidden bg-surface-container-lowest flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Minimalist architectural office interior with a single designer sketching, warm ambient low light with soft green reflections, creative career podcast cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdv-YpaeBafnnDc01G-dW-aXVERWOIFvNbO7p76xn1Sk0CkRWT3HLme6WKwGSpYVneG5HUbqRSbci4oPLg_92LN-q0WkAIZ2rzOxV-O6XCAx1yn227rYD6EILSazGM4q2aowqEJYRiTQQIzjaDoIQRcnS7tO5raLXoWeYqBUlY7r1EKjEtwOGfcelS9U5VifalV2Ph2nK4bPFHcH7Dt9g6ra-7JoFJJUg_NMSP8mAK"/>
+</div>
+<div class="flex flex-col min-w-0 pr-2">
+<span class="font-label-sm text-label-sm text-on-surface-variant">2 gün önce</span>
+<h3 class="font-label-lg text-label-lg text-on-surface truncate">Mimar Olmak: Şehirler ve Hayaller</h3>
+<div class="flex items-center gap-2 mt-0.5">
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">Nasıl Olunur?</span>
+<span class="font-label-sm text-label-sm bg-surface-container-highest px-1.5 py-0.5 rounded text-on-surface">64 dk</span>
+<span class="font-label-sm text-label-sm bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">1.5x</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-1 flex-shrink-0">
+<button aria-label="Bölümü İndir" class="episode-download-btn w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary active:scale-95 transition-colors" type="button">
+<span class="material-symbols-outlined text-[20px]">download</span>
+</button>
+<button aria-label="Oynat" class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-md active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+</div>
+<script>
+  // Filter chips active state toggling
+  document.querySelectorAll('.podcast-filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.podcast-filter-chip').forEach(c => {
+        c.classList.remove('bg-primary', 'text-on-primary');
+        c.classList.add('bg-surface-container-high', 'text-on-surface-variant');
+      });
+      chip.classList.remove('bg-surface-container-high', 'text-on-surface-variant');
+      chip.classList.add('bg-primary', 'text-on-primary');
+    });
+  });
+
+  // Follow buttons toggle state
+  document.querySelectorAll('.podcast-follow-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const isFollowing = btn.textContent.includes('Takip Ediliyor');
+      if (isFollowing) {
+        btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">add</span><span>Takip Et</span>';
+        btn.classList.remove('bg-surface-container-high', 'text-on-surface-variant');
+        btn.classList.add('bg-primary/10', 'text-primary');
+      } else {
+        btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">check</span><span>Takip Ediliyor</span>';
+        btn.classList.remove('bg-primary/10', 'text-primary');
+        btn.classList.add('bg-surface-container-high', 'text-on-surface-variant');
+      }
+    });
+  });
+
+  // Download episode state toggle
+  document.querySelectorAll('.episode-download-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const icon = btn.querySelector('.material-symbols-outlined');
+      if (icon.textContent === 'download') {
+        icon.textContent = 'download_done';
+        btn.classList.remove('text-on-surface-variant');
+        btn.classList.add('text-primary');
+      } else {
+        icon.textContent = 'download';
+        btn.classList.remove('text-primary');
+        btn.classList.add('text-on-surface-variant');
+      }
+    });
+  });
+
+  // Activate Podcast tab in shell navigation
+  const podcastTab = document.querySelector('nav a[data-path="podcast"]');
+  if (podcastTab) {
+    document.querySelectorAll('nav a').forEach(a => {
+      a.classList.remove('text-primary', 'font-bold');
+      a.classList.add('text-on-surface-variant');
+    });
+    podcastTab.classList.remove('text-on-surface-variant');
+    podcastTab.classList.add('text-primary', 'font-bold');
+    const icon = podcastTab.querySelector('.material-symbols-outlined');
+    if (icon) {
+      icon.style.fontVariationSettings = "'FILL' 1";
+    }
+  }
+</script></main><aside class="fixed bottom-16 inset-x-0 z-40 px-3 pb-2 pointer-events-none"><div class="pointer-events-auto relative overflow-hidden rounded-2xl bg-surface-container-high/90 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex items-center justify-between p-2"><div class="flex items-center gap-3 min-w-0 flex-1"><div class="relative w-12 h-12 rounded-xl overflow-hidden bg-surface-container-lowest flex-shrink-0 flex items-center justify-center"><span class="material-symbols-outlined text-primary text-[28px]">album</span><div class="absolute inset-0 bg-primary/10 mix-blend-overlay"></div></div><div class="flex flex-col min-w-0 pr-2"><div class="flex items-center gap-1.5"><p class="font-label-lg text-label-lg text-on-surface truncate">Dönence</p><span class="font-label-sm text-label-sm bg-primary/15 text-primary px-1 py-0.2 rounded font-bold uppercase tracking-wider">Hi-Res</span></div><p class="font-body-sm text-body-sm text-on-surface-variant truncate">Barış Manço</p></div></div><div class="flex items-center gap-1 flex-shrink-0"><button aria-label="Favorilere Ekle" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-primary transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">favorite</span></button><button aria-label="Oynat veya Duraklat" class="w-11 h-11 flex items-center justify-center rounded-full bg-primary text-on-primary hover:bg-primary-fixed shadow-md shadow-primary/20 transition-transform active:scale-95" type="button"><span class="material-symbols-outlined text-[24px]">play_arrow</span></button></div><div class="absolute bottom-0 inset-x-0 h-[2.5px] bg-surface-variant"><div class="h-full bg-primary rounded-full" style="width: 42%;"></div></div></div></aside><nav class="fixed bottom-0 inset-x-0 z-50 pb-safe bg-surface-container-lowest/90 backdrop-blur-2xl" data-active-classes="text-primary font-bold"><div class="flex justify-around items-center h-16 px-1"><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] gap-0.5 text-on-surface-variant hover:text-on-surface transition-colors" data-path="ana-sayfa" href="#"><span class="material-symbols-outlined text-[22px]">home</span><span class="font-label-sm text-label-sm tracking-tight">Ana Sayfa</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] gap-0.5 text-on-surface-variant hover:text-on-surface transition-colors" data-path="kesfet-ara" href="#"><span class="material-symbols-outlined text-[22px]">search</span><span class="font-label-sm text-label-sm tracking-tight">Keşfet</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] gap-0.5 text-on-surface-variant hover:text-on-surface transition-colors" data-path="muzik" href="#"><span class="material-symbols-outlined text-[22px]">album</span><span class="font-label-sm text-label-sm tracking-tight">Müzik</span></a><a aria-current="page" class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] gap-0.5 transition-colors text-primary font-bold" data-path="podcast" href="#"><span class="material-symbols-outlined text-[22px]">podcasts</span><span class="font-label-sm text-label-sm tracking-tight">Podcast</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] gap-0.5 text-on-surface-variant hover:text-on-surface transition-colors" data-path="kitapligim" href="#"><span class="material-symbols-outlined text-[22px]">library_music</span><span class="font-label-sm text-label-sm tracking-tight">Kitaplığım</span></a></div></nav></body></html>
