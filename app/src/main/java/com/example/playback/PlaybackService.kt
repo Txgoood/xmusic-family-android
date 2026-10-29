@@ -23,13 +23,32 @@ class PlaybackService : MediaSessionService() {
             timerHandler.postDelayed(stopPlayback, minutes * 60000L)
         }
     }
+    private val experimentalHeaders = java.util.concurrent.ConcurrentHashMap<String, Map<String, String>>()
+
+    fun registerExperimentalStream(url: String, headers: Map<String, String>) {
+        // Başlıklar yalnızca çözülen akış adresi için geçerlidir.
+        experimentalHeaders.clear()
+        experimentalHeaders[url] = headers
+    }
+
     private var player: ExoPlayer? = null
     private var mediaSession: MediaSession? = null
 
     override fun onCreate() {
         super.onCreate()
         activeService = this
+        val resolver = androidx.media3.datasource.ResolvingDataSource.Resolver { spec ->
+            val headers = experimentalHeaders[spec.uri.toString()]
+            if (headers == null) spec else spec.withAdditionalHeaders(headers)
+        }
+        val dataSource = androidx.media3.datasource.DefaultDataSource.Factory(
+            this,
+            androidx.media3.datasource.ResolvingDataSource.Factory(
+                androidx.media3.datasource.DefaultHttpDataSource.Factory(), resolver
+            )
+        )
         player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(androidx.media3.exoplayer.source.DefaultMediaSourceFactory(dataSource))
             .setAudioAttributes(AudioAttributes.Builder()
                 .setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true)
             .setHandleAudioBecomingNoisy(true)
