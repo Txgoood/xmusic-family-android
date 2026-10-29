@@ -35,6 +35,28 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     }
 
     @JavascriptInterface
+    fun goBack() {
+        webView.post {
+            if (webView.canGoBack()) webView.goBack()
+            else webView.loadUrl("file:///android_asset/stitch/ana_sayfa/code.html")
+        }
+    }
+
+    @JavascriptInterface
+    fun togglePlayPause() {
+        webView.post {
+            val controller = mediaController
+            if (controller == null) {
+                Toast.makeText(context, "Oynatıcı henüz hazır değil", Toast.LENGTH_SHORT).show()
+            } else if (controller.isPlaying) {
+                controller.pause()
+            } else {
+                controller.play()
+            }
+        }
+    }
+
+    @JavascriptInterface
     fun play() {
         mediaController?.play()
     }
