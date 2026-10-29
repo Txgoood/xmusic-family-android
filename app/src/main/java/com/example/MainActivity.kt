@@ -205,6 +205,9 @@ class MainActivity : ComponentActivity() {
                             if(!q){panel.style.display='none';return;}
                             panel.style.display='block';list.textContent='Aranıyor...';
                             debounce=setTimeout(function(){
+                              if(verifiedMode){
+                                setTimeout(function(){if(verifiedMode && id===currentId && list.textContent==='Aranıyor...'){list.textContent='Katalog yanıt vermedi. Aramayı yeniden dene.';}},16000);
+                              }
                               if(verifiedMode)window.Android.searchVerifiedCatalog(q,selectedArtist,id);
                               else if(mode==='tracks')window.Android.searchMusic(q,id);
                               else window.Android.searchAudiusCatalog(q,mode,id);
