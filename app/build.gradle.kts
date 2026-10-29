@@ -98,6 +98,8 @@ dependencies {
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
+  // Deneysel kaynak çözümleyici; yalnızca deneme dalında kullanılır.
+  implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
   // Media3 dependencies
   implementation("androidx.media3:media3-exoplayer:1.5.1")
   implementation("androidx.media3:media3-ui:1.5.1")
