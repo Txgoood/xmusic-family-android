@@ -95,6 +95,48 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     }
 
     @JavascriptInterface
+    fun searchAudiusCatalog(query: String, category: String, requestId: Int) {
+        if (query.isBlank() || query.length > 120 || category !in setOf("users", "playlists")) return
+        Thread {
+            val result = try {
+                val encoded = java.net.URLEncoder.encode(query.trim(), "UTF-8")
+                val endpoint = java.net.URL("https://discoveryprovider.audius.co/v1/$category/search?query=$encoded&app_name=XMusicFamily")
+                val conn = (endpoint.openConnection() as java.net.HttpURLConnection).apply {
+                    connectTimeout = 10000
+                    readTimeout = 12000
+                    setRequestProperty("Accept", "application/json")
+                }
+                try {
+                    if (conn.responseCode !in 200..299) throw java.io.IOException("API request failed")
+                    val data = org.json.JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+                        .optJSONArray("data") ?: org.json.JSONArray()
+                    val rows = org.json.JSONArray()
+                    for (i in 0 until minOf(data.length(), 25)) {
+                        val entry = data.optJSONObject(i) ?: continue
+                        val creator = entry.optJSONObject("user")
+                        val art = if (category == "users") entry.optJSONObject("profile_picture") else entry.optJSONObject("artwork")
+                        rows.put(org.json.JSONObject().apply {
+                            put("id", entry.optString("id"))
+                            put("title", if (category == "users") entry.optString("name") else entry.optString("playlist_name"))
+                            put("artist", if (category == "users") "Sanatçı" else (creator?.optString("name") ?: ""))
+                            put("artwork", art?.optString("150x150") ?: "")
+                        })
+                    }
+                    org.json.JSONObject().put("items", rows)
+                } finally { conn.disconnect() }
+            } catch (e: Exception) {
+                org.json.JSONObject().put("error", "Katalog yüklenemedi. İnternet bağlantısını kontrol et.")
+            }
+            webView.post {
+                webView.evaluateJavascript(
+                    "window.__xmusicCatalogResult && window.__xmusicCatalogResult(" +
+                        requestId + "," + org.json.JSONObject.quote(category) + "," + result.toString() + ")", null
+                )
+            }
+        }.start()
+    }
+
+    @JavascriptInterface
     fun goBack() {
         webView.post {
             if (webView.canGoBack()) webView.goBack()
