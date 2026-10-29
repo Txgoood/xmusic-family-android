@@ -15,3 +15,7 @@ Kural: Sırayı koru; her aşamada ilgili özellikleri kodda ve mümkün olan ot
 10. Genel kabul testi ve optimizasyon: 18 ekran ve tüm akışların uçtan uca testi, hata/performans, en son APK boyutu ve yayın hazırlığı.
 
 Durumları yalnız doğrulanan işin ardından güncelle.
+
+## Doğrulanan testler
+- 2026-10-29, derleme #32: Audius şarkı araması, sorgu değişimi, şarkı/sanatçı gösterimi, sonuç bulunamadı ve internet hatası kullanıcı testinde 5/5 başarılı. Aşama 2 kısmi; sanatçı/albüm araması ve diğer katalog işlevleri henüz onaylanmadı.
+- Ertelenen hata: menü geçişlerinde kısa süre görünen `notifications` metni (Aşama 1).
