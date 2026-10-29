@@ -290,6 +290,36 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     }
 
     @JavascriptInterface
+    fun playAudiusTrack(trackId: String, title: String, artist: String) {
+        if (!trackId.matches(Regex("[a-zA-Z0-9]{1,64}"))) {
+            webView.post { Toast.makeText(context, "Geçersiz Audius parça kimliği", Toast.LENGTH_SHORT).show() }
+            return
+        }
+        webView.post {
+            val controller = mediaController
+            if (controller == null) {
+                Toast.makeText(context, "Müzik oynatıcı hazır değil", Toast.LENGTH_SHORT).show()
+                return@post
+            }
+            val streamUrl = "https://discoveryprovider.audius.co/v1/tracks/$trackId/stream?app_name=XMusicFamily"
+            val item = MediaItem.Builder()
+                .setUri(streamUrl)
+                .setMediaId("audius:$trackId")
+                .setMediaMetadata(
+                    androidx.media3.common.MediaMetadata.Builder()
+                        .setTitle(title.take(180))
+                        .setArtist(artist.take(180))
+                        .build()
+                )
+                .build()
+            controller.setMediaItem(item)
+            controller.prepare()
+            controller.play()
+            Toast.makeText(context, "Audius: " + title.take(50), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    @JavascriptInterface
     fun playStream(url: String) {
         val uri = android.net.Uri.parse(url)
         if (uri.scheme != "https" && uri.scheme != "http") {
