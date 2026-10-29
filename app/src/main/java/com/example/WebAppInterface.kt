@@ -182,7 +182,8 @@ class WebAppInterface(private val context: Context, private val webView: WebView
                     org.json.JSONObject().put("items", items)
                 } finally { conn.disconnect() }
             } catch (e: Exception) {
-                org.json.JSONObject().put("error", "Müzik kataloğuna ulaşılamadı. Daha sonra tekrar dene.")
+                android.util.Log.w("XMusicCatalog", "MusicBrainz lookup failed", e)
+                org.json.JSONObject().put("error", "MusicBrainz yanıt vermedi. Bağlantıyı kontrol edip tekrar dene.")
             }
             webView.post {
                 webView.evaluateJavascript(
