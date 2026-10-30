@@ -297,6 +297,8 @@ eqTitle.closest('.p-4').click();assert.deepEqual(x.calls.at(-1),['openEqualizer'
 const switches=[...x.d.querySelectorAll('main input[type="checkbox"]')];
 assert.equal(switches.length,3);
 assert.equal(switches[0].disabled,true);assert.equal(switches[1].disabled,false);assert.equal(switches[2].disabled,true);checks+=4;
+const musicAccess=[...x.d.querySelectorAll('details button')].find(b=>b.textContent==='Mevcut müziklere erişim ver');
+musicAccess.click();assert.deepEqual(x.calls.at(-1),['authorizeExistingDriveAudio']);checks++;
 const sharedFolder=[...x.d.querySelectorAll('details button')].find(b=>b.textContent==='Ortak müzik klasörünü seç / değiştir');
 sharedFolder.click();assert.deepEqual(x.calls.at(-1),['chooseSharedDriveFolder']);checks++;
 const driveSummary=x.d.querySelector('details summary');assert.ok(driveSummary.textContent.includes('Google hesap ve Drive'));
@@ -314,6 +316,7 @@ x.dom.window.close();
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
 if(process.env.XMUSIC_AUDIT_OUTPUT)fs.writeFileSync(process.env.XMUSIC_AUDIT_OUTPUT,JSON.stringify(report,null,2));
+
 
 
 
