@@ -127,6 +127,11 @@ class ProfileStore(private val context: Context) {
                 .put("feed", track.optString("feed").take(2048)).put("artwork", track.optString("artwork").take(2048)))
         }
         child.put("approved", updated)
+        if (!remove) for (field in listOf("pending", "denied")) {
+            val old = child.optJSONArray(field) ?: continue; val keep = JSONArray()
+            for (i in 0 until old.length()) { val item = old.getJSONObject(i); if (key(item.optString("id")) != key(id)) keep.put(item) }
+            child.put(field, keep)
+        }
         return prefs.edit().putString("profiles", rows.toString()).commit()
     }
     // Başlık taraması yalnızca uyarı üretir; güvenli içerik kararı vermez.
