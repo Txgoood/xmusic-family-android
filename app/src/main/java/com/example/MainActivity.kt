@@ -98,10 +98,14 @@ class MainActivity : ComponentActivity() {
             family.status("Aile bağlantısındaki Google hesabını ve ortak klasörü bağla."); return
         }
         lastFamilyAttempt = android.os.SystemClock.elapsedRealtime(); familyBusy = true
+        val previousProfile = ProfileStore(this).activeId(); val previousRole = ProfileStore(this).role()
         driveFolderWorker.execute {
             try {
                 FamilyDriveClient(this).sync(token)
-                runOnUiThread { familyRefresh() }
+                runOnUiThread {
+                    val now = ProfileStore(this)
+                    familyRefresh(now.activeId() == previousProfile && now.role() != previousRole)
+                }
             } catch (_: Exception) {
                 family.status("Aile eşitlemesi tamamlanamadı. İnternet, ortak klasör ve otomatik arşiv iznini kontrol et; yerel kayıtların korunuyor.")
                 runOnUiThread { familyRefresh() }
