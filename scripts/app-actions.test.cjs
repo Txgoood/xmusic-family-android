@@ -59,6 +59,53 @@ x.w.__xmusicRssResult(1,{title:'Gerçek Podcast',items:[{id:'podcast:one',title:
 x.w.__xmusicRssResult(999,{title:'Eski yanıt',items:[]});assert.ok(!x.d.querySelector('main').textContent.includes('Eski yanıt'));checks++;
 x.dom.window.close();
 x=open('kitapl_m');x.w.__xmusicLocalImported({id:'local:content://test',title:'Kendi Kaydım',artist:'Yerel'});assert.ok(JSON.parse(db).local.some(t=>t.title==='Kendi Kaydım'));checks++;x.dom.window.close();
+// Keşfet regresyonu: gerçek filtre yönlendirmesi, yerleşim, eski yanıt ve çalma yolu.
+x=open('arama_ve_ke_fet');
+let searchTimers=[];
+x.w.setTimeout=(fn,ms)=>{if(ms===350)searchTimers.push(fn);return searchTimers.length;};
+x.w.clearTimeout=()=>{};
+function flushSearch(){const pending=searchTimers;searchTimers=[];pending.forEach(fn=>fn());}
+function searchCalls(){return x.calls.filter(c=>c[0]==='searchAppleCatalog');}
+const searchInput=x.d.getElementById('search-input');
+const searchShell=searchInput.closest('section');
+const results=x.d.getElementById('xmusic-live-search');
+assert.equal(searchShell.nextElementSibling,results);checks++;
+assert.ok(!results.textContent.includes('YouTube · Deneme'));
+assert.equal([...results.querySelectorAll('button')].length,0);checks++;
+searchInput.value='Mabel';searchInput.dispatchEvent(new x.w.Event('input',{bubbles:true}));flushSearch();
+assert.deepEqual(searchCalls().map(c=>c[3]),['artists','albums','songs']);checks++;
+const initial=searchCalls()[0];
+x.w.__xmusicAppleResult(initial[4],{items:[{id:'1',title:'Mabel Matiz',subtitle:'Pop'}]});
+assert.ok(results.textContent.includes('Mabel Matiz'));checks++;
+[...results.querySelectorAll('button')].find(b=>b.textContent.includes('Mabel Matiz')).click();flushSearch();
+let call=searchCalls().at(-1);
+assert.deepEqual(call.slice(0,4),['searchAppleCatalog','Mabel','1','albums']);checks++;
+x.w.__xmusicAppleResult(call[4],{items:[{id:'2',title:'Gök Nerede',subtitle:'Mabel Matiz',category:'Albüm'}]});
+[...results.querySelectorAll('button')].find(b=>b.textContent.includes('Gök Nerede')).click();flushSearch();
+call=searchCalls().at(-1);assert.equal(call[3],'songs');assert.equal(call[2],'2');checks++;
+x.w.__xmusicAppleResult(call[4],{items:[{id:'3',title:'Gel',subtitle:'Mabel Matiz'}]});
+[...results.querySelectorAll('button')].find(b=>b.textContent.includes('Gel')).click();flushSearch();
+let source=x.calls.filter(c=>c[0]==='searchExperimentalSource').at(-1);
+assert.equal(source[1],'Mabel Matiz Gel');checks++;
+x.w.__xmusicExperimentalResult(source[2],{items:[{id:'leTDrileoGI',title:'Mabel Matiz - Gel',artist:'Yükleyen'}]});
+[...results.querySelectorAll('button')].find(b=>b.textContent.includes('Mabel Matiz - Gel')).click();
+assert.deepEqual(x.calls.at(-1),['playExperimentalSource','leTDrileoGI','Mabel Matiz - Gel','Yükleyen']);checks++;
+for(const kind of ['songs','artists','albums']){
+ x.d.querySelector('[data-filter="'+kind+'"]').click();flushSearch();
+ call=searchCalls().at(-1);assert.equal(call[3],kind);assert.equal(call[2],'');
+ assert.equal(x.d.querySelector('[data-filter="'+kind+'"]').getAttribute('aria-pressed'),'true');checks+=3;
+}
+const latest=searchCalls().at(-1);
+x.w.__xmusicAppleResult(initial[4],{items:[{id:'9',title:'Eski sonuç'}]});
+assert.ok(!results.textContent.includes('Eski sonuç'));checks++;
+x.w.__xmusicAppleResult(latest[4],{items:[{id:'10',title:"Don't <img src=x>",subtitle:'Sanatçı',category:'Albüm'}]});
+assert.ok(results.textContent.includes("Don't <img src=x>"));assert.equal(results.querySelector('img[src="x"]'),null);checks+=2;
+x.d.getElementById('search-clear-btn').click();
+assert.equal(searchInput.value,'');assert.equal(results.style.display,'none');assert.equal(results.nextElementSibling.style.display,'');checks+=3;
+assert.ok(!x.d.querySelector('main').textContent.includes('Apple Türkiye müzik kataloğu'));
+assert.ok(!x.d.querySelector('main').textContent.includes('YouTube · Deneme'));checks+=2;
+x.dom.window.close();
+
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
 if(process.env.XMUSIC_AUDIT_OUTPUT)fs.writeFileSync(process.env.XMUSIC_AUDIT_OUTPUT,JSON.stringify(report,null,2));
