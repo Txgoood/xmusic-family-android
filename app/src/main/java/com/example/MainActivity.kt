@@ -837,10 +837,25 @@ class MainActivity : ComponentActivity() {
                           access.dataset.xmOwned='true';access.__xmOwnedRun=function(){window.Android.authorizeExistingDriveAudio();};
                           const sync=document.createElement('button');sync.type='button';sync.textContent='Otomatik ortak arşiv bağlantısını aç';
                           sync.dataset.xmOwned='true';sync.__xmOwnedRun=function(){window.Android.enableContinuousDrive();};
-                          [btn,shared,sync,access,library,upload,queue,automatic].forEach(function(item){
+                          const explain=function(text){const p=document.createElement('p');p.textContent=text;p.style.cssText='margin:12px 16px 6px;font-size:13px;line-height:1.5;color:#bbcbb8;';return p;};
+                          const appendAction=function(parent,item){
                             item.style.cssText='display:block;width:calc(100% - 32px);padding:14px;margin:8px 16px;text-align:left;border:1px solid #62796f;border-radius:12px;color:#e0e3e7;font:inherit;';
-                            details.appendChild(item);
-                          });
+                            parent.appendChild(item);
+                          };
+                          details.appendChild(explain('Bir kez kurulum: Her telefonda kendi Google hesabını ve aynı ortak müzik klasörünü kullan.'));
+                          details.appendChild(explain('1. Ortak klasörü seç. Daha önce seçtiysen bu adımı tekrarlama.'));
+                          appendAction(details,shared);
+                          details.appendChild(explain('2. Otomatik bağlantı iznini bir kez ver. Yeni müzikler uygulama açıkken yaklaşık dakikada bir alınır; tek tek şarkı seçmen gerekmez.'));
+                          appendAction(details,sync);
+                          details.appendChild(explain('Günlük kullanım: Ortak arşivdeki müzikleri aç ve dinle.'));
+                          appendAction(details,library);
+                          const advanced=document.createElement('details');advanced.style.cssText='margin:16px;border-top:1px solid #3c4a3c;padding-top:12px;';
+                          const advancedTitle=document.createElement('summary');advancedTitle.textContent='Gelişmiş işlemler';advancedTitle.style.cssText='padding:10px 0;font:inherit;color:#bbcbb8;cursor:pointer;';
+                          advancedTitle.dataset.xmOwned='true';advancedTitle.__xmOwnedRun=function(){advanced.open=!advanced.open;};
+                          advanced.appendChild(advancedTitle);
+                          advanced.appendChild(explain('Normal kullanım için aşağıdaki işlemleri tekrarlaman gerekmez. Dosya yükleme, kuyruk ve eski dosya bazlı erişim seçenekleri.'));
+                          [btn,upload,queue,automatic,access].forEach(function(item){appendAction(advanced,item);});
+                          details.appendChild(advanced);
                           section.appendChild(details);
                           const anchor=Array.from(main.querySelectorAll('section')).find(function(s){return (s.textContent||'').includes('İndirme & Depolama');});
                           if(anchor) anchor.before(section); else main.appendChild(section);
@@ -1014,6 +1029,7 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 }
+
 
 
 
