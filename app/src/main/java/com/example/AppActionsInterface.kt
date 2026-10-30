@@ -49,6 +49,19 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
     @JavascriptInterface fun requestChildReview(id: String, track: String): Boolean = profiles.requestReview(id, track)
     @JavascriptInterface fun setChildAge(id: String, age: String, pin: String): Boolean = profiles.setChildAge(id, age, pin)
     @JavascriptInterface fun resolveChildReview(id: String, key: String, deny: Boolean, pin: String): Boolean = profiles.resolveReview(id, key, deny, pin)
+    @JavascriptInterface fun familySyncState(): String = FamilySyncStore(activity).state()
+    @JavascriptInterface fun familySetup(action: String, code: String) { webView.post { activity.setupFamily(action, code) } }
+    @JavascriptInterface fun copyFamilyInvitation() { webView.post { activity.copyFamilyInvitation() } }
+    @JavascriptInterface fun setFamilySharing(enabled: Boolean): Boolean {
+        if (profiles.isChild()) return false
+        FamilySyncStore(activity).setSharing(profiles.activeId(), enabled)
+        webView.post { activity.syncFamilyIfReady(true) }; return true
+    }
+    @JavascriptInterface fun familySharing(): Boolean {
+        val data = JSONObject(profiles.publicState()).getJSONArray("profiles")
+        val row = (0 until data.length()).map { data.getJSONObject(it) }.firstOrNull { it.getString("id") == profiles.activeId() }
+        return !profiles.isChild() && FamilySyncStore(activity).isSharing(profiles.activeId(), row?.optBoolean("mixEnabled", false) ?: false)
+    }
     @JavascriptInterface fun familyMix(kind: String): String {
         if (profiles.isChild()) return profiles.approved().toString()
         if (kind !in setOf("favorites", "history")) return "[]"
@@ -60,8 +73,12 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
                 val row = rows.optJSONObject(i) ?: continue
                 val trackId = row.optString("id")
                 if (trackId.isNotBlank() && ids.add(trackId)) result.put(row)
-                if (result.length() >= 100) return result.toString()
+                if (result.length() >= 100) break
             }
+        }
+        val remote = FamilySyncStore(activity).remoteMix(kind)
+        for (i in 0 until remote.length()) {
+            val row = remote.getJSONObject(i); if (ids.add(row.optString("id")) && result.length() < 200) result.put(row)
         }
         return result.toString()
     }
