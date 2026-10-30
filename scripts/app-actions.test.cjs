@@ -279,7 +279,12 @@ x=open('ayarlar_ve_profil_y_netimi');
 const switches=[...x.d.querySelectorAll('main input[type="checkbox"]')];
 assert.equal(switches.length,3);
 assert.equal(switches[0].disabled,true);assert.equal(switches[1].disabled,false);assert.equal(switches[2].disabled,true);checks+=4;
-assert.ok(x.d.querySelector('details summary').textContent.includes('Google hesap ve Drive'));checks++;
+const driveSummary=x.d.querySelector('details summary');assert.ok(driveSummary.textContent.includes('Google hesap ve Drive'));
+driveSummary.click();assert.equal(driveSummary.parentElement.open,true);driveSummary.click();assert.equal(driveSummary.parentElement.open,false);checks+=3;
+const settingsMini=x.d.querySelector('main .fixed.bottom-2.inset-x-2');
+assert.equal(settingsMini.style.display,'none');
+x.w.__xmusicPlayback({ready:true,id:'experimental:leTDrileoGI',title:'Gerçek Şarkı',artist:'Sanatçı',playing:true,queue:[]});
+assert.notEqual(settingsMini.style.display,'none');assert.ok(settingsMini.textContent.includes('Gerçek Şarkı'));assert.ok(!settingsMini.textContent.includes('Antidepresan'));checks+=4;
 switches[1].checked=true;switches[1].dispatchEvent(new x.w.Event('change',{bubbles:true}));
 assert.deepEqual(x.calls.at(-1),['setDownloadWifiOnly',true]);checks++;
 const profileSection=[...x.d.querySelectorAll('main section')].find(s=>s.querySelector('h2')?.textContent.includes('Aile Profilleri'));
@@ -289,4 +294,5 @@ x.dom.window.close();
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
 if(process.env.XMUSIC_AUDIT_OUTPUT)fs.writeFileSync(process.env.XMUSIC_AUDIT_OUTPUT,JSON.stringify(report,null,2));
+
 
