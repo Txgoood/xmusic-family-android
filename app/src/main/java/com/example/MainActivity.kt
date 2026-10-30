@@ -20,6 +20,45 @@ class MainActivity : ComponentActivity() {
         if (uri != null) uploadLocalFileToDrive(uri)
     }
 
+    fun openDriveLibrary() {
+        val token = driveAccessToken
+        val folder = driveFolderId
+        if (driveBusy) { showDriveError("Drive işlemi sürüyor."); return }
+        if (token == null || folder == null) { showDriveError("Önce Ayarlar'dan Google Drive hesabını bağla."); return }
+        driveBusy = true
+        driveFolderWorker.execute {
+            try {
+                val tracks = com.example.data.drive.DriveFolderClient().listAudio(token, folder)
+                runOnUiThread {
+                    if (tracks.isEmpty()) showDriveError("XMusic Family klasöründe ses dosyası bulunamadı.")
+                    else android.app.AlertDialog.Builder(this).setTitle("Drive müzik arşivi")
+                        .setItems(tracks.map { it.name }.toTypedArray()) { _, index ->
+                            val track = tracks[index]
+                            val controller = mediaController
+                            val service = PlaybackService.activeService
+                            if (controller == null || service == null) {
+                                showDriveError("Oynatıcı henüz hazır değil.")
+                            } else if (driveAccessToken != token || driveFolderId != folder) {
+                                showDriveError("Drive hesabı değişti; arşivi yeniden aç.")
+                            } else {
+                                val url = "https://www.googleapis.com/drive/v3/files/" + track.id + "?alt=media"
+                                service.registerExperimentalStream(url, mapOf("Authorization" to "Bearer $token"))
+                                val metadata = androidx.media3.common.MediaMetadata.Builder()
+                                    .setTitle(track.name).setArtist("Google Drive arşivi").build()
+                                val item = androidx.media3.common.MediaItem.Builder()
+                                    .setMediaId("drive:" + track.id).setUri(url).setMediaMetadata(metadata).build()
+                                controller.setMediaItem(item)
+                                controller.prepare()
+                                controller.play()
+                            }
+                        }.setNegativeButton("Kapat", null).show()
+                }
+            } catch (e: Exception) {
+                runOnUiThread { showDriveError(e.message ?: "Drive arşivi açılamadı") }
+            } finally { runOnUiThread { driveBusy = false } }
+        }
+    }
+
     fun chooseDriveUpload() {
         if (driveBusy) {
             showDriveError("Drive işlemi sürüyor; tamamlanmasını bekle.")
@@ -570,7 +609,10 @@ class MainActivity : ComponentActivity() {
                           const upload=document.createElement('button');
                           upload.type='button';upload.textContent='Drive’a ses dosyası yükle';upload.style.cssText=btn.style.cssText;
                           upload.dataset.xmOwned='true';upload.__xmOwnedRun=function(){if(window.Android)window.Android.chooseDriveUpload();};
-                          main.prepend(upload);main.prepend(btn);
+                          const library=document.createElement('button');
+                          library.type='button';library.textContent='Drive müzik arşivini aç';library.style.cssText=btn.style.cssText;
+                          library.dataset.xmOwned='true';library.__xmOwnedRun=function(){if(window.Android)window.Android.openDriveLibrary();};
+                          main.prepend(library);main.prepend(upload);main.prepend(btn);
                         }
                       }
                       // Ayarlar ekranındaki anahtarları Android SharedPreferences ile sakla.
