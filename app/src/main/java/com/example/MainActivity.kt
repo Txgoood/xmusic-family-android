@@ -11,6 +11,65 @@ import com.example.playback.PlaybackService
 class MainActivity : ComponentActivity() {
     // Erişim anahtarı yalnızca bellekte tutulur; süre bitince yeniden yetki alınır.
     private var driveAccessToken: String? = null
+    private var driveFolderId: String? = null
+    private var driveBusy = false
+    private val driveFolderWorker = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val driveFilePicker = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) uploadLocalFileToDrive(uri)
+    }
+
+    fun chooseDriveUpload() {
+        if (driveBusy) {
+            showDriveError("Drive işlemi sürüyor; tamamlanmasını bekle.")
+            return
+        }
+        if (driveAccessToken == null || driveFolderId == null) {
+            showDriveError("Önce Google Drive hesabını bağla ve klasörün hazır olmasını bekle.")
+            return
+        }
+        driveFilePicker.launch(arrayOf("audio/*"))
+    }
+
+    private fun uploadLocalFileToDrive(uri: android.net.Uri) {
+        val token = driveAccessToken ?: return
+        val folder = driveFolderId ?: return
+        if (driveBusy) return
+        driveBusy = true
+        android.widget.Toast.makeText(this, "Dosya Drive'a yükleniyor; tamamlanana kadar uygulamayı açık tut.", android.widget.Toast.LENGTH_LONG).show()
+        driveFolderWorker.execute {
+            var temp: java.io.File? = null
+            try {
+                var name = "Müzik dosyası"
+                contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                    if (it.moveToFirst()) name = it.getString(0).orEmpty().take(255).ifBlank { "Müzik dosyası" }
+                }
+                val mime = contentResolver.getType(uri) ?: "application/octet-stream"
+                val local = java.io.File.createTempFile("drive-upload-", ".audio", cacheDir)
+                temp = local
+                val input = contentResolver.openInputStream(uri) ?: throw java.io.IOException("Dosya açılamadı")
+                input.use { source -> local.outputStream().use { out ->
+                    val buffer = ByteArray(65536)
+                    var total = 0L
+                    while (true) {
+                        val n = source.read(buffer)
+                        if (n < 0) break
+                        total += n
+                        if (total > 250L * 1024 * 1024) throw java.io.IOException("Bu denemede dosya sınırı 250 MB")
+                        out.write(buffer, 0, n)
+                    }
+                } }
+                val uploaded = com.example.data.drive.DriveUploadClient().upload(token, folder, local, name, mime)
+                runOnUiThread { showDriveError("Yükleme tamamlandı: " + uploaded.name + "\nDrive → XMusic Family klasöründen kontrol edebilirsin.") }
+            } catch (e: Exception) {
+                runOnUiThread { showDriveError("Yükleme tamamlanamadı: " + (e.message ?: e.javaClass.simpleName)) }
+            } finally {
+                temp?.delete()
+                runOnUiThread { driveBusy = false }
+            }
+        }
+    }
     private val driveAuthLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
@@ -45,12 +104,26 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun receiveDriveAuthorization(result: com.google.android.gms.auth.api.identity.AuthorizationResult) {
-        driveAccessToken = result.accessToken
-        val message = if (driveAccessToken.isNullOrBlank()) "Drive erişimi alınamadı" else "Google Drive izni alındı. Klasör seçimi henüz hazır değil."
-        android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_LONG).show()
+        val token = result.accessToken
+        if (token.isNullOrBlank()) { showDriveError("Drive erişimi alınamadı"); return }
+        driveAccessToken = token
+        driveFolderId = null
+        driveBusy = true
+        driveFolderWorker.execute {
+            try {
+                val folder = com.example.data.drive.DriveFolderClient().getOrCreate(token)
+                runOnUiThread {
+                    if (driveAccessToken == token) driveFolderId = folder
+                    showDriveError("Drive bağlantısı hazır. XMusic Family klasörü bulundu veya oluşturuldu. Şimdi 'Drive’a ses dosyası yükle' düğmesini kullanabilirsin.")
+                }
+            } catch (e: Exception) {
+                runOnUiThread { showDriveError(e.message ?: "Drive klasörü hazırlanamadı") }
+            } finally { runOnUiThread { driveBusy = false } }
+        }
     }
 
     fun authorizeDrive() {
+        if (driveBusy) { showDriveError("Drive işlemi sürüyor; tamamlanmasını bekle."); return }
         val request = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder()
             .setRequestedScopes(listOf(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file")))
             .build()
@@ -494,7 +567,10 @@ class MainActivity : ComponentActivity() {
                           btn.id='xmusic-drive-connect';btn.type='button';btn.textContent='Google Drive hesabını bağla';
                           btn.style.cssText='display:block;padding:12px;margin:12px;border:1px solid #62796f;border-radius:12px;color:#e0e3e7;';
                           btn.dataset.xmOwned='true';btn.__xmOwnedRun=function(){if(window.Android)window.Android.connectDrive();};
-                          main.prepend(btn);
+                          const upload=document.createElement('button');
+                          upload.type='button';upload.textContent='Drive’a ses dosyası yükle';upload.style.cssText=btn.style.cssText;
+                          upload.dataset.xmOwned='true';upload.__xmOwnedRun=function(){if(window.Android)window.Android.chooseDriveUpload();};
+                          main.prepend(upload);main.prepend(btn);
                         }
                       }
                       // Ayarlar ekranındaki anahtarları Android SharedPreferences ile sakla.
