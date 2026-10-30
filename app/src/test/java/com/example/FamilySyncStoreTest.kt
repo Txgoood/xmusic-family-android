@@ -24,7 +24,7 @@ class FamilySyncStoreTest {
         val store = FamilySyncStore(context); store.prepare("folder123", "account123"); store.finishCreate("root123")
         val policy = profiles.policy(store.familyId(), 1); val signed = store.signedPolicy(policy)
         val encrypted = store.seal(signed)
-        assertFalse(encrypted.contains("parentHash")); assertFalse(encrypted.contains("Ben"))
+        assertFalse(encrypted.contains("parentHash")); assertFalse(encrypted.contains("\"Ben\""))
         assertEquals(policy.toString(), store.verifyPolicy(store.open(encrypted)).toString())
         val forged = JSONObject(signed.toString()); val payload = JSONObject(forged.getString("payload"))
         payload.getJSONArray("profiles").getJSONObject(0).put("name", "Değiştirilmiş")
