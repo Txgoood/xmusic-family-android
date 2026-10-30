@@ -136,9 +136,10 @@ class AutomaticDriveArchive(context: Context, params: WorkerParameters) : Worker
             if (!prefs.getBoolean("enabled", true)) return
             val account = prefs.getString("account", null) ?: return
             if (prefs.contains(account + ":" + source)) return
+            val network = if (context.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE).getBoolean("download_unmetered_only", false)) NetworkType.UNMETERED else NetworkType.CONNECTED
             val work = OneTimeWorkRequestBuilder<AutomaticDriveArchive>()
                 .setInputData(workDataOf("source" to source, "title" to title, "account" to account))
-                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(network).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .addTag("xmusic-drive-upload").addTag("xmusic-auto-archive").build()
             WorkManager.getInstance(context).enqueueUniqueWork("auto-drive-$account-$source", ExistingWorkPolicy.KEEP, work)
