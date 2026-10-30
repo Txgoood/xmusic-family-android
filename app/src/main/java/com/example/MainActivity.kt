@@ -9,6 +9,44 @@ import androidx.media3.session.SessionToken
 import com.example.playback.PlaybackService
 
 class MainActivity : ComponentActivity() {
+    // Erişim anahtarı yalnızca bellekte tutulur; süre bitince yeniden yetki alınır.
+    private var driveAccessToken: String? = null
+    private val driveAuthLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        try {
+            val data = result.data ?: throw IllegalStateException("Yetkilendirme iptal edildi")
+            val auth = com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this)
+                .getAuthorizationResultFromIntent(data)
+            receiveDriveAuthorization(auth)
+        } catch (_: Exception) {
+            android.widget.Toast.makeText(this, "Google Drive bağlantısı tamamlanamadı", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun receiveDriveAuthorization(result: com.google.android.gms.auth.api.identity.AuthorizationResult) {
+        driveAccessToken = result.accessToken
+        val message = if (driveAccessToken.isNullOrBlank()) "Drive erişimi alınamadı" else "Google Drive izni alındı. Klasör seçimi henüz hazır değil."
+        android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_LONG).show()
+    }
+
+    fun authorizeDrive() {
+        val request = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file")))
+            .build()
+        val client = com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this)
+        client.authorize(request).addOnSuccessListener { result ->
+            if (result.hasResolution()) {
+                val pending = result.pendingIntent
+                if (pending != null) {
+                    driveAuthLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(pending.intentSender).build())
+                } else android.widget.Toast.makeText(this, "Google hesap seçimi açılamadı", android.widget.Toast.LENGTH_LONG).show()
+            } else receiveDriveAuthorization(result)
+        }.addOnFailureListener {
+            android.widget.Toast.makeText(this, "Google Drive izni alınamadı. Hesap ve uygulama yapılandırmasını kontrol et.", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
     private var mediaController: MediaController? = null
     private var controllerFuture: com.google.common.util.concurrent.ListenableFuture<MediaController>? = null
     private lateinit var playbackBridge: PlaybackWebBridge
@@ -427,6 +465,16 @@ class MainActivity : ComponentActivity() {
                             experimentalQuery='';fromAlbum=false;
                             runSearch();
                           });
+                        }
+                      }
+                      if ((location.pathname || '').includes('/ayarlar_ve_profil_y_netimi/')) {
+                        const main=document.querySelector('main');
+                        if(main && !document.getElementById('xmusic-drive-connect')){
+                          const btn=document.createElement('button');
+                          btn.id='xmusic-drive-connect';btn.type='button';btn.textContent='Google Drive hesabını bağla';
+                          btn.style.cssText='display:block;padding:12px;margin:12px;border:1px solid #62796f;border-radius:12px;color:#e0e3e7;';
+                          btn.addEventListener('click',function(){if(window.Android)window.Android.connectDrive();});
+                          main.prepend(btn);
                         }
                       }
                       // Ayarlar ekranındaki anahtarları Android SharedPreferences ile sakla.
