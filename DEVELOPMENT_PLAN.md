@@ -71,3 +71,7 @@ Durumları yalnız doğrulanan işin ardından güncelle.
 - Sabit imzalama: GitHub secret eklendi; #71 APK imzası kontrol edildi. Kullanıcı yeni OAuth imzasıyla bağlanıp gerçek MP3 yüklemesini doğruladı.
 - Drive arşivi: Sayfalı listeleme ve Media3 üzerinden yetkili dosya oynatma eklendi; cihaz testi bekliyor. Bağlantı izni bu oturum için alınmalı.
 - Otomatik dinleme arşivi/indirme kuyruğu ve çevrimdışı kalıcı dosyalar henüz yok.
+
+- #72: Kullanıcı Drive arşivindeki dosyanın uygulamada çaldığını doğruladı.
+- Kalıcı yükleme kuyruğu: WorkManager ile seçilmiş yerel ses dosyası, hesap kimliği kontrolü, bağlantı bekleme ve en fazla üç deneme. Anahtarlar iş verisine kaydedilmez. Yeni yüklemeler SHA-256 ile etiketlenir; eski etiketsiz dosyalar içerik eşleştirmesine dahil değildir. Bu cihazda paralel aynı içerik yüklemesi kilitlenir.
+- Otomatik dinleme kaydı ve kaynak dosyası indirme henüz bu kuyruğa bağlı değil. Kuyruk cihazda doğrulanmadı; Android zorla durdurma ve süre sınırlamaları geçerlidir.
