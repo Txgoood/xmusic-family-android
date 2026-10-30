@@ -630,12 +630,12 @@
   function requestMusicShelf(query,callback){
     const id=++shelfId;shelfCallbacks.set(id,callback);N.searchMusicShelf(query,id);
   }
-  function musicRow(item){
+  function musicRow(item,genre=''){
     const row=create('div',undefined,'flex items-center gap-3 p-3 rounded-xl bg-surface-container-low');
     const image=create('img');image.src='https://i.ytimg.com/vi/'+item.id+'/mqdefault.jpg';image.alt='';
     image.style.cssText='width:64px;height:48px;object-fit:cover;border-radius:8px;flex-shrink:0;';
     const caption=create('div',undefined,'flex-1 min-w-0');caption.append(create('strong',item.title||'Şarkı'),create('p',item.artist||''));
-    const play=button('▶',()=>N.playExperimentalSource(item.id,item.title||'',item.artist||''));
+    const play=button('▶',()=>{if(genre)A.assignMusicGenre(item.id,genre);N.playExperimentalSource(item.id,item.title||'',item.artist||'');});
     play.setAttribute('aria-label',(item.title||'Şarkı')+' oynat');play.className='w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center';
     row.append(image,caption,play);return row;
   }
@@ -647,7 +647,7 @@
         if(payload.error){detail.textContent=payload.error;return;}
         if(payload.stale)detail.append(create('p','Bağlantı yok; önceki liste gösteriliyor.'));
         if(!(payload.items||[]).length){detail.append(create('p','Sonuç bulunamadı.'));return;}
-        (payload.items||[]).forEach(item=>detail.append(musicRow(item)));
+        (payload.items||[]).forEach(item=>detail.append(musicRow(item,title)));
       });
     });
   }
@@ -705,7 +705,32 @@
     const quality=first?.querySelector('[aria-label="Stüdyo Kalite Seçici"]');if(quality)quality.style.display='none';
     const status=first?.querySelector('span.uppercase');if(status)status.textContent='Müzik';
     const showcase=findTitle('Aile DJ Miksi #42');if(showcase)showcase.style.display='none';
-    const family=sections.find(s=>s.textContent.includes('Bu Hafta En Çok Dinlenen Tür'));if(family)family.style.display='none';
+    const family=sections.find(s=>s.textContent.includes('Bu Hafta En Çok Dinlenen Tür'));
+    if(family){
+      const title=Array.from(family.querySelectorAll('*')).find(n=>n.children.length===0&&n.textContent.trim()==='Bu Hafta En Çok Dinlenen Tür');
+      if(title)title.textContent='Bu Cihazda En Çok Dinlenen Tür';
+      const value=Array.from(family.querySelectorAll('*')).find(n=>n.children.length===0&&n.textContent.includes('Anadolu Rock'));
+      const chart=family.querySelector('button');
+      let totals={items:[],total:0},lastStatId='';
+      function refreshStats(){
+        try{totals=JSON.parse(A.familyGenreStats()||'{}');}catch(_){totals={};}
+        const rows=Array.isArray(totals.items)?totals.items:[],total=Number(totals.total)||0;
+        if(value)value.textContent=total&&rows.length?rows[0].genre+' (%'+Math.round(rows[0].count*100/total)+')':'Henüz dinleme verisi yok';
+      }
+      function details(){
+        refreshStats();modal('Bu cihazdaki dinlemeler',p=>{
+          const total=Number(totals.total)||0;p.append(create('p','Tüm yerel profiller · çalma sayısı'));
+          if(!total){p.append(create('p','Henüz dinleme verisi yok.'));return;}
+          (totals.items||[]).forEach(row=>p.append(create('p',row.genre+' · %'+Math.round(row.count*100/total)+' ('+row.count+' çalma)')));
+        });
+      }
+      if(chart)makeOwned(chart,details);
+      family.style.cursor='pointer';family.setAttribute('role','button');family.tabIndex=0;
+      family.onclick=e=>{if(!e.target.closest('button'))details();};
+      family.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();details();}};
+      refreshStats();
+      window.addEventListener('xmusic:playback',e=>{const id=e.detail?.playing?e.detail.id:'';if(id&&id!==lastStatId){lastStatId=id;refreshStats();}});
+    }
     const familySession=sections.find(s=>s.textContent.includes('Ortak Aile Oturumu'));if(familySession)familySession.style.display='none';
     const genres=document.getElementById('genre-filter-tray');
     if(genres)Array.from(genres.querySelectorAll('button')).forEach(b=>makeOwned(b,()=>{
@@ -747,7 +772,7 @@
         holder.replaceChildren();
         if(payload.error){holder.append(create('p',payload.error,'text-on-surface-variant'));return;}
         if(payload.stale)holder.append(create('p','Önceki liste gösteriliyor.','text-on-surface-variant'));
-        (payload.items||[]).slice(0,max).forEach(t=>holder.append(musicRow(t)));
+        (payload.items||[]).slice(0,max).forEach(t=>holder.append(musicRow(t,title==='Stüdyo ve akustik kayıtlar'?'Akustik':'')));
         if(!(payload.items||[]).length)holder.append(create('p','Sonuç bulunamadı.','text-on-surface-variant'));
       });
     }
