@@ -31,6 +31,28 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         return changed
     }
 
+    private val podcastCatalog = PodcastCatalogClient()
+
+    @JavascriptInterface fun searchPodcasts(query: String, requestId: Int) {
+        if (query.trim().length !in 2..100) return
+        Thread {
+            val result = try { podcastCatalog.search(query) }
+            catch (_: Exception) { JSONObject().put("error", "Podcast araması yapılamadı. Bağlantını kontrol edip yeniden dene.") }
+            webView.post {
+                webView.evaluateJavascript("window.__xmusicPodcastSearchResult && window.__xmusicPodcastSearchResult(" +
+                    requestId + "," + result.toString() + ")", null)
+            }
+        }.start()
+    }
+
+    @JavascriptInterface fun openPodcastPage(address: String) { webView.post {
+        try {
+            val uri = android.net.Uri.parse(address)
+            require(uri.scheme == "https" && uri.host == "podcasts.apple.com")
+            activity.startActivity(Intent(Intent.ACTION_VIEW, uri))
+        } catch (_: Exception) { android.widget.Toast.makeText(activity, "Program bağlantısı açılamadı.", 0).show() }
+    } }
+
     private val episodes = java.util.concurrent.ConcurrentHashMap<String, JSONObject>()
     private val downloadsPrefs get() = activity.getSharedPreferences("xmusic_downloads_" + profiles.activeId(), Context.MODE_PRIVATE)
 
