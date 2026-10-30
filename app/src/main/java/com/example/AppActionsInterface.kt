@@ -279,6 +279,9 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
             "speed" -> p.setPlaybackSpeed(target.coerceIn(50, 200) / 100f)
         }
     } }
+    @JavascriptInterface fun setSleepFade(enabled: Boolean) { webView.post {
+        com.example.playback.PlaybackService.activeService?.setSleepFade(enabled)
+    } }
     @JavascriptInterface fun setSleepTimer(minutes: Int) { webView.post {
         val service = com.example.playback.PlaybackService.activeService
         if (service == null || (minutes != 0 && controller?.currentMediaItem == null)) {
@@ -303,3 +306,4 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         } catch (_: Exception) { android.widget.Toast.makeText(activity, "Dosya açılamadı. Dosyayı yeniden seç.", 0).show() }
     } }
 }
+
