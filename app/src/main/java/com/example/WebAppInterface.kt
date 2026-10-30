@@ -53,6 +53,14 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         webView.post { webView.loadUrl(url) }
     }
 
+    // Yeni indirme ve arşiv işleri için ağ tercihi. Mevcut işler kendi koşullarını korur.
+    @JavascriptInterface fun getDownloadWifiOnly(): Boolean =
+        context.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE).getBoolean("download_unmetered_only", false)
+    @JavascriptInterface fun setDownloadWifiOnly(enabled: Boolean) {
+        context.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE)
+            .edit().putBoolean("download_unmetered_only", enabled).apply()
+    }
+
     // Ayarlar yalnızca cihazda saklanır; bulut senkronizasyonuna karışmaz.
     @JavascriptInterface
     fun saveSetting(key: String, enabled: Boolean) {
@@ -150,10 +158,19 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     }
 
     @JavascriptInterface
-    fun playExperimentalSource(id: String, title: String, artist: String) {
+    fun playExperimentalSource(id: String, title: String, artist: String) = startExperimentalSource(id, title, artist, 0L)
+
+    @JavascriptInterface
+    fun resumeExperimentalSource(id: String, title: String, artist: String, position: Long) =
+        startExperimentalSource(id, title, artist, position.coerceIn(0L, 86_400_000L))
+
+    private fun startExperimentalSource(id: String, title: String, artist: String, position: Long) {
         if (!id.matches(Regex("[A-Za-z0-9_-]{11}"))) return
         webView.post {
-        if ((context as? MainActivity)?.playArchivedSource(id, title, artist) == true) return@post
+        if ((context as? MainActivity)?.playArchivedSource(id, title, artist) == true) {
+            if (position > 0) mediaController?.seekTo(position)
+            return@post
+        }
         Thread {
             try {
                 val stream = com.example.data.source.ExperimentalAudioResolver(context).resolve("https://www.youtube.com/watch?v=$id")
@@ -167,6 +184,7 @@ class WebAppInterface(private val context: Context, private val webView: WebView
                         val item = MediaItem.Builder().setMediaId("experimental:$id").setUri(stream.url).setMediaMetadata(metadata).build()
                         com.example.playback.PlaybackService.activeService?.registerExperimentalStream(stream.url, stream.headers)
                         controller.setMediaItem(item)
+                        if (position > 0) controller.seekTo(position)
                         controller.prepare()
                         controller.play()
                     }
