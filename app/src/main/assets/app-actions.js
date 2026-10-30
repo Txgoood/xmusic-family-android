@@ -212,7 +212,7 @@
       panel.append(create('strong',family.owner?'Bu telefon aile kurucusu':'Bu telefon aileye bağlı'));
       panel.append(create('p',family.lastSync?'Son eşitleme: '+new Date(family.lastSync).toLocaleString('tr-TR'):'İlk eşitleme bekleniyor.'));
       if(family.error)panel.append(create('p',family.error));
-      panel.append(create('p','İki telefonda aynı ortak Drive klasörü ve Otomatik ortak arşiv bağlantısı açık olmalı. Uygulama açıkken yaklaşık bir dakikada yenilenir; kapalıyken anlık bildirim gelmez. İnternet yokken son alınan kurallar kullanılır.'));
+      panel.append(create('p','İki telefonda aynı ortak Drive klasörü ve Otomatik ortak arşiv bağlantısı açık olmalı. Uygulama açıkken yaklaşık bir dakikada yenilenir; kapalıyken anlık bildirim gelmez. İnternet yokken son alınan kurallar kullanılır; farklı cihazlardaki süre kullanımı yeniden bağlanınca birleşir.'));
       if(data.role!=='child'){
         const share=create('input');share.type='checkbox';share.checked=!!A.familySharing();share.setAttribute('aria-label','Bu profilin miks paylaşımı');
         const label=create('label',' Bu profildeki beğeni ve son dinlemelerimi aile miksine kat');label.prepend(share);panel.append(label);
