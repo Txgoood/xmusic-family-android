@@ -235,10 +235,10 @@
     const list=filters.nextElementSibling;
     const follow=document.getElementById('followBtn'),followText=document.getElementById('followText');
     const cover=identity.querySelector('img'),title=identity.querySelector('h2'),artist=title?.nextElementSibling;
-    const coverBadge=cover?.parentElement?.querySelector('span');if(coverBadge)coverBadge.hidden=true;
+    const coverBadge=cover?.parentElement?.querySelector('span');if(coverBadge)coverBadge.style.display='none';
     const tags=title?.previousElementSibling;
     const category=tags?.children[0],rating=tags?.children[1],count=tags?.children[2];
-    if(rating)rating.hidden=true;
+    if(rating)rating.style.display='none';
     if(category){category.textContent=info.genre||'';category.hidden=!info.genre;}
     if(count)count.textContent='';
     if(title)title.textContent=info.title&&info.title!==address?info.title:'Podcast';
