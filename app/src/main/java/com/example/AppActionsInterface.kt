@@ -155,6 +155,13 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         if (profiles.activeId() != libraryProfileId || value.length > 1_000_000) return false
         return try { JSONObject(value); prefs.edit().putString("data", value).commit() } catch (_: Exception) { false }
     }
+    @JavascriptInterface fun searchHistory(action: String, query: String): String {
+        // Önceki profilin açık sayfasından yeni profile geçmiş yazılmasını engelle.
+        if (profiles.activeId() != libraryProfileId) return "[]"
+        return try { SearchHistoryStore(activity, libraryProfileId).update(action, query) }
+        catch (_: Exception) { "null" }
+    }
+
     @JavascriptInterface fun voiceSearch() { webView.post { activity.openVoiceSearch() } }
     @JavascriptInterface fun openLocalAudio() { webView.post { activity.openLocalAudio() } }
     @JavascriptInterface fun clearWebCache() { webView.post {
