@@ -203,6 +203,26 @@
     (state.queue||[]).forEach((t,i)=>{const row=create('div',undefined,'xm-row');row.append(create('span',(i===state.index?'▶ ':'')+t.title+' — '+t.artist),button('Oynat',()=>A.queueAction('play',i,0)),button('↑',()=>A.queueAction('move',i,i-1)),button('↓',()=>A.queueAction('move',i,i+1)),button('Kaldır',()=>A.queueAction('remove',i,0)));panel.append(row);});
   }
   function profileState(){try{return JSON.parse(A.profileState()||'{}');}catch(_){return {};}}
+  function avatarNode(value){
+    const wrap=create('span',undefined,'flex items-center justify-center rounded-full bg-surface-container-high overflow-hidden');
+    wrap.style.cssText='width:48px;height:48px;font-size:27px;flex-shrink:0;';
+    if(typeof value==='string'&&value.startsWith('data:image/jpeg;base64,')){const img=create('img');img.src=value;img.alt='Profil fotoğrafı';img.style.cssText='width:100%;height:100%;object-fit:cover';wrap.append(img);}
+    else wrap.textContent=value||'🎵';return wrap;
+  }
+  function refreshAvatar(){
+    const value=A.activeAvatar()||'';
+    document.querySelectorAll('[data-xm-active-avatar]').forEach(n=>n.replaceChildren(avatarNode(value)));
+    const profileButton=document.querySelector('header button[aria-label="Profil ve Aile Alanı"]');
+    const img=profileButton?.querySelector('img');
+    if(img){const holder=img.parentElement;if(holder){holder.replaceChildren(avatarNode(value));}}
+  }
+  window.__xmusicRefreshAvatar=refreshAvatar;
+  function avatarChooser(){modal('Profil görseli',(panel,close)=>{
+    panel.append(create('p','Hazır görsel seç veya telefonundan bir fotoğraf kullan.'));
+    const choices=create('div',undefined,'flex flex-wrap gap-2');
+    ['🎵','🎧','🎸','🌸','🌟','🐱','🦊','🐼'].forEach(icon=>choices.append(button(icon,()=>{if(A.setActiveAvatar(icon)){refreshAvatar();close();}})));
+    panel.append(choices,button('Telefondan fotoğraf seç',()=>{close();A.pickActiveAvatar();}));
+  });}
   function profileForm(profile){
     modal(profile?'Profil Düzenle':'Yeni Yetişkin Profili',(p,close)=>{
       const name=create('input',undefined,'xm-input');name.maxLength=60;name.placeholder='Profil adı';name.setAttribute('aria-label','Profil adı');name.value=profile?.name||'';
@@ -214,7 +234,7 @@
   }
   function renderProfiles(){
     const data=profileState(), panel=content('Yerel Aile Profilleri');if(!panel)return;
-    panel.append(create('p','Her yetişkin profilinin favorileri, listeleri ve geçmişi ayrıdır. Bulut eşitleme ve güvenli çocuk profili henüz hazır değil.'),button('Yeni Profil Ekle',()=>profileForm()));
+    panel.append(create('p','Her yetişkin profilinin favorileri, listeleri ve geçmişi ayrıdır. Bulut eşitleme ve güvenli çocuk profili henüz hazır değil.'),button('Yeni Profil Ekle',()=>profileForm()),button('Aktif profil görselini değiştir',avatarChooser));
     (data.profiles||[]).forEach(profile=>{
       const row=create('div',undefined,'xm-row');row.append(create('strong',profile.name+(profile.id===data.active?' · Aktif':'')));
       row.append(button('Seç',()=>{
@@ -927,13 +947,16 @@
         grid.replaceChildren();
         const data=profileState(),active=data.profiles?.find(p=>p.id===data.active);
         const card=create('div',undefined,'relative p-3 bg-surface-container rounded-lg flex flex-col items-center text-center');
-        const icon=create('span','person','material-symbols-outlined text-primary');icon.style.fontSize='42px';
+        const icon=create('span');icon.dataset.xmActiveAvatar='true';icon.append(avatarNode(A.activeAvatar()||''));
         card.append(icon,create('strong',active?.name||'Ben','font-label-lg text-label-lg text-on-surface'),create('span','Aktif profil','font-label-sm text-primary'));
         grid.append(card);
       }
       const detail=section.querySelector('h2')?.parentElement?.parentElement?.querySelector('p');if(detail)detail.textContent='Bu cihazdaki aktif profil';
       const badge=section.querySelector('.rounded-full');if(badge)badge.textContent='Bu cihaz';
     }
+    const equalizer=Array.from(document.querySelectorAll('main h4')).find(h=>h.textContent.trim()==='Ekolayzır');
+    const eqRow=equalizer?.closest('.p-4');if(eqRow){const info=eqRow.querySelector('p');if(info)info.textContent='Cihazın ses ayarlarını aç';makeOwned(eqRow,()=>A.openEqualizer());eqRow.setAttribute('role','button');eqRow.tabIndex=0;}
+    refreshAvatar();
     const reset=Array.from(document.querySelectorAll('main button')).find(b=>b.textContent.includes('Geçmişi Sıfırla'));
     if(reset){
       reset.textContent='Bu profilin dinleme geçmişini sıfırla';
@@ -943,6 +966,7 @@
     }
   }
 
+  if(page!=='ayarlar_ve_profil_y_netimi')refreshAvatar();
   if(page==='ana_sayfa')initHome();
   if(page==='ayarlar_ve_profil_y_netimi')initSettings();
   if(page==='arama_ve_ke_fet')initDiscoverShelves();
@@ -973,5 +997,6 @@
   if(page==='arama_ve_ke_fet')setTimeout(function seedSearch(){if(!window.__xmusicActionsInstalled){setTimeout(seedSearch,50);return;}const query=sessionStorage.getItem('xm-search');if(query!==null){sessionStorage.removeItem('xm-search');const input=document.getElementById('search-input');if(input){input.value=query;input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();}}},0);
   window.__xmusicActionsAudit=()=>Array.from(document.querySelectorAll('button,a')).filter(b=>!b.closest('#xmusic-live-search')).map(b=>({label:b.getAttribute('aria-label')||b.textContent.trim(),action:b.dataset.xmAction|| (b.dataset.xmOwned?'owned':null),blocked:b.dataset.xmBlocked||null}));
 })();
+
 
 
