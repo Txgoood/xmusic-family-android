@@ -55,6 +55,16 @@ class PlaybackService : MediaSessionService() {
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
         player!!.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (!isPlaying) return
+                val item = player?.currentMediaItem ?: return
+                if (item.mediaId.startsWith("experimental:")) {
+                    com.example.data.drive.AutomaticDriveArchive.enqueue(
+                        this@PlaybackService, item.mediaId.removePrefix("experimental:"),
+                        item.mediaMetadata.title?.toString().orEmpty()
+                    )
+                }
+            }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 val id = player?.currentMediaItem?.mediaId.orEmpty()
                 if (id.startsWith("experimental:")) {
