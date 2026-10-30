@@ -21,10 +21,11 @@ class ProfileStore(private val context: Context) {
     private fun find(id: String, rows: JSONArray = records()): JSONObject? = (0 until rows.length()).map { rows.getJSONObject(it) }.firstOrNull { it.getString("id") == id }
     fun role(id: String = activeId()): String = find(id)?.optString("role", "adult") ?: "child"
     fun isChild(): Boolean = role() == "child"
-    fun isAdmin(): Boolean = role() == "admin"
+    fun isAdmin(): Boolean = role() == "admin" && FamilySyncStore(context).mayManage()
     fun hasParentPin(): Boolean = !prefs.getString("parent_hash", "").isNullOrEmpty()
     private fun date(): String = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT).format(java.util.Date())
-    fun usedMillis(id: String = activeId()): Long = prefs.getLong("usage_${date()}_$id", 0L)
+    fun localUsedMillis(id: String = activeId()): Long = prefs.getLong("usage_${date()}_$id", 0L)
+    fun usedMillis(id: String = activeId()): Long = localUsedMillis(id) + FamilySyncStore(context).remoteUsage(id, date())
     fun recordListening(id: String, elapsed: Long) {
         if (elapsed <= 0 || role(id) != "child") return
         synchronized(ProfileStore::class.java) { val key = "usage_${date()}_$id"; prefs.edit().putLong(key, prefs.getLong(key, 0L) + elapsed.coerceAtMost(2000L)).commit() }
@@ -76,7 +77,7 @@ class ProfileStore(private val context: Context) {
             if (needsParent) { if (!parent(oldPin)) return false } else if (!checked(row, oldPin, id)) return false
             return prefs.edit().putString("active", id).putString("profiles", rows.toString()).commit()
         }
-        if (isChild()) return false
+        if (isChild() || !FamilySyncStore(context).mayManage()) return false
         if (action == "create") return saveProfile("", name, "adult", "", newPin, "", 60, false, false)
         if (row == null || !checked(row, oldPin, id)) return false
         if (action == "delete") {
@@ -89,7 +90,7 @@ class ProfileStore(private val context: Context) {
         return prefs.edit().putString("profiles", rows.toString()).commit()
     }
     @Synchronized fun saveProfile(id: String, name: String, newRole: String, oldPin: String, newPin: String, parentPin: String, dailyMinutes: Int, mix: Boolean, requireParent: Boolean = true): Boolean {
-        if (isChild() || name.isBlank() || name.length > 60 || newRole !in setOf("admin", "adult", "child") || dailyMinutes !in 1..720 || (newPin.isNotEmpty() && !newPin.matches(Regex("[0-9]{4,8}")))) return false
+        if (!FamilySyncStore(context).mayManage() || isChild() || name.isBlank() || name.length > 60 || newRole !in setOf("admin", "adult", "child") || dailyMinutes !in 1..720 || (newPin.isNotEmpty() && !newPin.matches(Regex("[0-9]{4,8}")))) return false
         val rows = records(); val existing = if (id.isBlank()) null else (find(id, rows) ?: return false)
         if (!isAdmin() && (id != activeId() || existing?.getString("role") != newRole)) return false
         if (newRole == "child" && !hasParentPin()) return false
@@ -183,5 +184,115 @@ class ProfileStore(private val context: Context) {
         row.put("pending", keep)
         return prefs.edit().putString("profiles", rows.toString()).commit()
     }
-    fun mixProfileIds(): List<String> { val rows = records(); return (0 until rows.length()).map { rows.getJSONObject(it) }.filter { it.getString("role") != "child" && it.optBoolean("mixEnabled", false) }.map { it.getString("id") } }
+    internal fun policy(family: String, revision: Long): JSONObject = JSONObject().put("family", family).put("revision", revision)
+        .put("profiles", records()).put("parentHash", prefs.getString("parent_hash", "")).put("parentSalt", prefs.getString("parent_salt", ""))
+    internal fun validatePolicy(data: JSONObject): JSONArray {
+        val rows = data.getJSONArray("profiles"); require(rows.length() in 1..12)
+        val ids = mutableSetOf<String>(); var managers = 0
+        for (i in 0 until rows.length()) {
+            val row = rows.getJSONObject(i); val id = row.getString("id")
+            require(id.matches(Regex("[A-Za-z0-9_-]{1,200}")) && ids.add(id))
+            require(row.getString("role") in setOf("admin", "adult", "child") && row.getString("name").length in 1..60)
+            require(row.optInt("dailyMinutes", 60) in 1..720)
+            if (row.getString("role") == "admin") managers++
+            for (field in listOf("approved", "pending", "denied")) require((row.optJSONArray(field)?.length() ?: 0) <= 500)
+        }
+        require(managers > 0)
+        require(data.optString("parentHash").length <= 100 && data.optString("parentSalt").length <= 100)
+        if ((0 until rows.length()).any { rows.getJSONObject(it).getString("role") == "child" }) require(data.optString("parentHash").isNotEmpty())
+        return rows
+    }
+    internal fun migrateLibrary(from: String, to: String) {
+        if (from == to) return
+        val source = context.getSharedPreferences("xmusic_library_$from", Context.MODE_PRIVATE)
+        val target = context.getSharedPreferences("xmusic_library_$to", Context.MODE_PRIVATE)
+        val data = source.getString("data", if (from == "default") context.getSharedPreferences("xmusic_library", Context.MODE_PRIVATE).getString("data", "{}") else "{}") ?: "{}"
+        // Kaynak kopya korunur; aynı isim farklı cihazlarda kimlik yerine kullanılmaz.
+        if (!target.contains("data")) target.edit().putString("data", data).commit()
+        val avatars = context.getSharedPreferences("xmusic_profile_avatars", Context.MODE_PRIVATE)
+        avatars.getString(from, null)?.let { avatars.edit().putString(to, it).commit() }
+    }
+    internal fun makeGlobalIds() {
+        val rows = records(); var active = activeId()
+        for (i in 0 until rows.length()) {
+            val row = rows.getJSONObject(i)
+            if (row.getString("id") == "default") {
+                val id = java.util.UUID.randomUUID().toString(); migrateLibrary("default", id); row.put("id", id)
+                if (active == "default") active = id
+            }
+        }
+        prefs.edit().putString("profiles", rows.toString()).putString("active", active).commit()
+    }
+    internal fun applyPolicy(data: JSONObject, joiningProfile: String? = null) {
+        val rows = validatePolicy(data); val old = records()
+        if (joiningProfile != null) {
+            require(find(joiningProfile, rows) != null)
+            migrateLibrary(activeId(), joiningProfile)
+            prefs.edit().putString("familyBackup", old.toString()).commit()
+        }
+        for (i in 0 until rows.length()) {
+            val row = rows.getJSONObject(i); val previous = find(row.getString("id"), old) ?: continue
+            val pending = row.optJSONArray("pending") ?: JSONArray()
+            val local = previous.optJSONArray("pending") ?: continue
+            val seen = mutableSetOf<String>()
+            for (field in listOf("approved", "pending", "denied")) {
+                val list = row.optJSONArray(field) ?: continue
+                for (n in 0 until list.length()) { val item = list.getJSONObject(n); seen.add(item.optString("requestKey", key(item.optString("id")))) }
+            }
+            for (n in 0 until local.length()) { val item = local.getJSONObject(n); if (pending.length() < 100 && seen.add(item.optString("requestKey"))) pending.put(item) }
+            row.put("pending", pending)
+        }
+        val edit = prefs.edit().putString("profiles", rows.toString()).putString("parent_hash", data.optString("parentHash")).putString("parent_salt", data.optString("parentSalt"))
+        if (joiningProfile != null) edit.putString("active", joiningProfile)
+        edit.commit()
+    }
+    internal fun mergeRemoteRequests(devices: JSONArray) {
+        val rows = records()
+        for (d in 0 until devices.length()) {
+            val requests = devices.getJSONObject(d).optJSONObject("requests") ?: continue
+            for (i in 0 until rows.length()) {
+                val child = rows.getJSONObject(i); if (child.getString("role") != "child") continue
+                val incoming = requests.optJSONArray(child.getString("id")) ?: continue
+                val seen = mutableSetOf<String>()
+                for (field in listOf("approved", "denied", "pending")) {
+                    val list = child.optJSONArray(field) ?: continue
+                    for (n in 0 until list.length()) { val item = list.getJSONObject(n); seen.add(item.optString("requestKey", key(item.optString("id")))) }
+                }
+                val pending = child.optJSONArray("pending") ?: JSONArray()
+                for (n in 0 until minOf(100, incoming.length())) {
+                    val item = incoming.getJSONObject(n); val requestKey = item.optString("requestKey")
+                    if (requestKey.isNotEmpty() && seen.add(requestKey) && pending.length() < 100) pending.put(item)
+                }
+                child.put("pending", pending)
+            }
+        }
+        prefs.edit().putString("profiles", rows.toString()).commit()
+    }
+    internal fun deviceSnapshot(family: String, device: String): JSONObject {
+        val rows = records(); val shared = JSONArray(); val usage = JSONObject(); val requests = JSONObject()
+        for (i in 0 until rows.length()) {
+            val row = rows.getJSONObject(i); val id = row.getString("id")
+            if (row.getString("role") == "child") {
+                usage.put(id, localUsedMillis(id)); requests.put(id, row.optJSONArray("pending") ?: JSONArray()); continue
+            }
+            if (!FamilySyncStore(context).isSharing(id, row.optBoolean("mixEnabled", false))) continue
+            val library = try { JSONObject(context.getSharedPreferences("xmusic_library_$id", Context.MODE_PRIVATE).getString("data", "{}") ?: "{}") } catch (_: Exception) { JSONObject() }
+            val profile = JSONObject().put("id", id)
+            for (kind in listOf("favorites", "history")) {
+                val input = library.optJSONArray(kind) ?: JSONArray(); val safe = JSONArray()
+                for (n in 0 until minOf(100, input.length())) {
+                    val track = input.optJSONObject(n) ?: continue
+                    val trackId = track.optString("id")
+                    if (!trackId.startsWith("experimental:") && !trackId.startsWith("drive:") && !trackId.startsWith("drive-source:") && !trackId.startsWith("podcast:")) continue
+                    val clean = JSONObject()
+                    for (field in listOf("id", "title", "artist", "artwork", "feed")) clean.put(field, track.optString(field).take(if (field in listOf("artwork", "feed")) 2048 else 500))
+                    safe.put(clean)
+                }
+                profile.put(kind, safe)
+            }
+            shared.put(profile)
+        }
+        return JSONObject().put("family", family).put("device", device).put("day", date()).put("updatedAt", System.currentTimeMillis()).put("profiles", shared).put("usage", usage).put("requests", requests)
+    }
+    fun mixProfileIds(): List<String> { val rows = records(); return (0 until rows.length()).map { rows.getJSONObject(it) }.filter { it.getString("role") != "child" && FamilySyncStore(context).isSharing(it.getString("id"), it.optBoolean("mixEnabled", false)) }.map { it.getString("id") } }
 }
