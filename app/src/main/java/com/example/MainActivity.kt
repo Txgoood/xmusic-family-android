@@ -197,7 +197,7 @@ class MainActivity : ComponentActivity() {
                 bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 82, bytes)
                 bitmap.recycle()
                 val value = "data:image/jpeg;base64," + android.util.Base64.encodeToString(bytes.toByteArray(), android.util.Base64.NO_WRAP)
-                getSharedPreferences("xmusic_profile_avatars", MODE_PRIVATE).edit().putString(target, value).apply()
+                getSharedPreferences("xmusic_profile_avatars", MODE_PRIVATE).edit().putString(target, value).putLong("time_$target", System.currentTimeMillis()).apply()
                 if (::appWebView.isInitialized) appWebView.evaluateJavascript("window.__xmusicRefreshAvatar && window.__xmusicRefreshAvatar()", null)
                 android.widget.Toast.makeText(this, "Profil fotoğrafı kaydedildi", 0).show()
             } catch (_: Exception) { android.widget.Toast.makeText(this, "Fotoğraf açılamadı", 0).show() }
