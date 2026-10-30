@@ -45,6 +45,10 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         if (profiles.isAdmin() || id == profiles.activeId()) profiles.approved(id).toString() else "[]"
     @JavascriptInterface fun approveChildTrack(id: String, track: String, remove: Boolean, parentPin: String): Boolean =
         profiles.approve(id, track, remove, parentPin)
+    @JavascriptInterface fun childReview(id: String): String = profiles.childReview(id)
+    @JavascriptInterface fun requestChildReview(id: String, track: String): Boolean = profiles.requestReview(id, track)
+    @JavascriptInterface fun setChildAge(id: String, age: String, pin: String): Boolean = profiles.setChildAge(id, age, pin)
+    @JavascriptInterface fun resolveChildReview(id: String, key: String, deny: Boolean, pin: String): Boolean = profiles.resolveReview(id, key, deny, pin)
     @JavascriptInterface fun familyMix(kind: String): String {
         if (profiles.isChild()) return profiles.approved().toString()
         if (kind !in setOf("favorites", "history")) return "[]"
