@@ -16,10 +16,10 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
     private var libraryProfileId = profiles.activeId()
     private val prefs get() = activity.getSharedPreferences("xmusic_library_" + profiles.activeId(), Context.MODE_PRIVATE)
     private val avatarPrefs get() = activity.getSharedPreferences("xmusic_profile_avatars", Context.MODE_PRIVATE)
-    @JavascriptInterface fun activeAvatar(): String = avatarPrefs.getString(profiles.activeId(), "") ?: ""
+    @JavascriptInterface fun activeAvatar(): String = FamilySyncStore(activity).syncedAvatar(profiles.activeId(), avatarPrefs.getString(profiles.activeId(), "") ?: "")
     @JavascriptInterface fun setActiveAvatar(value: String): Boolean {
         if (value !in setOf("🎵", "🎧", "🎸", "🌸", "🌟", "🐱", "🦊", "🐼")) return false
-        return avatarPrefs.edit().putString(profiles.activeId(), value).commit()
+        return avatarPrefs.edit().putString(profiles.activeId(), value).putLong("time_" + profiles.activeId(), System.currentTimeMillis()).commit()
     }
     @JavascriptInterface fun pickActiveAvatar() { webView.post { activity.pickProfilePhoto() } }
     @JavascriptInterface fun openEqualizer() { webView.post {
@@ -66,21 +66,23 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         if (profiles.isChild()) return profiles.approved().toString()
         if (kind !in setOf("favorites", "history")) return "[]"
         val result = org.json.JSONArray(); val ids = mutableSetOf<String>()
+        fun canonical(id: String): String = if (id.startsWith("drive-source:")) "experimental:" + id.substringAfter(':') else id
         for (id in profiles.mixProfileIds()) {
             val data = try { JSONObject(activity.getSharedPreferences("xmusic_library_$id", Context.MODE_PRIVATE).getString("data", "{}") ?: "{}") } catch (_: Exception) { continue }
             val rows = data.optJSONArray(kind) ?: continue
             for (i in 0 until minOf(rows.length(), 100)) {
                 val row = rows.optJSONObject(i) ?: continue
                 val trackId = row.optString("id")
-                if (trackId.isNotBlank() && ids.add(trackId)) result.put(row)
-                if (result.length() >= 100) break
+                if (trackId.isNotBlank() && ids.add(canonical(trackId))) result.put(row)
             }
         }
         val remote = FamilySyncStore(activity).remoteMix(kind)
         for (i in 0 until remote.length()) {
-            val row = remote.getJSONObject(i); if (ids.add(row.optString("id")) && result.length() < 200) result.put(row)
+            val row = remote.getJSONObject(i); if (ids.add(canonical(row.optString("id")))) result.put(row)
         }
-        return result.toString()
+        val sorted = org.json.JSONArray()
+        (0 until result.length()).map { result.getJSONObject(it) }.sortedBy { canonical(it.optString("id")) }.take(200).forEach { sorted.put(it) }
+        return sorted.toString()
     }
 
     @JavascriptInterface fun profileState(): String = profiles.publicState()
