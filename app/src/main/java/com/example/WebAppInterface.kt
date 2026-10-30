@@ -17,6 +17,9 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     private var lastMusicBrainzRequest = 0L
 
     @JavascriptInterface
+    fun showDriveUploadQueue() { webView.post { (context as? MainActivity)?.showDriveUploadQueue() } }
+
+    @JavascriptInterface
     fun openDriveLibrary() { webView.post { (context as? MainActivity)?.openDriveLibrary() } }
 
     @JavascriptInterface
