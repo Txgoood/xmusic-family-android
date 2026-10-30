@@ -20,6 +20,9 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     fun showDriveUploadQueue() { webView.post { (context as? MainActivity)?.showDriveUploadQueue() } }
 
     @JavascriptInterface
+    fun toggleAutomaticArchive() { webView.post { (context as? MainActivity)?.toggleAutomaticArchive() } }
+
+    @JavascriptInterface
     fun openDriveLibrary() { webView.post { (context as? MainActivity)?.openDriveLibrary() } }
 
     @JavascriptInterface
@@ -102,6 +105,8 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     @JavascriptInterface
     fun playExperimentalSource(id: String, title: String, artist: String) {
         if (!id.matches(Regex("[A-Za-z0-9_-]{11}"))) return
+        webView.post {
+        if ((context as? MainActivity)?.playArchivedSource(id, title, artist) == true) return@post
         Thread {
             try {
                 val stream = com.example.data.source.ExperimentalAudioResolver(context).resolve("https://www.youtube.com/watch?v=$id")
@@ -129,6 +134,7 @@ class WebAppInterface(private val context: Context, private val webView: WebView
                 }
             }
         }.start()
+        }
     }
 
     @JavascriptInterface
