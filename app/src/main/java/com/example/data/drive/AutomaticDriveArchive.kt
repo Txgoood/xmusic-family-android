@@ -83,7 +83,7 @@ class AutomaticDriveArchive(context: Context, params: WorkerParameters) : Worker
                 .setInputData(workDataOf("source" to source, "title" to title, "account" to account))
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
-                .addTag("xmusic-drive-upload").build()
+                .addTag("xmusic-drive-upload").addTag("xmusic-auto-archive").build()
             WorkManager.getInstance(context).enqueueUniqueWork("auto-drive-$account-$source", ExistingWorkPolicy.KEEP, work)
         }
     }
