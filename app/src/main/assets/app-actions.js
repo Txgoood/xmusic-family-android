@@ -614,7 +614,7 @@
     if(state.playing&&state.id&&library.history[0]?.id!==state.id){library.history=[trackData(),...library.history.filter(t=>t.id!==state.id)].slice(0,100);save();}
     if(state.id && !state.pending && (state.playing||wasPlaying) &&
       (previousId!==state.id || (wasPlaying&&!state.playing) || Date.now()-resumeSavedAt>=5000)){
-      library.resume=Object.assign(trackData(),{position:Math.max(0,Number(state.position)||0),duration:Math.max(0,Number(state.duration)||0)});
+      library.resume=Object.assign(trackData(),{position:Math.max(0,Number(state.position)||0),duration:Math.max(0,Number(state.duration)||0),updatedAt:Date.now()});
       resumeSavedAt=Date.now();save();
     }
     if(page==='ana_sayfa'&&window.__xmusicHomeRefresh)window.__xmusicHomeRefresh();
@@ -795,6 +795,13 @@
 
 
   function initHome(){
+    try {
+      const native=JSON.parse(A.loadPlaybackResume()||'{}');
+      if(native.id && (!library.resume || (native.updatedAt||0)>(library.resume.updatedAt||0))){
+        if(!native.feed && library.resume?.id===native.id)native.feed=library.resume.feed||'';
+        library.resume=native;
+      }
+    } catch (_) {}
     const sections=Array.from(document.querySelectorAll('main section'));
     const recent=sections.find(s=>s.querySelector('h2')?.textContent.trim()==='Son Dinlenenler');
     const resume=sections.find(s=>s.textContent.includes('Kaldığın Yerden Devam Et'));
@@ -897,7 +904,7 @@
     if(reset){
       reset.textContent='Bu profilin dinleme geçmişini sıfırla';
       makeOwned(reset,()=>confirmAction('Bu profilin dinleme geçmişi silinsin mi?',()=>{
-        library.history=[];delete library.resume;delete library.weeklyMusicMix;if(save())N.showToast('Geçmiş silindi.');
+        library.history=[];delete library.resume;delete library.weeklyMusicMix;A.clearPlaybackResume();if(save())N.showToast('Geçmiş silindi.');
       }));
     }
   }
