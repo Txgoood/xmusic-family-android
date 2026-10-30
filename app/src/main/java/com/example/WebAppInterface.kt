@@ -17,6 +17,9 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     private var lastMusicBrainzRequest = 0L
 
     @JavascriptInterface
+    fun connectDrive() { webView.post { (context as? MainActivity)?.authorizeDrive() } }
+
+    @JavascriptInterface
     fun showToast(message: String) {
         webView.post { Toast.makeText(context, message, Toast.LENGTH_SHORT).show() }
     }
