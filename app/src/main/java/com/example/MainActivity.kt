@@ -245,6 +245,17 @@ class MainActivity : ComponentActivity() {
                               row.addEventListener('click',function(){window.Android.playExperimentalSource(item.id,item.title||'',item.artist||'');});
                               list.appendChild(row);
                             });
+                            if(payload.limit===10 && payload.items.length===10){
+                              const more=document.createElement('button');
+                              more.type='button';more.textContent='Daha fazla sonuç';
+                              more.style.cssText='padding:12px;color:#9af0ba;';
+                              more.addEventListener('click',function(){
+                                more.disabled=true;more.textContent='Daha fazla sonuç aranıyor...';
+                                currentId+=1;
+                                window.Android.searchExperimentalSourceMore(experimentalQuery||input.value.trim(),currentId,30);
+                              });
+                              list.appendChild(more);
+                            }
                           };
                           let appleMode=true, appleId='', appleStage='artists', appleName='';
                           categories.style.display='none';appleButton.style.background='#36584d';
