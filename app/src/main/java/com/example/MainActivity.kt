@@ -108,24 +108,38 @@ class MainActivity : ComponentActivity() {
     }
 
     fun showDriveUploadQueue() {
-        driveFolderWorker.execute {
-            try {
-                val jobs = androidx.work.WorkManager.getInstance(this).getWorkInfosByTag("xmusic-drive-upload")
-                    .get(10, java.util.concurrent.TimeUnit.SECONDS)
-                val text = jobs.take(30).joinToString("\n\n") { job ->
-                    val status = when (job.state) {
+        runOnUiThread {
+            if (isFinishing || isDestroyed) return@runOnUiThread
+            val status = androidx.work.WorkManager.getInstance(this)
+                .getWorkInfosByTagLiveData("xmusic-drive-upload")
+            val dialog = android.app.AlertDialog.Builder(this)
+                .setTitle("Drive yükleme kuyruğu")
+                .setMessage("Kuyruk okunuyor…")
+                .setPositiveButton("Tamam", null).create()
+            val observer = androidx.lifecycle.Observer<List<androidx.work.WorkInfo>> { jobs ->
+                val text = jobs.sortedBy { it.state.isFinished }.take(30).joinToString("\n\n") { job ->
+                    val state = when (job.state) {
                         androidx.work.WorkInfo.State.ENQUEUED -> "Bekliyor / yeniden denenecek"
-                        androidx.work.WorkInfo.State.RUNNING -> "Yükleniyor"
+                        androidx.work.WorkInfo.State.RUNNING -> {
+                            val stage = job.progress.getString("stage") ?: "Yükleniyor"
+                            val percent = job.progress.getInt("percent", -1)
+                            stage + if (percent in 0..100) " · %" + percent else ""
+                        }
                         androidx.work.WorkInfo.State.SUCCEEDED -> if (job.outputData.getBoolean("duplicate", false)) "Drive'da zaten var" else "Tamamlandı"
                         androidx.work.WorkInfo.State.FAILED -> "Başarısız"
                         androidx.work.WorkInfo.State.BLOCKED -> "Sıra bekliyor"
                         else -> "İptal edildi"
                     }
-                    (job.outputData.getString("name") ?: job.id.toString().take(8)) + ": " + status +
-                        (job.outputData.getString("error")?.let { "\n" + it } ?: "")
+                    val name = job.outputData.getString("name") ?: job.progress.getString("name")
+                        ?: job.id.toString().take(8)
+                    name + ": " + state + (job.outputData.getString("error")?.let { "\n" + it } ?: "")
                 }.ifBlank { "Yükleme kuyruğu boş." }
-                runOnUiThread { showDriveError(text) }
-            } catch (_: Exception) { runOnUiThread { showDriveError("Kuyruk durumu okunamadı.") } }
+                dialog.setMessage(text)
+            }
+            // Ekran açıkken canlı izle; kapatıldığında gözlemciyi kaldır.
+            dialog.setOnDismissListener { status.removeObserver(observer) }
+            dialog.show()
+            status.observe(this, observer)
         }
     }
     private val driveAuthLauncher = registerForActivityResult(
