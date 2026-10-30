@@ -61,7 +61,7 @@ x.dom.window.close();
 x=open('podcast_program_ve_b_l_m_detay',{'xm-feed':'https://example.org/rss'});
 assert.deepEqual(x.calls.find(c=>c[0]==='loadRss'),['loadRss','https://example.org/rss',1]);checks++;
 assert.ok(x.d.getElementById('followBtn'));assert.ok(x.d.getElementById('heroPlayBtn'));checks+=2;
-assert.ok(!x.d.querySelector('main').textContent.includes('Mimar Olmak: Şehirler ve Hikayeleri'));checks++;
+assert.equal(x.d.querySelector('section.mt-6').style.display,'none');checks++;
 x.w.__xmusicRssResult(1,{title:'Gerçek Podcast',description:'Gerçek program açıklaması',items:[{id:'podcast:one',title:'Bölüm',artist:'Program'}]});
 assert.equal(x.d.querySelector('main h2').textContent.trim(),'Gerçek Podcast');
 assert.equal(x.d.getElementById('showDescription').textContent,'Gerçek program açıklaması');
