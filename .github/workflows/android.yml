@@ -51,15 +51,37 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace
       - name: Verify final APK signing certificate
         run: |
-          signer=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
-          test -n "$signer"
-          apk=$(find app/build/outputs/apk/debug -name '*.apk' -type f | head -1)
-          actual=$("$signer" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-1 digest: //p')
-          if [ "$actual" != "d1666252a15cb05dc2df52ab4700eaf0fafbe643" ]; then
-            echo "::error::Final APK has unexpected certificate: $actual"
-            exit 1
-          fi
-          echo "Final APK certificate verified."
+          python3 - <<'PY'
+          import pathlib, struct, hashlib
+          apk = next(pathlib.Path("app/build/outputs/apk/debug").glob("*.apk"))
+          data = apk.read_bytes()
+          eocd = data.rfind(b"PK\x05\x06")
+          directory = struct.unpack_from("<I", data, eocd + 16)[0]
+          assert data[directory-16:directory] == b"APK Sig Block 42", "Signing block missing"
+          size = struct.unpack_from("<Q", data, directory-24)[0]
+          pos = directory-size
+          def field(blob, offset=0):
+              length = struct.unpack_from("<I", blob, offset)[0]
+              return blob[offset+4:offset+4+length], offset+4+length
+          found = False
+          while pos < directory-24:
+              length = struct.unpack_from("<Q", data, pos)[0]
+              kind = struct.unpack_from("<I", data, pos+8)[0]
+              value = data[pos+12:pos+8+length]
+              pos += 8+length
+              if kind == 0x7109871a:
+                  signers, _ = field(value)
+                  signer, _ = field(signers)
+                  signed, _ = field(signer)
+                  _, offset = field(signed)
+                  certs, _ = field(signed, offset)
+                  cert, _ = field(certs)
+                  actual = hashlib.sha1(cert).hexdigest()
+                  assert actual == "d1666252a15cb05dc2df52ab4700eaf0fafbe643", actual
+                  found = True
+          assert found, "APK v2 signer missing"
+          print("Final APK certificate verified.")
+          PY
       - name: Upload debug APK
         if: success()
         uses: actions/upload-artifact@v4
