@@ -23,6 +23,7 @@ class MainActivity : ComponentActivity() {
     private val driveSyncHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val driveSyncTicker = object : Runnable {
         override fun run() {
+            syncFamilyIfReady()
             if (getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE).getBoolean("sync_enabled", false) &&
                 !driveBusy && !syncInFlight && android.os.SystemClock.elapsedRealtime() - lastDriveSync > 55000L) {
                 reconnectSharedDriveSilently()
@@ -40,7 +41,7 @@ class MainActivity : ComponentActivity() {
         }
     }
     private fun reconnectSharedDriveSilently() {
-        if (ProfileStore(this).isChild()) return
+        if (ProfileStore(this).isChild() && !FamilySyncStore(this).enabled()) return
         syncInFlight = true
         lastDriveSync = android.os.SystemClock.elapsedRealtime()
         val request = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder()
@@ -77,6 +78,96 @@ class MainActivity : ComponentActivity() {
             .setMessage("Google bir kez daha geniş Drive okuma izni isteyecek. Bu izin hesabının erişebildiği Drive dosyalarını okumayı kapsar; XMusic yalnızca seçtiğin müzik klasörünü tarar. Yeni şarkılar uygulama açıkken yaklaşık bir dakika içinde alınır.")
             .setPositiveButton("Google ile yetkilendir") { _, _ -> requestContinuousRead = true; authorizeDrive() }
             .setNegativeButton("Vazgeç", null).show()
+    }
+
+    private var familyBusy = false
+    private var lastFamilyAttempt = 0L
+    private fun familyRefresh(reload: Boolean = false) {
+        if (isDestroyed) return
+        if (reload) {
+            appActions.controller?.clearMediaItems()
+            appWebView.loadUrl("file:///android_asset/stitch/ana_sayfa/code.html")
+        } else appWebView.evaluateJavascript("window.dispatchEvent(new Event('xmusic:family'));", null)
+    }
+    fun syncFamilyIfReady(force: Boolean = false) {
+        val family = FamilySyncStore(this)
+        if (!family.enabled() || familyBusy || driveBusy) return
+        if (!force && android.os.SystemClock.elapsedRealtime() - lastFamilyAttempt < 55000L) return
+        val token = driveAccessToken ?: return
+        if (driveAccountId != family.account() || driveFolderId != family.folder()) {
+            family.status("Aile bağlantısındaki Google hesabını ve ortak klasörü bağla."); return
+        }
+        lastFamilyAttempt = android.os.SystemClock.elapsedRealtime(); familyBusy = true
+        driveFolderWorker.execute {
+            try {
+                FamilyDriveClient(this).sync(token)
+                runOnUiThread { familyRefresh() }
+            } catch (_: Exception) {
+                family.status("Aile eşitlemesi tamamlanamadı. İnternet, ortak klasör ve otomatik arşiv iznini kontrol et; yerel kayıtların korunuyor.")
+                runOnUiThread { familyRefresh() }
+            } finally { runOnUiThread { familyBusy = false } }
+        }
+    }
+    fun setupFamily(action: String, code: String) {
+        if (ProfileStore(this).isChild()) { showDriveError("Aile kurulumu için ebeveyn profiline geç."); return }
+        val family = FamilySyncStore(this)
+        if (action == "sync") { syncFamilyIfReady(true); return }
+        if (family.enabled()) { showDriveError("Bu telefon zaten bir aileye bağlı. Aile profilleri ekranındaki bağlantı durumunu kontrol et."); return }
+        val token = driveAccessToken; val folder = driveFolderId; val account = driveAccountId
+        val continuous = getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE).getBoolean("sync_enabled", false)
+        if (token == null || folder == null || account == null || !continuous) {
+            showDriveError("Önce Ayarlar → Google hesap ve Drive ayarları: ortak klasörü seç, ardından Otomatik ortak arşiv bağlantısını aç. Sonra Aile Profilleri’ne dön."); return
+        }
+        if (familyBusy || driveBusy) { showDriveError("Devam eden işlemin bitmesini bekle."); return }
+        if (action == "create") {
+            if (!ProfileStore(this).isAdmin() || !ProfileStore(this).hasParentPin()) { showDriveError("Önce yönetici profilinde Ebeveyn PIN’i belirle. Fatma ve çocuk profillerini de bu telefonda ekle."); return }
+            familyBusy = true
+            driveFolderWorker.execute {
+                try { FamilyDriveClient(this).createFamily(token, folder, account); runOnUiThread { familyRefresh(true); showDriveError("Aile oluşturuldu. Aile Profilleri → Aile bağlantısı → Bağlantı kodunu kopyala. Diğer telefonda Aileye katıl seç.") } }
+                catch (_: Exception) { runOnUiThread { showDriveError("Aile oluşturulamadı. Ortak klasörde düzenleme ve otomatik arşiv izinlerini kontrol et."); familyRefresh(true) } }
+                finally { runOnUiThread { familyBusy = false } }
+            }; return
+        }
+        if (action != "join") return
+        val invitation = try { family.parseInvitation(code.trim()) } catch (_: Exception) { showDriveError("Aile bağlantı kodu geçersiz. Kurucu telefondaki kodun tamamını kopyala."); return }
+        if (invitation.getString("folder") != folder) { showDriveError("İki telefonda aynı ortak müzik klasörü seçilmeli. Önce Drive ayarlarında ortak klasörü değiştir."); return }
+        familyBusy = true
+        driveFolderWorker.execute {
+            try {
+                val policy = FamilyDriveClient(this).preview(token, invitation)
+                val rows = policy.getJSONArray("profiles")
+                val labels = (0 until rows.length()).map { val row = rows.getJSONObject(it); row.getString("name") + " · " + when(row.getString("role")) { "child" -> "Çocuk"; "admin" -> "Aile kurucusu"; else -> "Yetişkin" } }.toTypedArray()
+                runOnUiThread {
+                    familyBusy = false
+                    if (isDestroyed) return@runOnUiThread
+                    android.app.AlertDialog.Builder(this).setTitle("Bu telefonu kim kullanacak?")
+                        .setItems(labels) { _, index ->
+                            val selected = rows.getJSONObject(index)
+                            android.app.AlertDialog.Builder(this).setTitle(selected.getString("name") + " ile aileye katıl")
+                                .setMessage("Bu telefondaki aktif profilin kitaplığı korunarak seçtiğin aile profiline bağlanacak. Yetişkin beğeni/geçmiş paylaşımını Aile bağlantısı ekranından açıp kapatabilirsin. Çocuk kuralları kurucu telefondan yönetilir; istekler ve günlük süre kullanımı eşitlenir. Kod gizlidir; yalnızca ailenle paylaş.")
+                                .setPositiveButton("Katıl") { _, _ ->
+                                    if (familyBusy) return@setPositiveButton
+                                    familyBusy = true
+                                    driveFolderWorker.execute {
+                                        try {
+                                            // Önizleme ile onay arasında değişmiş olabilecek kurallar yeniden doğrulanır.
+                                            val fresh = FamilyDriveClient(this).preview(token, invitation)
+                                            FamilyDriveClient(this).join(token, account, invitation, selected.getString("id"), fresh)
+                                            runOnUiThread { familyRefresh(true); showDriveError("Aile bağlantısı hazır. Uygulama açıkken yaklaşık bir dakikada eşitlenir. İnternet yokken son alınan kurallar geçerlidir.") }
+                                        } catch (_: Exception) { runOnUiThread { showDriveError("Katılım tamamlanamadı. Aile bağlantısını ve Drive izinlerini kontrol et; mevcut kitaplığın korunur."); familyRefresh(true) } }
+                                        finally { runOnUiThread { familyBusy = false } }
+                                    }
+                                }.setNegativeButton("Vazgeç", null).show()
+                        }.setNegativeButton("Vazgeç", null).show()
+                }
+            } catch (_: Exception) { runOnUiThread { familyBusy = false; showDriveError("Aile bilgileri okunamadı. Aynı klasörü, bağlantı kodunu ve otomatik arşiv iznini kontrol et.") } }
+        }
+    }
+    fun copyFamilyInvitation() {
+        if (!ProfileStore(this).isAdmin() || !FamilySyncStore(this).owner()) { showDriveError("Kodu yalnızca aile kurucusu paylaşabilir."); return }
+        val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("XMusic aile bağlantısı", FamilySyncStore(this).invitation()))
+        showDriveError("Aile bağlantı kodu kopyalandı. Yalnızca ailenle paylaş; bu kod aile verilerine erişim sağlar.")
     }
 
     private val driveFolderWorker = java.util.concurrent.Executors.newSingleThreadExecutor()
