@@ -56,25 +56,30 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     // Deneysel arama sonuçları her zaman kullanıcıya kaynak belirtilerek gösterilir.
     @JavascriptInterface
     fun searchExperimentalSource(query: String, requestId: Int) {
-        if (query.isBlank() || query.length > 120) return
+        searchExperimentalSourceMore(query, requestId, 10)
+    }
+
+    @JavascriptInterface
+    fun searchExperimentalSourceMore(query: String, requestId: Int, limit: Int) {
+        if (query.isBlank() || query.length > 120 || limit !in setOf(10, 30)) return
         Thread {
             val result = try {
                 val engine = com.yausername.youtubedl_android.YoutubeDL.getInstance()
                 engine.init(context.applicationContext)
-                val request = com.yausername.youtubedl_android.YoutubeDLRequest("ytsearch10:" + query.trim())
+                val request = com.yausername.youtubedl_android.YoutubeDLRequest("ytsearch$limit:" + query.trim())
                 request.addOption("--flat-playlist")
                 request.addOption("--dump-single-json")
                 request.addOption("--no-warnings")
                 val response = engine.execute(request, "xmusic-search-$requestId") { _, _, _ -> }
                 val entries = org.json.JSONObject(response.out).optJSONArray("entries") ?: org.json.JSONArray()
                 val items = org.json.JSONArray()
-                for (i in 0 until minOf(entries.length(), 10)) {
+                for (i in 0 until minOf(entries.length(), limit)) {
                     val entry = entries.optJSONObject(i) ?: continue
                     val id = entry.optString("id")
                     if (!id.matches(Regex("[A-Za-z0-9_-]{11}"))) continue
                     items.put(org.json.JSONObject().put("id", id).put("title", entry.optString("title")).put("artist", entry.optString("channel", entry.optString("uploader"))))
                 }
-                org.json.JSONObject().put("items", items)
+                org.json.JSONObject().put("items", items).put("limit", limit)
             } catch (e: Exception) {
                 org.json.JSONObject().put("error", "Kaynak araması başarısız oldu. İnternet bağlantısını kontrol edip tekrar dene.")
             }
