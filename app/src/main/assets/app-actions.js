@@ -66,8 +66,10 @@
     const main=document.querySelector('main');if(!main)return null;
     main.replaceChildren();const panel=create('section',undefined,'xm-panel');panel.style.margin='16px';panel.append(create('h2',title));main.append(panel);return panel;
   }
+  let libraryPlaylistTemplate=null;
   function renderLibrary() {
     const main=document.querySelector('main'),host=main?.firstElementChild;
+    host?.querySelector('#xm-library-tracks')?.remove();host?.querySelector('#xm-library-search')?.remove();
     if(!host||host.children.length<8)return;
     const [top,filters,toolbar,pins,artists,playlists,local,shared]=Array.from(host.children);
     // Aile senkronizasyonu ve sanatçı takibi henüz gerçek veri sağlamıyor.
@@ -83,8 +85,8 @@
     }
     function clickable(el,fn){
       if(!el)return;el.setAttribute('role','button');el.tabIndex=0;
-      el.addEventListener('click',e=>{if(!e.target.closest('button'))fn();});
-      el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fn();}});
+      el.onclick=e=>{if(!e.target.closest('button'))fn();};
+      el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fn();}};
     }
     const favoriteCard=pins.children[0],downloadCard=pins.children[1];
     const favoriteSub=favoriteCard?.querySelector('h2')?.parentElement?.nextElementSibling;
@@ -96,11 +98,12 @@
     if(localSub)localSub.textContent=library.local.length+' yerel kayıt';
     const playlistTitle=playlists.querySelector('h3'),playlistHeader=playlistTitle?.parentElement?.parentElement;
     // Template’in liste satırını kendi verilerimizle tekrar kullan.
-    const template=playlists.children[1]?.cloneNode(true);
+    if(!libraryPlaylistTemplate)libraryPlaylistTemplate=playlists.children[1]?.cloneNode(true);
+    const template=libraryPlaylistTemplate;
     Array.from(playlists.children).slice(1).forEach(n=>n.remove());
     const rows=create('div');rows.id='xm-library-tracks';rows.className='px-4 flex flex-col gap-2';
     pins.insertAdjacentElement('afterend',rows);
-    const searchInput=create('input',undefined,'xm-input');searchInput.placeholder='Kitaplıkta ara';
+    const searchInput=create('input',undefined,'xm-input');searchInput.id='xm-library-search';searchInput.placeholder='Kitaplıkta ara';
     searchInput.setAttribute('aria-label','Kitaplıkta ara');searchInput.style.cssText='display:none;margin:4px 16px 12px;width:calc(100% - 32px);padding:12px;background:#1c2023;border-radius:14px;color:#e0e3e7;';
     top.insertAdjacentElement('afterend',searchInput);
     let filter='all',showFavorites=false;
