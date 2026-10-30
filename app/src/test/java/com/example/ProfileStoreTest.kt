@@ -106,5 +106,28 @@ class ProfileStoreTest {
         assertFalse(ProfileStore(context).change("select", "default", "", "1357", ""))
     }
 
+    @Test fun reviewQueueDeduplicatesPersistsAndNeverAutomaticallyAllowsUnknownTracks() {
+        val store = ProfileStore(context); val id = child(store)
+        val raw = """{"id":"experimental:review12345","title":"Test (Explicit)"}"""
+        assertTrue(store.requestReview(id, raw))
+        assertTrue(store.requestReview(id, raw))
+        val review = JSONObject(ProfileStore(context).childReview(id))
+        assertEquals(1, review.getJSONArray("pending").length())
+        assertTrue(review.getJSONArray("pending").getJSONObject(0).getString("reason").contains("yetişkin"))
+        assertTrue(store.setChildAge(id, "under7", "1357"))
+        assertFalse(store.setChildAge(id, "invalid", "1357"))
+        assertTrue(store.change("select", id, "", "", ""))
+        assertNotNull(store.playbackBlockReason("experimental:review12345"))
+        assertFalse(store.resolveReview(id, "experimental:review12345", true, "1357"))
+        assertFalse(store.setChildAge(id, "teen", "1357"))
+        assertTrue(store.requestReview(id, """{"title":"Bir şarkı isteği"}"""))
+        assertTrue(store.change("select", "default", "", "1357", ""))
+        assertFalse(store.resolveReview(id, "experimental:review12345", false, "1357"))
+        assertTrue(store.resolveReview(id, "experimental:review12345", true, "1357"))
+        assertTrue(store.requestReview(id, raw))
+        assertEquals(1, JSONObject(store.childReview(id)).getJSONArray("pending").length())
+        assertEquals(1, JSONObject(store.childReview(id)).getJSONArray("denied").length())
+    }
+
 }
 
