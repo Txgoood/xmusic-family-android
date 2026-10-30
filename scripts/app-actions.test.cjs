@@ -251,6 +251,34 @@ x.w.__xmusicMusicShelfResult(shelfRequests[0][2],{items:[{id:'leTDrileoGI',title
 x.d.querySelector('[aria-label="Stüdyo kayıt oynat"]').click();assert.deepEqual(x.calls.at(-1),['playExperimentalSource','leTDrileoGI','Stüdyo kayıt','Sanatçı']);checks++;
 x.dom.window.close();
 
+// Ana sayfa: gerçek geçmiş, 6 kayıt, devam etme, iki kaynak seçkisi.
+x=open('ana_sayfa');
+const playingHome={ready:true,id:'experimental:leTDrileoGI',title:'Son Parça',artist:'Sanatçı',artwork:'https://i.ytimg.com/vi/leTDrileoGI/mqdefault.jpg',playing:true,position:42000,duration:180000,queue:[]};
+x.w.__xmusicPlayback(playingHome);
+assert.equal(JSON.parse(db).resume.position,42000);checks++;
+let homeRecent=[...x.d.querySelectorAll('main section')].find(s=>s.querySelector('h2')?.textContent.trim()==='Son Dinlenenler');
+assert.ok(homeRecent.textContent.includes('Son Parça'));
+assert.ok(homeRecent.querySelector('.grid').children.length<=6);checks+=2;
+let homeMix=[...x.d.querySelectorAll('main section')].find(s=>s.querySelector('h2')?.textContent.includes('Günlük Aile Miksi'));
+assert.equal(homeMix.children[1].children.length,2);checks++;
+homeMix.children[1].children[1].click();
+assert.ok(x.calls.filter(c=>c[0]==='searchMusicShelf').some(c=>c[1].includes('pop')));checks++;
+x.dom.window.close();
+x=open('ana_sayfa');
+let resumeCard=[...x.d.querySelectorAll('main section')].find(s=>s.textContent.includes('Kaldığın Yerden Devam Et')).children[1];
+resumeCard.click();
+assert.deepEqual(x.calls.at(-1),['resumeExperimentalSource','leTDrileoGI','Son Parça','Sanatçı',42000]);checks++;
+x.dom.window.close();
+x=open('ayarlar_ve_profil_y_netimi');
+const switches=[...x.d.querySelectorAll('main input[type="checkbox"]')];
+assert.equal(switches.length,4);
+assert.equal(switches[0].disabled,true);assert.equal(switches[1].disabled,true);assert.equal(switches[3].disabled,true);checks+=4;
+switches[2].checked=true;switches[2].dispatchEvent(new x.w.Event('change',{bubbles:true}));
+assert.deepEqual(x.calls.at(-1),['setDownloadWifiOnly',true]);checks++;
+const profileSection=[...x.d.querySelectorAll('main section')].find(s=>s.querySelector('h2')?.textContent.includes('Aile Profilleri'));
+assert.equal(profileSection.querySelector('.grid').children.length,1);assert.ok(profileSection.querySelector('.grid').textContent.includes('Ben'));checks+=2;
+x.dom.window.close();
+
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
 if(process.env.XMUSIC_AUDIT_OUTPUT)fs.writeFileSync(process.env.XMUSIC_AUDIT_OUTPUT,JSON.stringify(report,null,2));
