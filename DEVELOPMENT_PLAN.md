@@ -79,3 +79,7 @@ Durumları yalnız doğrulanan işin ardından güncelle.
 - #75: Kullanıcı kalıcı yerel dosya yükleme kuyruğunun çalıştığını doğruladı.
 - Otomatik arşiv denemesi: Hesap yeniden bağlandıktan sonra gerçek experimental oynatma başlangıcı WorkManager işini tetikler; ses yt-dlp/FFmpeg ile hazırlanıp Drive'a yüklenir. Kaynak kimliği Drive appProperties alanına ve hesap bazlı yerel eşleştirmeye yazılır. Tekrar aynı YouTube kaydı seçilirse tamamlanmış Drive kopyası tercih edilir.
 - Varsayılan otomatik mod açık; Ayarlar'dan aç/kapat ve yükleme kuyruğu durum ekranı mevcut. Hesap izni gerektiğinde iş hata verir; uygulama zorla durdurulursa Android işleri yeniden başlatmayı bekletebilir. Kaynak indirme, FFmpeg cihaz desteği, otomatik yükleme ve tekrar Drive oynatma henüz uçtan uca cihaz testinden geçmedi.
+
+
+- #80: Kullanıcı otomatik arşivleme düzeltmesinin çalıştığını doğruladı. Çalışan geri dönüş noktası: `93b4a3a0fe695e71880452022dc645241a33aa55`.
+- Kuyruk görünürlüğü: Otomatik indirme, ses hazırlama, Drive yükleme ve sunucu onayı aşamaları WorkManager ilerleme verisiyle gösterilir. Açık kuyruk penceresi değişiklikleri canlı izler; kapandığında gözlemci kaldırılır. Yükleme yüzdesi gönderilen baytlardan hesaplanır; başarı yalnız Drive dosya kimliği döndükten sonra bildirilir. Aynı aşamanın güncellemeleri saniyede birle sınırlıdır. Yeni görünüm cihazda henüz doğrulanmadı.
