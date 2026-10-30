@@ -324,8 +324,15 @@ class MainActivity : ComponentActivity() {
                         button.innerHTML = '<span class="material-symbols-outlined" style="font-size:26px">settings</span>';
                         button.addEventListener('click',function(e){e.stopPropagation();go('ayarlar_ve_profil_y_netimi');});
                         // Sağ grup içindeki çan + profilin sonuna ekle; üçüncü flex sütunu oluşturma.
-                        const rightGroup = header.querySelector('button[aria-label="Profil ve Aile Alanı"]')?.parentElement;
+                        const rightGroup = header.querySelector('button[aria-label="Profil ve Aile Alanı"]')?.parentElement || (header.children.length > 1 ? header.lastElementChild : null);
                         if (rightGroup) {
+                          const avatar = rightGroup.querySelector('img[alt="Profile"]');
+                          if (avatar && avatar.parentElement === rightGroup) {
+                            const profileButton = document.createElement('button');
+                            profileButton.type = 'button'; profileButton.setAttribute('aria-label','Profil ve Aile Alanı');
+                            profileButton.dataset.xmOwned='true'; profileButton.__xmOwnedRun=function(){go('aile_profili_se_imi');};
+                            rightGroup.replaceChild(profileButton, avatar); profileButton.appendChild(avatar);
+                          }
                           rightGroup.appendChild(button);
                           rightGroup.style.setProperty('margin-left','auto','important');
                           rightGroup.style.setProperty('flex-shrink','0','important');
@@ -616,7 +623,21 @@ class MainActivity : ComponentActivity() {
                           queue.dataset.xmOwned='true';queue.__xmOwnedRun=function(){if(window.Android)window.Android.showDriveUploadQueue();};
                           const automatic=document.createElement('button');automatic.type='button';automatic.textContent='Otomatik Drive arşivini aç / kapat';automatic.style.cssText=btn.style.cssText;
                           automatic.dataset.xmOwned='true';automatic.__xmOwnedRun=function(){if(window.Android)window.Android.toggleAutomaticArchive();};
-                          main.prepend(automatic);main.prepend(queue);main.prepend(library);main.prepend(upload);main.prepend(btn);
+                          const section=document.createElement('section');
+                          section.className='px-4 mb-6';
+                          const details=document.createElement('details');
+                          details.className='bg-surface-container-low rounded-xl overflow-hidden shadow-sm';
+                          const summary=document.createElement('summary');
+                          summary.className='p-4 font-label-lg text-label-lg text-on-surface cursor-pointer';
+                          summary.textContent='Google hesap ve Drive ayarları';
+                          details.appendChild(summary);
+                          [btn,library,upload,queue,automatic].forEach(function(item){
+                            item.style.cssText='display:block;width:calc(100% - 32px);padding:14px;margin:8px 16px;text-align:left;border:1px solid #62796f;border-radius:12px;color:#e0e3e7;font:inherit;';
+                            details.appendChild(item);
+                          });
+                          section.appendChild(details);
+                          const anchor=Array.from(main.querySelectorAll('section')).find(function(s){return (s.textContent||'').includes('İndirme & Depolama');});
+                          if(anchor) anchor.before(section); else main.appendChild(section);
                         }
                       }
                       // Yalnız gerçek arka plan işlerine bağlı ağ tercihi etkin.
@@ -629,6 +650,24 @@ class MainActivity : ComponentActivity() {
                             box.checked=false;box.disabled=true;box.title='Bu özellik henüz hazır değil';
                           }
                         });
+                      }
+                      if ((location.pathname || '').includes('/ayarlar_ve_profil_y_netimi/')) {
+                        ['Biyometrik Hızlı Geçiş','Bağlı Cihazlar & Yayın','İndirme Kalitesi','Akış Kalitesi (Wi-Fi)','Mobil Veri Akış Kalitesi'].forEach(function(label){
+                          const title=Array.from(document.querySelectorAll('main h4,main p')).find(function(n){return n.textContent.trim()===label;});
+                          const row=title?.closest('.p-4, .pt-3'); if(row)row.remove();
+                        });
+                        const place=Array.from(document.querySelectorAll('main span')).find(function(n){return (n.textContent||'').includes('Depolama Konumu:');});
+                        const storage=place?.closest('.p-4');
+                        if(storage && window.Android){
+                          try {
+                            const info=JSON.parse(window.Android.deviceStorageInfo());
+                            const gb=function(n){return (n/1073741824).toLocaleString('tr-TR',{maximumFractionDigits:1})+' GB';};
+                            storage.replaceChildren();
+                            const title=document.createElement('p');title.className='font-label-md text-label-md text-on-surface';title.textContent='Cihaz depolama alanı';
+                            const detail=document.createElement('p');detail.className='font-body-sm text-body-sm text-on-surface-variant';detail.textContent=gb(info.free)+' boş · '+gb(info.total)+' toplam';
+                            storage.append(title,detail);
+                          } catch (_) { storage.textContent='Depolama bilgisi alınamadı.'; }
+                        }
                       }
                       // Ekran genişliğini aşan sabit öğelerin yatay taşmasını önle.
                       const sheet = document.createElement('style');
@@ -765,3 +804,4 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 }
+
