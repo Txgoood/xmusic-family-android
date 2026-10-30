@@ -121,30 +121,130 @@
     });
   }
   let rssRequest=0, downloadSnapshot='';
+  let podcastRequest=0, podcastQuery='', podcastTimer;
+  function openFeed(feed){
+    sessionStorage.setItem('xm-feed',feed.url);
+    sessionStorage.setItem('xm-feed-info',JSON.stringify(feed));
+    go('podcast_program_ve_b_l_m_detay');
+  }
+  function toggleFeed(feed,control){
+    const previous=library.feeds.slice();
+    const index=library.feeds.findIndex(f=>f.url===feed.url);
+    if(index<0)library.feeds.push(feed);else library.feeds.splice(index,1);
+    if(!save()){library.feeds=previous;return;}
+    control.textContent=index<0?'Takibi Bırak':'Takip Et';
+  }
   function renderPodcasts() {
-    const panel=content('Podcast');if(!panel)return;
-    panel.append(create('p','Yayıncının HTTPS RSS adresiyle program ekle. Kayıtlar bu cihazda saklanır.'));
+    const main=document.querySelector('main');if(!main)return;
+    // Orijinal başlığı koru; demo programların yerine gerçek arama ve takipler gelsin.
+    const host=main.firstElementChild||main;
+    document.getElementById('xm-podcast-panel')?.remove();
+    Array.from(host.children).slice(1).forEach(n=>{n.style.display='none';});
+    const chips=document.getElementById('podcast-chips');if(chips)chips.style.display='none';
+    const panel=create('section',undefined,'xm-panel');panel.id='xm-podcast-panel';panel.style.margin='0 0 16px';
+    host.appendChild(panel);
+    const nav=document.querySelector('nav');if(nav)nav.querySelectorAll('a[data-path]').forEach(a=>{
+      const active=a.dataset.path==='podcast';
+      a.classList.toggle('text-primary',active);a.classList.toggle('font-bold',active);
+      a.classList.toggle('text-on-surface-variant',!active);
+      if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');
+    });
+    panel.append(create('h2','Podcast ara'));
+    const form=create('form');
+    const input=create('input',undefined,'xm-input');
+    input.id='xm-podcast-search';input.type='search';input.maxLength=100;
+    input.placeholder='Program adı veya yayıncı ara…';input.setAttribute('aria-label','Podcast ara');input.value=podcastQuery;
+    form.append(input,button('Ara',()=>searchNow()),button('Aramayı Temizle',()=>{
+      input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();
+    }));panel.appendChild(form);
+    const results=create('div','Bir program adı veya yayıncı yazarak ara.');results.id='xm-podcast-results';results.setAttribute('aria-live','polite');
+    panel.append(results);
+    let currentQuery='';
+    function searchNow(){
+      clearTimeout(podcastTimer);
+      const query=input.value.trim();podcastQuery=query;
+      const id=++podcastRequest;currentQuery=query;
+      results.replaceChildren();
+      if(query.length<2){results.textContent=query?'En az iki karakter yaz.':'Bir program adı veya yayıncı yazarak ara.';return;}
+      results.textContent='Podcast’ler aranıyor…';
+      A.searchPodcasts(query,id);
+    }
+    form.addEventListener('submit',e=>{e.preventDefault();searchNow();});
+    input.addEventListener('input',()=>{
+      clearTimeout(podcastTimer);++podcastRequest;podcastQuery=input.value.trim();
+      if(podcastQuery.length<2){results.textContent=podcastQuery?'En az iki karakter yaz.':'Bir program adı veya yayıncı yazarak ara.';return;}
+      results.textContent='Podcast’ler aranıyor…';
+      podcastTimer=setTimeout(searchNow,650);
+    });
+    function drawFollowed(){
+      following.replaceChildren();
+      if(!library.feeds.length){following.append(create('p','Henüz takip ettiğin program yok.'));return;}
+      library.feeds.forEach(feed=>{
+        const row=create('div',undefined,'xm-row');
+        const unfollow=button('Takibi Bırak',()=>confirmAction('Podcast takibi kaldırılsın mı?',()=>{
+          toggleFeed(feed,unfollow);drawFollowed();
+        }));
+        row.append(button(feed.title,()=>openFeed(feed)),unfollow);following.appendChild(row);
+      });
+    }
+    window.__xmusicPodcastSearchResult=(id,payload)=>{
+      if(id!==podcastRequest||currentQuery!==input.value.trim())return;
+      results.replaceChildren();
+      if(payload.error){results.append(create('p',payload.error),button('Tekrar Dene',searchNow));return;}
+      if(!payload.items?.length){results.textContent='Açık RSS kaynağı olan program bulunamadı.';return;}
+      payload.items.forEach(item=>{
+        const feed={url:item.feed,title:item.title,artist:item.artist,artwork:item.artwork};
+        const row=create('div',undefined,'xm-row');row.style.alignItems='flex-start';
+        if(item.artwork?.startsWith('https://')){
+          const image=create('img');image.src=item.artwork;image.alt='';image.loading='lazy';
+          image.style.cssText='width:64px;height:64px;border-radius:12px;object-fit:cover;flex-shrink:0;';row.appendChild(image);
+        }
+        const info=create('div');info.style.cssText='flex:1;min-width:160px;';
+        info.append(create('strong',item.title||'Podcast'),create('p',item.artist||''),
+          create('small',[item.genre,item.episodeCount>0?item.episodeCount+' bölüm':''].filter(Boolean).join(' · ')));
+        const controls=create('div',undefined,'xm-row');controls.style.border='0';
+        const follow=button(library.feeds.some(f=>f.url===feed.url)?'Takibi Bırak':'Takip Et',()=>{
+          toggleFeed(feed,follow);drawFollowed();
+        });
+        controls.append(button('Bölümleri Aç',()=>openFeed(feed)),follow);
+        if(item.url)controls.append(button('Apple Podcasts’te Gör',()=>A.openPodcastPage(item.url)));
+        info.appendChild(controls);row.appendChild(info);results.appendChild(row);
+      });
+    };
+    panel.append(create('h3','Takip Ettiklerim'));
+    const following=create('div');following.id='xm-podcast-following';panel.appendChild(following);drawFollowed();
     panel.append(button('RSS Kaynağı Ekle',()=>editName('HTTPS RSS adresi','',address=>{
       try {const url=new URL(address);if(url.protocol!=='https:')throw Error();}
       catch(_){N.showToast('Geçerli bir HTTPS RSS adresi gir.');return;}
-      if(!library.feeds.some(f=>f.url===address))library.feeds.push({url:address,title:address});
-      if(save()){sessionStorage.setItem('xm-feed',address);go('podcast_program_ve_b_l_m_detay');}
+      const feed={url:address,title:address};
+      if(!library.feeds.some(f=>f.url===address))library.feeds.push(feed);
+      if(save())openFeed(feed);
     })),button('İndirilen Bölümler',()=>go('i_ndirme_y_neticisi')));
-    if(!library.feeds.length)panel.append(create('p','Henüz takip edilen podcast yok.'));
-    library.feeds.forEach(feed=>{const row=create('div',undefined,'xm-row');row.append(button(feed.title,()=>{sessionStorage.setItem('xm-feed',feed.url);go('podcast_program_ve_b_l_m_detay');}),button('Takibi Bırak',()=>confirmAction('Podcast takibi kaldırılsın mı?',()=>{library.feeds=library.feeds.filter(f=>f.url!==feed.url);if(save())renderPodcasts();})));panel.append(row);});
+    if(podcastQuery.length>=2)searchNow();
   }
   function renderFeed(){
     const panel=content('Podcast Bölümleri');if(!panel)return;
     const address=sessionStorage.getItem('xm-feed');
     panel.append(button('Podcast Kitaplığı',()=>go('podcast_merkezi')));
     if(!address){panel.append(create('p','Önce gerçek bir RSS programı seç.'));return;}
+    let info={url:address,title:address};
+    try{const saved=JSON.parse(sessionStorage.getItem('xm-feed-info')||'null');if(saved?.url===address)info=saved;}catch(_){}
+    if(info.artwork?.startsWith('https://')){
+      const image=create('img');image.src=info.artwork;image.alt='';
+      image.style.cssText='width:96px;height:96px;object-fit:cover;border-radius:16px;margin:12px 0;';panel.appendChild(image);
+    }
+    if(info.title!==address)panel.append(create('h3',info.title));
+    if(info.artist)panel.append(create('p',info.artist));
+    const follow=button(library.feeds.some(f=>f.url===address)?'Takibi Bırak':'Takip Et',()=>toggleFeed(info,follow));
+    panel.appendChild(follow);
     const results=create('div','RSS yükleniyor…');panel.append(results);
     const id=++rssRequest;
     window.__xmusicRssResult=(request,payload)=>{
       if(request!==rssRequest||(payload.feed&&payload.feed!==address))return;
       results.replaceChildren();
       if(payload.error){results.append(create('p',payload.error),button('Tekrar Dene',renderFeed));return;}
-      const feed=library.feeds.find(f=>f.url===address);if(feed){feed.title=payload.title;save();}
+      info.title=payload.title||info.title;
+      const feed=library.feeds.find(f=>f.url===address);if(feed&&feed.title!==payload.title){feed.title=payload.title;save();}
       results.append(create('h3',payload.title||'Podcast'));
       if(!payload.items?.length)results.append(create('p','Desteklenen HTTPS ses bölümü bulunamadı.'));
       (payload.items||[]).forEach(t=>{const row=create('div',undefined,'xm-row');row.append(create('strong',t.title),button('Oynat',()=>A.playPodcast(t.id,false)),button('+ Sıraya',()=>A.playPodcast(t.id,true)),button('İndir',()=>A.downloadPodcast(t.id)),button('Listeye Ekle',()=>addToPlaylist(t)));results.append(row);});
