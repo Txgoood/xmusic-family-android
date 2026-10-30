@@ -27,6 +27,10 @@ open class FamilyDriveClient(private val context: Context) {
         } finally { conn.disconnect() }
     }
     private fun read(token: String, id: String) = request("https://www.googleapis.com/drive/v3/files/${valid(id)}?alt=media", token)
+    private fun readCached(token: String, id: String, version: String? = null): String {
+        val stamp = version ?: JSONObject(request("https://www.googleapis.com/drive/v3/files/${valid(id)}?fields=modifiedTime", token)).optString("modifiedTime")
+        return store.cachedFile(id, stamp) ?: read(token, id).also { store.cacheFile(id, stamp, it) }
+    }
     private fun write(token: String, id: String, data: String) {
         request("https://www.googleapis.com/upload/drive/v3/files/${valid(id)}?uploadType=media&fields=id", token, "PATCH", data, "application/octet-stream")
     }
@@ -65,25 +69,31 @@ open class FamilyDriveClient(private val context: Context) {
         require(store.enabled())
         var changed = false
         if (!store.owner()) {
-            val policy = store.verifyPolicy(store.open(read(token, store.root())))
+            val policy = store.verifyPolicy(store.open(readCached(token, store.root())))
             val before = profiles.policy(store.familyId(), 0).toString()
             profiles.applyPolicy(policy); store.revision(policy.getLong("revision"))
             changed = before != profiles.policy(store.familyId(), 0).toString()
         }
         val own = profiles.deviceSnapshot(store.familyId(), store.deviceId())
-        val encrypted = store.seal(own)
-        if (store.deviceFile().isEmpty()) store.deviceFile(create(token, store.folder(), "device", encrypted)) else write(token, store.deviceFile(), encrypted)
+        own.remove("updatedAt")
+        val digest = store.digest(own.toString())
+        if (store.deviceFile().isEmpty() || store.remembered("deviceDigest") != digest) {
+            val encrypted = store.seal(own)
+            if (store.deviceFile().isEmpty()) store.deviceFile(create(token, store.folder(), "device", encrypted)) else write(token, store.deviceFile(), encrypted)
+            store.remember("deviceDigest", digest)
+        }
         val devices = JSONArray().put(own); val seen = mutableSetOf(store.deviceId())
         val query = "'${valid(store.folder())}' in parents and trashed=false and appProperties has { key='xmusicFamily' and value='${valid(store.familyId())}' } and appProperties has { key='xmusicFamilyKind' and value='device' }"
         var page = ""; var count = 0
         do {
-            val result = JSONObject(request("https://www.googleapis.com/drive/v3/files?q=" + URLEncoder.encode(query, "UTF-8") + "&fields=nextPageToken,files(id)&pageSize=100" + if (page.isEmpty()) "" else "&pageToken=" + URLEncoder.encode(page, "UTF-8"), token))
+            val result = JSONObject(request("https://www.googleapis.com/drive/v3/files?q=" + URLEncoder.encode(query, "UTF-8") + "&fields=nextPageToken,files(id,modifiedTime)&pageSize=100" + if (page.isEmpty()) "" else "&pageToken=" + URLEncoder.encode(page, "UTF-8"), token))
             val files = result.optJSONArray("files") ?: JSONArray()
             for (i in 0 until files.length()) {
                 require(++count <= 50) { "Aile cihaz sınırı aşıldı." }
-                val file = files.getJSONObject(i).getString("id"); if (file == store.deviceFile()) continue
+                val info = files.getJSONObject(i)
+                val file = info.getString("id"); if (file == store.deviceFile()) continue
                 // Hatalı tek bir cihaz dosyası diğer üyelerin eşitlenmesini durdurmaz.
-                val device = try { store.open(read(token, file)) } catch (_: Exception) { continue }
+                val device = try { store.open(readCached(token, file, info.optString("modifiedTime"))) } catch (_: Exception) { continue }
                 val deviceId = device.optString("device")
                 if (device.optString("family") != store.familyId() || !deviceId.matches(Regex("[A-Za-z0-9_-]{1,200}")) || !seen.add(deviceId)) continue
                 devices.put(device)
@@ -93,9 +103,12 @@ open class FamilyDriveClient(private val context: Context) {
         store.cache(devices)
         if (store.owner()) {
             profiles.mergeRemoteRequests(devices)
-            val revision = store.nextRevision()
-            write(token, store.root(), store.seal(store.signedPolicy(profiles.policy(store.familyId(), revision))))
-            store.revision(revision)
+            val policyDigest = store.digest(profiles.policy(store.familyId(), 0).toString())
+            if (store.remembered("policyDigest") != policyDigest) {
+                val revision = store.nextRevision()
+                write(token, store.root(), store.seal(store.signedPolicy(profiles.policy(store.familyId(), revision))))
+                store.revision(revision); store.remember("policyDigest", policyDigest)
+            }
         }
         store.status(); return changed
     }
