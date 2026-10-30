@@ -473,7 +473,7 @@ class MainActivity : ComponentActivity() {
                           const btn=document.createElement('button');
                           btn.id='xmusic-drive-connect';btn.type='button';btn.textContent='Google Drive hesabını bağla';
                           btn.style.cssText='display:block;padding:12px;margin:12px;border:1px solid #62796f;border-radius:12px;color:#e0e3e7;';
-                          btn.addEventListener('click',function(){if(window.Android)window.Android.connectDrive();});
+                          btn.dataset.xmOwned='true';btn.__xmOwnedRun=function(){if(window.Android)window.Android.connectDrive();};
                           main.prepend(btn);
                         }
                       }
