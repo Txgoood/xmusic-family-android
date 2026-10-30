@@ -231,6 +231,7 @@ let shelfCall=x.calls.filter(k=>k[0]==='searchMusicShelf').at(-1);
 assert.ok(shelfCall[1].includes('pop'));checks++;
 x.w.__xmusicMusicShelfResult(shelfCall[2],{items:[{id:'leTDrileoGI',title:'Örnek Şarkı',artist:'Sanatçı'}]});
 x.d.querySelector('#xm-dialog [aria-label="Örnek Şarkı oynat"]').click();
+assert.deepEqual(x.calls.filter(k=>k[0]==='assignMusicGenre').at(-1),['assignMusicGenre','leTDrileoGI','Pop']);checks++;
 assert.deepEqual(x.calls.at(-1),['playExperimentalSource','leTDrileoGI','Örnek Şarkı','Sanatçı']);checks++;
 [...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Kapat').click();
 const topInput=x.d.getElementById('search-input');
