@@ -13,6 +13,19 @@ import java.util.concurrent.TimeUnit
 
 /** Çalma başlamasını engellemeden seçilmiş kaydı arşivler. */
 class AutomaticDriveArchive(context: Context, params: WorkerParameters) : Worker(context, params) {
+    private var progressStage = ""
+    private var progressAt = 0L
+
+    private fun report(name: String, stage: String, percent: Int = -1) {
+        if (isStopped) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        // Veritabanını her ses parçasında yazma; aşama değişince hemen bildir.
+        if (stage == progressStage && now - progressAt < 1000L) return
+        progressStage = stage
+        progressAt = now
+        setProgressAsync(workDataOf("name" to name, "stage" to stage, "percent" to percent.coerceIn(-1, 100)))
+    }
+
     override fun doWork(): Result {
         val source = inputData.getString("source") ?: return Result.failure()
         val account = inputData.getString("account") ?: return Result.failure()
@@ -22,6 +35,7 @@ class AutomaticDriveArchive(context: Context, params: WorkerParameters) : Worker
         val dir = java.io.File(applicationContext.cacheDir, "archive-$id")
         return try {
             if (!prefs.getBoolean("enabled", true)) return Result.success()
+            report(name, "Drive izni kontrol ediliyor")
             val auth = Tasks.await(Identity.getAuthorizationClient(applicationContext).authorize(
                 AuthorizationRequest.builder().setRequestedScopes(listOf(Scope("https://www.googleapis.com/auth/drive.file"))).build()
             ), 30, TimeUnit.SECONDS)
@@ -29,7 +43,10 @@ class AutomaticDriveArchive(context: Context, params: WorkerParameters) : Worker
             if (auth.hasResolution() || token.isNullOrBlank()) return Result.failure(workDataOf("error" to "Drive hesabını yeniden bağla."))
             val client = DriveFolderClient()
             if (client.accountId(token) != account) return Result.failure(workDataOf("error" to "Drive hesabı değişti; arşivlenmedi."))
+            report(name, "Arşiv sırası bekleniyor")
             synchronized(downloadLock) {
+                if (isStopped) return Result.failure()
+                report(name, "Drive arşivi kontrol ediliyor")
                 val folder = client.getOrCreate(token)
                 val existing = client.findBySource(token, folder, source)
                 if (existing != null) {
@@ -65,7 +82,13 @@ class AutomaticDriveArchive(context: Context, params: WorkerParameters) : Worker
                         request.addOption("-x")
                         request.addOption("--audio-format", "m4a")
                         request.addOption("-o", java.io.File(dir, "audio.%(ext)s").absolutePath)
-                        engine.execute(request, id.toString()) { _, _, _ -> }
+                        report(name, if (hls) "Ses kaynağı hazırlanıyor" else "Alternatif ses kaynağı deneniyor")
+                        engine.execute(request, id.toString()) { percent, _, _ ->
+                            if (percent.isFinite() && percent >= 0f) {
+                                if (percent >= 100f) report(name, "Ses dosyası hazırlanıyor")
+                                else report(name, "İndiriliyor", percent.toInt().coerceIn(0, 99))
+                            }
+                        }
                         val output = java.io.File(dir, "audio.m4a")
                         require(output.isFile && output.length() in 1..(250L * 1024 * 1024)) {
                             "Ses dosyası hazırlanamadı."
@@ -84,7 +107,13 @@ class AutomaticDriveArchive(context: Context, params: WorkerParameters) : Worker
                 if (isStopped) return Result.failure()
                 val audio = java.io.File(dir, "audio.m4a")
                 require(audio.isFile && audio.length() in 1..(250L * 1024 * 1024)) { "Ses dosyası hazırlanamadı." }
-                val file = DriveUploadClient().upload(token, folder, audio, name, "audio/mp4", youtubeId = source)
+                report(name, "Drive'a yükleniyor", 0)
+                val file = DriveUploadClient().upload(token, folder, audio, name, "audio/mp4", youtubeId = source,
+                    onProgress = { sent, total ->
+                        if (isStopped) throw InterruptedException("Arşivleme iptal edildi.")
+                        if (sent >= total) report(name, "Drive onayı bekleniyor")
+                        else report(name, "Drive'a yükleniyor", (sent * 100 / total).toInt().coerceIn(0, 99))
+                    })
                 prefs.edit().putString(account + ":" + source, file.id).commit()
                 Result.success(workDataOf("name" to name, "fileId" to file.id))
             }
