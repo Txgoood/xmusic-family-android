@@ -46,6 +46,18 @@ class DriveFolderClient {
         return tracks
     }
 
+    fun accountId(token: String): String =
+        request("https://www.googleapis.com/drive/v3/about?fields=user(permissionId)", token, null)
+            .getJSONObject("user").getString("permissionId")
+
+    fun findByHash(token: String, folderId: String, hash: String): String? {
+        require(folderId.matches(Regex("[A-Za-z0-9_-]{1,200}")) && hash.matches(Regex("[a-f0-9]{64}")))
+        val query = "'$folderId' in parents and trashed=false and appProperties has { key='contentSha256' and value='$hash' }"
+        val rows = request("https://www.googleapis.com/drive/v3/files?q=" + URLEncoder.encode(query, "UTF-8") +
+            "&fields=files(id)&pageSize=1", token, null).optJSONArray("files")
+        return if (rows != null && rows.length() > 0) rows.getJSONObject(0).getString("id") else null
+    }
+
     private fun request(address: String, token: String, body: JSONObject?): JSONObject {
         val conn = URL(address).openConnection() as HttpURLConnection
         try {
