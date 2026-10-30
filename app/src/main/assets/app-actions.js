@@ -233,6 +233,7 @@
     });
   }
   function renderProfiles(){
+    const heading=document.querySelector('header h1');if(heading)heading.textContent='Aile Profilleri';
     const data=profileState(), panel=content('Yerel Aile Profilleri');if(!panel)return;
     panel.append(create('p','Her yetişkin profilinin favorileri, listeleri ve geçmişi ayrıdır. Bulut eşitleme ve güvenli çocuk profili henüz hazır değil.'),button('Yeni Profil Ekle',()=>profileForm()),button('Aktif profil görselini değiştir',avatarChooser));
     (data.profiles||[]).forEach(profile=>{
@@ -859,6 +860,8 @@
     const timeLabel=resume.firstElementChild?.lastElementChild;
     const resumeArtist=resumeInfo?.previousElementSibling?.lastElementChild;
     const progress=resumeCard?.querySelector('[style*="width:"]');
+    const progressLabel=progress?.parentElement?.nextElementSibling;
+    if(progressLabel)progressLabel.id='xm-resume-percentage';
     const resumeTag=resumeInfo?.previousElementSibling?.firstElementChild;if(resumeTag)resumeTag.style.display='none';
     let signature='';
     function playResume(track){
@@ -874,8 +877,10 @@
       else playTrack(track);
     }
     function refreshHome(){
-      const tracks=(library.history||[]).slice(0,6),last=library.resume||tracks[0]||null;
-      const current=JSON.stringify([tracks,last]);if(current===signature)return;signature=current;
+      const tracks=(library.history||[]).slice(0,6),saved=library.resume||tracks[0]||null;
+      const last=saved&&state.id===saved.id&&!state.pending?Object.assign({},saved,{position:state.position,duration:state.duration}):saved;
+      const current=JSON.stringify(tracks);
+      if(current!==signature){signature=current;
       grid.replaceChildren();
       if(!tracks.length)grid.append(create('p','Dinlediğin parçalar burada görünecek.','text-on-surface-variant'));
       tracks.forEach(track=>{
@@ -886,12 +891,14 @@
         makeOwned(card,()=>playTrack(track));if(play)makeOwned(play,()=>playTrack(track));
         grid.append(card);
       });
+      }
       if(!last){
         if(resumeInfo)resumeInfo.textContent='Henüz parça dinlenmedi';
         if(resumeArtist)resumeArtist.textContent='Bir parça seçerek başlayabilirsin';
         if(resumeImage)resumeImage.removeAttribute('src');
         if(timeLabel)timeLabel.textContent='';
         if(progress)progress.style.width='0%';
+        if(progressLabel)progressLabel.textContent='';
         if(resumeCard){delete resumeCard.dataset.xmOwned;resumeCard.__xmOwnedRun=null;}
       }else{
         if(resumeInfo)resumeInfo.textContent=last.title||'Son parça';
@@ -899,7 +906,9 @@
         if(resumeImage){if(last.artwork?.startsWith('https://'))resumeImage.src=last.artwork;else resumeImage.removeAttribute('src');resumeImage.alt='';}
         const duration=Number(last.duration)||0,position=Number(last.position)||0;
         if(timeLabel)timeLabel.textContent=duration>0?Math.max(0,Math.ceil((duration-position)/60000))+' dk kaldı':'Son dinlenen parça';
-        if(progress)progress.style.width=duration>0?Math.min(100,Math.max(0,position/duration*100))+'%':'0%';
+        const percentage=duration>0?Math.min(100,Math.max(0,position/duration*100)):0;
+        if(progress)progress.style.width=percentage+'%';
+        if(progressLabel)progressLabel.textContent=duration>0?'%'+Math.floor(percentage):'';
         if(resumeCard)makeOwned(resumeCard,()=>playResume(last));
       }
     }
@@ -997,6 +1006,7 @@
   if(page==='arama_ve_ke_fet')setTimeout(function seedSearch(){if(!window.__xmusicActionsInstalled){setTimeout(seedSearch,50);return;}const query=sessionStorage.getItem('xm-search');if(query!==null){sessionStorage.removeItem('xm-search');const input=document.getElementById('search-input');if(input){input.value=query;input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();}}},0);
   window.__xmusicActionsAudit=()=>Array.from(document.querySelectorAll('button,a')).filter(b=>!b.closest('#xmusic-live-search')).map(b=>({label:b.getAttribute('aria-label')||b.textContent.trim(),action:b.dataset.xmAction|| (b.dataset.xmOwned?'owned':null),blocked:b.dataset.xmBlocked||null}));
 })();
+
 
 
 
