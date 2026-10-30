@@ -65,6 +65,10 @@ x=open('alma_listesi_y_netimi',{'xm-playlist':playlist.id});x.w.__xmusicPlayback
 [...x.d.querySelectorAll('button')].find(b=>b.textContent==='Çalan Parçayı Ekle').click();assert.equal(JSON.parse(db).playlists[0].tracks[0].id,state.id);checks++;
 [...x.d.querySelectorAll('button')].find(b=>b.textContent==='Dinle').click();assert.deepEqual(x.calls.at(-1),['resolveAudiusTrack','test123',false]);checks++;
 x.dom.window.close();
+x=open('aile_profili_se_imi');
+[...x.d.querySelectorAll('button')].find(b=>b.textContent==='Aktif profil görselini değiştir').click();
+[...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Telefondan fotoğraf seç').click();
+assert.deepEqual(x.calls.at(-1),['pickActiveAvatar']);checks++;x.dom.window.close();
 x=open('uyku_zamanlay_c_s');
 assert.equal(x.d.querySelector('header h1').textContent,'Uyku Zamanlayıcısı');
 assert.ok(!x.d.querySelector('main').textContent.includes('Boran’ın Odası'));
@@ -288,6 +292,8 @@ resumeCard=[...x.d.querySelectorAll('main section')].find(s=>s.textContent.inclu
 resumeCard.click();assert.deepEqual(x.calls.at(-1),['resumeExperimentalSource','leTDrileoGI','Son Parça','Sanatçı',99000]);checks++;
 x.dom.window.close();resumeOverride={};
 x=open('ayarlar_ve_profil_y_netimi');
+const eqTitle=[...x.d.querySelectorAll('main h4')].find(h=>h.textContent.trim()==='Ekolayzır');
+eqTitle.closest('.p-4').click();assert.deepEqual(x.calls.at(-1),['openEqualizer']);checks++;
 const switches=[...x.d.querySelectorAll('main input[type="checkbox"]')];
 assert.equal(switches.length,3);
 assert.equal(switches[0].disabled,true);assert.equal(switches[1].disabled,false);assert.equal(switches[2].disabled,true);checks+=4;
@@ -306,6 +312,7 @@ x.dom.window.close();
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
 if(process.env.XMUSIC_AUDIT_OUTPUT)fs.writeFileSync(process.env.XMUSIC_AUDIT_OUTPUT,JSON.stringify(report,null,2));
+
 
 
 
