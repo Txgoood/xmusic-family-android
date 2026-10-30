@@ -37,7 +37,7 @@ class ProfileStore(private val context: Context) {
             result.put(JSONObject().put("id", id).put("name", row.getString("name")).put("role", r)
                 .put("hasPin", row.optString("hash").isNotEmpty()).put("needsParentPin", hasParentPin() && (r == "admin" || (isChild() && r != "child")))
                 .put("dailyMinutes", row.optInt("dailyMinutes", 60)).put("usedMinutes", usedMillis(id) / 60000)
-                .put("mixEnabled", row.optBoolean("mixEnabled", false)).put("approvedCount", row.optJSONArray("approved")?.length() ?: 0))
+                .put("mixEnabled", row.optBoolean("mixEnabled", false)).put("approvedCount", row.optJSONArray("approved")?.length() ?: 0).put("pendingCount", row.optJSONArray("pending")?.length() ?: 0))
         }
         return JSONObject().put("active", activeId()).put("role", role()).put("parentConfigured", hasParentPin()).put("profiles", result).toString()
     }
@@ -127,6 +127,55 @@ class ProfileStore(private val context: Context) {
                 .put("feed", track.optString("feed").take(2048)).put("artwork", track.optString("artwork").take(2048)))
         }
         child.put("approved", updated)
+        return prefs.edit().putString("profiles", rows.toString()).commit()
+    }
+    // Başlık taraması yalnızca uyarı üretir; güvenli içerik kararı vermez.
+    fun reviewReason(title: String): String = if (Regex("(?i)(explicit|uncensored|sansürsüz|sansursuz|\\b18\\+)").containsMatchIn(title))
+        "Başlıkta yetişkin içerik işareti var; ebeveyn incelemesi gerekli" else "Güvenilir içerik/söz değerlendirmesi yok; ebeveyn onayı gerekli"
+    fun childReview(id: String): String {
+        if (!isAdmin() && id != activeId()) return "{}"
+        val row = find(id) ?: return "{}"
+        return JSONObject().put("ageGroup", row.optString("ageGroup", "under13"))
+            .put("pending", row.optJSONArray("pending") ?: JSONArray()).put("denied", row.optJSONArray("denied") ?: JSONArray()).toString()
+    }
+    @Synchronized fun setChildAge(id: String, age: String, pin: String): Boolean {
+        if (!isAdmin() || !parent(pin) || age !in setOf("under7", "under13", "teen")) return false
+        val rows = records(); val row = find(id, rows) ?: return false
+        if (row.getString("role") != "child") return false
+        row.put("ageGroup", age)
+        return prefs.edit().putString("profiles", rows.toString()).commit()
+    }
+    @Synchronized fun requestReview(id: String, raw: String): Boolean {
+        if ((!isAdmin() && (id != activeId() || !isChild())) || raw.length > 5000) return false
+        val rows = records(); val row = find(id, rows) ?: return false
+        if (row.getString("role") != "child") return false
+        val input = try { JSONObject(raw) } catch (_: Exception) { return false }
+        val title = input.optString("title").trim().take(180); if (title.isEmpty()) return false
+        val trackId = input.optString("id").take(500)
+        val requestKey = if (trackId.isNotBlank()) key(trackId) else "query:" + title.lowercase(java.util.Locale.ROOT)
+        for (field in listOf("approved", "denied", "pending")) {
+            val list = row.optJSONArray(field) ?: continue
+            for (i in 0 until list.length()) {
+                val item = list.getJSONObject(i)
+                if (item.optString("requestKey") == requestKey || (trackId.isNotBlank() && key(item.optString("id")) == key(trackId))) return true
+            }
+        }
+        val list = row.optJSONArray("pending") ?: JSONArray(); if (list.length() >= 100) return false
+        list.put(JSONObject().put("id", trackId).put("title", title).put("artist", input.optString("artist").take(180))
+            .put("requestKey", requestKey).put("reason", reviewReason(title)).put("createdAt", System.currentTimeMillis()))
+        row.put("pending", list)
+        return prefs.edit().putString("profiles", rows.toString()).commit()
+    }
+    @Synchronized fun resolveReview(id: String, requestKey: String, deny: Boolean, pin: String): Boolean {
+        if (!isAdmin() || !parent(pin)) return false
+        val rows = records(); val row = find(id, rows) ?: return false
+        if (row.getString("role") != "child") return false
+        val pending = row.optJSONArray("pending") ?: JSONArray(); val keep = JSONArray(); var match: JSONObject? = null
+        for (i in 0 until pending.length()) { val item = pending.getJSONObject(i); if (item.optString("requestKey") == requestKey) match = item else keep.put(item) }
+        val found = match ?: return false
+        if (!deny && (found.optString("id").isBlank() || (0 until approved(id).length()).none { key(approved(id).getJSONObject(it).optString("id")) == key(found.optString("id")) })) return false
+        if (deny) { val denied = row.optJSONArray("denied") ?: JSONArray(); if (denied.length() >= 500) return false; denied.put(found); row.put("denied", denied) }
+        row.put("pending", keep)
         return prefs.edit().putString("profiles", rows.toString()).commit()
     }
     fun mixProfileIds(): List<String> { val rows = records(); return (0 until rows.length()).map { rows.getJSONObject(it) }.filter { it.getString("role") != "child" && it.optBoolean("mixEnabled", false) }.map { it.getString("id") } }
