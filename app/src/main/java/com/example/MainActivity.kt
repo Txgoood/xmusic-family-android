@@ -15,6 +15,68 @@ class MainActivity : ComponentActivity() {
     private var driveAccountId: String? = null
     private var driveBusy = false
     private var selectingDriveFolder = false
+    private var requestContinuousRead = false
+    private var syncInFlight = false
+    private var driveLibraryAdapter: android.widget.ArrayAdapter<String>? = null
+    private var visibleDriveTracks = emptyList<com.example.data.drive.DriveFolderClient.Track>()
+    private var lastDriveSync = 0L
+    private val driveSyncHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val driveSyncTicker = object : Runnable {
+        override fun run() {
+            if (getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE).getBoolean("sync_enabled", false) &&
+                !driveBusy && !syncInFlight && android.os.SystemClock.elapsedRealtime() - lastDriveSync > 55000L) {
+                reconnectSharedDriveSilently()
+            }
+            driveSyncHandler.postDelayed(this, 15000L)
+        }
+    }
+    private fun cacheSharedTracks(account: String, tracks: List<com.example.data.drive.DriveFolderClient.Track>) {
+        val edit = getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE).edit()
+        tracks.filter { it.sourceId.matches(Regex("[A-Za-z0-9_-]{11}")) }.forEach { edit.putString(account + ":" + it.sourceId, it.id) }
+        edit.apply()
+        if (driveLibraryAdapter != null && account == driveAccountId) {
+            visibleDriveTracks = tracks
+            driveLibraryAdapter?.apply { clear(); addAll(tracks.map { it.name }); notifyDataSetChanged() }
+        }
+    }
+    private fun reconnectSharedDriveSilently() {
+        syncInFlight = true
+        lastDriveSync = android.os.SystemClock.elapsedRealtime()
+        val request = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(
+                com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file"),
+                com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.readonly")))
+            .build()
+        com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this).authorize(request)
+            .addOnSuccessListener { auth ->
+                val token = auth.accessToken
+                if (auth.hasResolution() || token.isNullOrBlank()) { syncInFlight = false; return@addOnSuccessListener }
+                driveFolderWorker.execute {
+                    try {
+                        val client = com.example.data.drive.DriveFolderClient()
+                        val account = client.accountId(token)
+                        val prefs = getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE)
+                        require(account == prefs.getString("sync_account", null))
+                        val folder = prefs.getString(account, "").orEmpty()
+                        require(folder.isNotBlank())
+                        val tracks = client.listAudio(token, folder)
+                        runOnUiThread {
+                            if (!driveBusy) { driveAccessToken = token; driveAccountId = account; driveFolderId = folder; cacheSharedTracks(account, tracks) }
+                            syncInFlight = false
+                        }
+                    } catch (_: Exception) { runOnUiThread { syncInFlight = false } }
+                }
+            }.addOnFailureListener { syncInFlight = false }
+    }
+    fun enableContinuousDrive() {
+        if (driveBusy || syncInFlight) { showDriveError("Drive işlemi sürüyor; biraz sonra tekrar dene."); return }
+        if (driveFolderId == null) { showDriveError("Önce ortak müzik klasörünü seç."); return }
+        android.app.AlertDialog.Builder(this).setTitle("Ortak arşivi otomatik yenile")
+            .setMessage("Google bir kez daha geniş Drive okuma izni isteyecek. Bu izin hesabının erişebildiği Drive dosyalarını okumayı kapsar; XMusic yalnızca seçtiğin müzik klasörünü tarar. Yeni şarkılar uygulama açıkken yaklaşık bir dakika içinde alınır.")
+            .setPositiveButton("Google ile yetkilendir") { _, _ -> requestContinuousRead = true; authorizeDrive() }
+            .setNegativeButton("Vazgeç", null).show()
+    }
+
     private val driveFolderWorker = java.util.concurrent.Executors.newSingleThreadExecutor()
     private val driveFilePicker = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
@@ -107,24 +169,29 @@ class MainActivity : ComponentActivity() {
             try {
                 val tracks = com.example.data.drive.DriveFolderClient().listAudio(token, folder)
                 runOnUiThread {
+                    driveAccountId?.let { cacheSharedTracks(it, tracks) }
                     if (tracks.isEmpty()) android.app.AlertDialog.Builder(this)
                         .setTitle("Drive müzik arşivi")
                         .setMessage("Bu klasörde uygulamanın erişebildiği ses dosyası yok. Drive'da dosyalar görünüyorsa mevcut müziklere ayrıca erişim ver. Klasör kimliği: " + folder)
                         .setPositiveButton("Müziklere erişim ver") { _, _ -> authorizeExistingDriveAudio() }
                         .setNeutralButton("Klasörü değiştir") { _, _ -> chooseSharedDriveFolder() }
                         .setNegativeButton("Kapat", null).show()
-                    else android.app.AlertDialog.Builder(this).setTitle("Drive müzik arşivi")
-                        .setItems(tracks.map { it.name }.toTypedArray()) { _, index ->
-                            val track = tracks[index]
+                    else {
+                        visibleDriveTracks = tracks
+                        val adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_list_item_1, tracks.map { it.name }.toMutableList())
+                        driveLibraryAdapter = adapter
+                        val dialog = android.app.AlertDialog.Builder(this).setTitle("Drive müzik arşivi")
+                        .setAdapter(adapter) { _, index ->
+                            val track = visibleDriveTracks.getOrNull(index) ?: return@setAdapter
                             val controller = mediaController
                             val service = PlaybackService.activeService
                             if (controller == null || service == null) {
                                 showDriveError("Oynatıcı henüz hazır değil.")
-                            } else if (driveAccessToken != token || driveFolderId != folder) {
+                            } else if (driveAccessToken == null || driveFolderId != folder) {
                                 showDriveError("Drive hesabı değişti; arşivi yeniden aç.")
                             } else {
                                 val url = "https://www.googleapis.com/drive/v3/files/" + track.id + "?alt=media"
-                                service.registerExperimentalStream(url, mapOf("Authorization" to "Bearer $token"))
+                                service.registerExperimentalStream(url, mapOf("Authorization" to "Bearer ${driveAccessToken}"))
                                 val metadata = androidx.media3.common.MediaMetadata.Builder()
                                     .setTitle(track.name).setArtist("Google Drive arşivi").build()
                                 val item = androidx.media3.common.MediaItem.Builder()
@@ -133,7 +200,10 @@ class MainActivity : ComponentActivity() {
                                 controller.prepare()
                                 controller.play()
                             }
-                        }.setNegativeButton("Kapat", null).show()
+                        }.setNegativeButton("Kapat", null).create()
+                        dialog.setOnDismissListener { if (driveLibraryAdapter === adapter) driveLibraryAdapter = null }
+                        dialog.show()
+                    }
                 }
             } catch (e: Exception) {
                 runOnUiThread { showDriveError(e.message ?: "Drive arşivi açılamadı") }
@@ -233,6 +303,7 @@ class MainActivity : ComponentActivity() {
     private fun receiveDriveAuthorization(result: com.google.android.gms.auth.api.identity.AuthorizationResult) {
         val token = result.accessToken
         if (token.isNullOrBlank()) { showDriveError("Drive erişimi alınamadı"); return }
+        val continuous = result.grantedScopes.contains("https://www.googleapis.com/auth/drive.readonly")
         val picked = result.tokenResponseParams?.getString("picked_file_ids").orEmpty().split(',').filter { it.isNotBlank() }
         val choosing = selectingDriveFolder || picked.isNotEmpty()
         selectingDriveFolder = false
@@ -258,13 +329,19 @@ class MainActivity : ComponentActivity() {
                     archive.all.keys.filter { it.startsWith(account + ":") }.forEach { edit.remove(it) }
                     edit.commit()
                 }
-                folderPrefs.edit().putString(account, folder).commit()
+                val prefsEdit = folderPrefs.edit().putString(account, folder)
+                if (continuous) prefsEdit.putBoolean("sync_enabled", true).putString("sync_account", account)
+                prefsEdit.commit()
+                val sharedTracks = if (continuous) folderClient.listAudio(token, folder) else emptyList()
+
                 runOnUiThread {
                     if (driveAccessToken == token) {
                         driveFolderId = folder; driveAccountId = account
+                        cacheSharedTracks(account, sharedTracks)
                         getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE).edit().putString("account", account).apply()
                     }
-                    showDriveError("Drive bağlantısı hazır. Müzik klasörü hesabın için kaydedildi. Drive müzik arşivini açarak içerikleri kontrol edebilirsin.")
+                    showDriveError(if (continuous) "Ortak arşiv otomatik yenileme açık. Yeni şarkılar uygulama açıkken yaklaşık bir dakika içinde görünür. Tek tek dosya seçmen gerekmez." else "Drive bağlantısı hazır. Ortak arşivin yeni dosyalarını otomatik görmek için Otomatik ortak arşiv bağlantısını aç.")
+                    requestContinuousRead = false
                 }
             } catch (e: Exception) {
                 runOnUiThread { showDriveError(e.message ?: "Drive klasörü hazırlanamadı") }
@@ -332,8 +409,10 @@ class MainActivity : ComponentActivity() {
     fun authorizeDrive(pickFolder: Boolean = false) {
         if (driveBusy) { showDriveError("Drive işlemi sürüyor; tamamlanmasını bekle."); return }
         selectingDriveFolder = pickFolder
-        val builder = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder()
-            .setRequestedScopes(listOf(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file")))
+        val scopes = mutableListOf(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file"))
+        if (!pickFolder && (requestContinuousRead || getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE).getBoolean("sync_enabled", false)))
+            scopes.add(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.readonly"))
+        val builder = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder().setRequestedScopes(scopes)
         if (pickFolder) {
             builder.setOptOutIncludingGrantedScopes(true)
                 .setPrompt(com.google.android.gms.auth.api.identity.AuthorizationRequest.Prompt.CONSENT or com.google.android.gms.auth.api.identity.AuthorizationRequest.Prompt.SELECT_ACCOUNT)
@@ -756,7 +835,9 @@ class MainActivity : ComponentActivity() {
                           shared.dataset.xmOwned='true';shared.__xmOwnedRun=function(){window.Android.chooseSharedDriveFolder();};
                           const access=document.createElement('button');access.type='button';access.textContent='Mevcut müziklere erişim ver';
                           access.dataset.xmOwned='true';access.__xmOwnedRun=function(){window.Android.authorizeExistingDriveAudio();};
-                          [btn,shared,access,library,upload,queue,automatic].forEach(function(item){
+                          const sync=document.createElement('button');sync.type='button';sync.textContent='Otomatik ortak arşiv bağlantısını aç';
+                          sync.dataset.xmOwned='true';sync.__xmOwnedRun=function(){window.Android.enableContinuousDrive();};
+                          [btn,shared,sync,access,library,upload,queue,automatic].forEach(function(item){
                             item.style.cssText='display:block;width:calc(100% - 32px);padding:14px;margin:8px 16px;text-align:left;border:1px solid #62796f;border-radius:12px;color:#e0e3e7;font:inherit;';
                             details.appendChild(item);
                           });
@@ -912,14 +993,18 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         playbackBridge.start()
+        driveSyncHandler.removeCallbacks(driveSyncTicker)
+        driveSyncHandler.post(driveSyncTicker)
     }
 
     override fun onStop() {
         playbackBridge.stop()
+        driveSyncHandler.removeCallbacks(driveSyncTicker)
         super.onStop()
     }
 
     override fun onDestroy() {
+        driveSyncHandler.removeCallbacks(driveSyncTicker)
         playbackBridge.close()
         controllerFuture?.let { MediaController.releaseFuture(it) }
         appActions.controller = null
@@ -929,6 +1014,7 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 }
+
 
 
 
