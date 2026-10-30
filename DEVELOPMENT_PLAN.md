@@ -62,3 +62,5 @@ Durumları yalnız doğrulanan işin ardından güncelle.
 
 - #62: Kullanıcı daha fazla sonuç özelliğinin çalıştığını bildirdi.
 - Drive: Dosya yükleme istemcisi eklendi; kullanıcı yetkilendirmesi, indirme kuyruğu, hesap ve klasör seçimi, yeniden deneme ve cihaz testi henüz tamamlanmadı.
+
+- #66: Kullanıcı Google Drive bağlantısının tamamlanamadığını bildirdi. Hata kodu önceki sürümde gizlendi; OAuth ve imza yapılandırması doğrulanmış değil.
