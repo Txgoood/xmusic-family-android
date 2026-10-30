@@ -34,6 +34,9 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     fun chooseDriveUpload() { webView.post { (context as? MainActivity)?.chooseDriveUpload() } }
 
     @JavascriptInterface
+    fun enableContinuousDrive() { webView.post { (context as? MainActivity)?.enableContinuousDrive() } }
+
+    @JavascriptInterface
     fun authorizeExistingDriveAudio() { webView.post { (context as? MainActivity)?.authorizeExistingDriveAudio() } }
 
     @JavascriptInterface
@@ -670,6 +673,7 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         this.mediaController = controller
     }
 }
+
 
 
 
