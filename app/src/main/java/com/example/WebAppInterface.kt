@@ -308,7 +308,11 @@ class WebAppInterface(private val context: Context, private val webView: WebView
                 } else {
                     "https://itunes.apple.com/search?term=" +
                         java.net.URLEncoder.encode(query.trim(), "UTF-8") +
-                        "&country=TR&media=music&entity=musicArtist&limit=30"
+                        "&country=TR&media=music&entity=" + when (kind) {
+                            "albums" -> "album"
+                            "songs" -> "song"
+                            else -> "musicArtist"
+                        } + "&limit=50"
                 }
                 val conn = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
                     connectTimeout = 9000
@@ -325,7 +329,11 @@ class WebAppInterface(private val context: Context, private val webView: WebView
                     for (i in 0 until data.length()) {
                         val entry = data.optJSONObject(i) ?: continue
                         val type = entry.optString("wrapperType")
-                        if (itemId.isEmpty() && type != "artist") continue
+                        if (itemId.isEmpty() && type != when (kind) {
+                                "albums" -> "collection"
+                                "songs" -> "track"
+                                else -> "artist"
+                            }) continue
                         if (itemId.isNotEmpty() && (type == "artist" || (kind == "albums" && type != "collection") ||
                                 (kind == "songs" && type != "track"))) continue
                         if (kind == "albums" && entry.optString("collectionType") != "Album") continue
