@@ -16,6 +16,11 @@ object PodcastRssParser {
                         when (parser.name.lowercase()) {
                             "item" -> item = JSONObject()
                             "title" -> { val title = parser.nextText().take(300); if (item != null) item.put("title", title) else feedTitle = title }
+                            "pubdate" -> if (item != null) item.put("published", parser.nextText().take(120))
+                            "description" -> if (item != null) {
+                                val raw = parser.nextText().take(10000)
+                                item.put("description", android.text.Html.fromHtml(raw, android.text.Html.FROM_HTML_MODE_LEGACY).toString().trim().take(500))
+                            }
                             "enclosure" -> if (item != null) {
                                 val url = parser.getAttributeValue(null, "url").orEmpty()
                                 val type = parser.getAttributeValue(null, "type").orEmpty()
