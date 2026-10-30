@@ -5,13 +5,16 @@ const assets=process.env.XMUSIC_TEST_PAGES||path.join(root,'app/src/main/assets/
 const script=fs.readFileSync(path.join(root,'app/src/main/assets/app-actions.js'),'utf8');
 const player=fs.readFileSync(path.join(root,'app/src/main/assets/playback.js'),'utf8');
 const main=fs.readFileSync(path.join(root,'app/src/main/java/com/example/MainActivity.kt'),'utf8').split('evaluateJavascript("""')[1].split('""".trimIndent()')[0];
-let db='{}',checks=0,recentState=[],topState=[],resumeOverride={};const report=[];
+let db='{}',checks=0,recentState=[],topState=[],resumeOverride={},profileMock={},approvedMock=[];const report=[];
 function open(folder,session={}){
  const f=path.join(assets,fs.existsSync(path.join(assets,folder+'.html'))?folder+'.html':folder+'/code.html');
  const dom=new JSDOM(fs.readFileSync(f,'utf8'),{url:'https://local.test/stitch/'+folder+'/code.html',runScripts:'outside-only'});
  const w=dom.window,calls=[];
  w.Android=new Proxy({}, {get:(_,key)=>(...args)=>{calls.push([key,...args]);return false;}});
- w.AndroidActions=new Proxy({}, {get:(_,key)=>(...args)=>{calls.push([key,...args]);if(key==='loadPlaybackResume')return JSON.stringify(resumeOverride);
+ w.AndroidActions=new Proxy({}, {get:(_,key)=>(...args)=>{calls.push([key,...args]);if(key==='profileState')return JSON.stringify(profileMock);
+ if(key==='childTracks')return JSON.stringify(approvedMock);
+ if(key==='familyMix')return JSON.stringify(approvedMock);
+ if(key==='loadPlaybackResume')return JSON.stringify(resumeOverride);
  if(key==='topSearches')return JSON.stringify(topState);
  if(key==='recordSearch'){
   const query=args[0],key=query.toLocaleLowerCase('tr');let item=topState.find(x=>x.query.toLocaleLowerCase('tr')===key);
@@ -288,7 +291,7 @@ assert.ok(homeRecent.querySelector('.grid').children.length<=6);checks+=2;
 let homeMix=[...x.d.querySelectorAll('main section')].find(s=>s.querySelector('h2')?.textContent.includes('Günlük Aile Miksi'));
 assert.equal(homeMix.children[1].children.length,2);checks++;
 homeMix.children[1].children[1].click();
-assert.ok(x.calls.filter(c=>c[0]==='searchMusicShelf').some(c=>c[1].includes('pop')));checks++;
+assert.ok(x.calls.some(c=>c[0]==='familyMix'&&c[1]==='history'));checks++;
 x.dom.window.close();
 x=open('ana_sayfa');
 let resumeCard=[...x.d.querySelectorAll('main section')].find(s=>s.textContent.includes('Kaldığın Yerden Devam Et')).children[1];
@@ -328,9 +331,32 @@ const profileSection=[...x.d.querySelectorAll('main section')].find(s=>s.querySe
 assert.equal(profileSection.querySelector('.grid').children.length,1);assert.ok(profileSection.querySelector('.grid').textContent.includes('Ben'));checks+=2;
 x.dom.window.close();
 
+// Yerel roller, PIN çıkışı, onaylı çocuk kitaplığı ve aile miksleri.
+profileMock={active:'kid',role:'child',parentConfigured:true,profiles:[{id:'default',name:'Tolga',role:'admin',hasPin:false,needsParentPin:true},{id:'kid',name:'Can',role:'child',dailyMinutes:30,usedMinutes:2,approvedCount:1}]};
+approvedMock=[{id:'experimental:abcdefghijk',title:'Onaylı Şarkı',artist:'Sanatçı'}];
+x=open('ana_sayfa');
+assert.ok(x.d.querySelector('main').textContent.includes('Onaylı Şarkı'));
+assert.ok(!x.d.querySelector('main').textContent.includes('Stüdyo & Türkçe Pop'));checks+=2;x.dom.window.close();
+x=open('aile_profili_se_imi');
+assert.ok(![...x.d.querySelectorAll('button')].some(b=>b.textContent==='Yeni Profil Ekle'));
+assert.ok(![...x.d.querySelectorAll('button')].some(b=>b.textContent==='Düzenle'));
+[...x.d.querySelectorAll('button')].find(b=>b.textContent==='Seç').click();
+assert.ok(x.d.querySelector('[role="dialog"]').getAttribute('aria-label').includes('Ebeveyn'));
+checks+=3;x.dom.window.close();
+profileMock={active:'default',role:'admin',parentConfigured:true,profiles:[{id:'default',name:'Tolga',role:'admin',mixEnabled:true}]};
+x=open('aile_profili_se_imi');
+[...x.d.querySelectorAll('button')].find(b=>b.textContent==='Yeni Profil Ekle').click();
+x.d.querySelector('input[aria-label="Profil adı"]').value='Can';
+x.d.querySelector('select').value='child';x.d.querySelector('select').dispatchEvent(new x.w.Event('change'));
+x.d.querySelector('input[aria-label="Ebeveyn PIN’i"]').value='1357';
+[...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Kaydet').click();
+assert.deepEqual(x.calls.at(-2)?.[0]==='saveFamilyProfile'?x.calls.at(-2):x.calls.at(-1),['saveFamilyProfile','','Can','child','','','1357',60,false]);checks++;
+x.dom.window.close();profileMock={};approvedMock=[];
+
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
 if(process.env.XMUSIC_AUDIT_OUTPUT)fs.writeFileSync(process.env.XMUSIC_AUDIT_OUTPUT,JSON.stringify(report,null,2));
+
 
 
 
