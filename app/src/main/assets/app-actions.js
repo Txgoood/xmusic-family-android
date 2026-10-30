@@ -39,8 +39,9 @@
   }); }
   function search(query='') { sessionStorage.setItem('xm-search',query);go('arama_ve_ke_fet'); }
   function playTrack(track, enqueue=false) {
-    if(track.id.startsWith('local:')) A.playSavedTrack(JSON.stringify(track),enqueue);
-    else if(track.id.startsWith('podcast:')) { if(track.feed){sessionStorage.setItem('xm-feed',track.feed);go('podcast_program_ve_b_l_m_detay');}else N.showToast('Podcast kaynağını aç.'); }
+    if(track.id.startsWith('drive:')) N.resumeDriveTrack(track.id.slice(6),track.title||'',track.artist||'',0);
+    else if(track.id.startsWith('local:')) A.playSavedTrack(JSON.stringify(track),enqueue);
+    else if(track.id.startsWith('podcast:')) { if(profileState().role==='child'&&track.feed){A.resumePodcast(track.feed,track.id,0);return;} if(track.feed){sessionStorage.setItem('xm-feed',track.feed);go('podcast_program_ve_b_l_m_detay');}else N.showToast('Podcast kaynağını aç.'); }
     else if(track.id.startsWith('experimental:')||track.id.startsWith('drive-source:')) {
       const id=track.id.split(':')[1];N.playExperimentalSource(id,track.title||'',track.artist||'');
     }
@@ -1129,7 +1130,7 @@
     window.addEventListener('xmusic:playback',e=>{const v=e.detail,t=document.getElementById('xm-timer-track'),r=document.getElementById('xm-timer-track-remaining');if(t)t.textContent=v.id?'Şu an seçili: '+(v.title||'Parça'):'Henüz parça seçilmedi';if(r){const sec=Math.max(0,Math.ceil(((v.duration||0)-(v.position||0))/1000));r.textContent=v.id&&v.duration>0?'Kalan çalma süresi: '+Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0'):'';}});
   }
   if(page==='arama_ve_ke_fet')setTimeout(function seedSearch(){if(!window.__xmusicActionsInstalled){setTimeout(seedSearch,50);return;}const query=sessionStorage.getItem('xm-search');if(query!==null){sessionStorage.removeItem('xm-search');const input=document.getElementById('search-input');if(input){input.value=query;input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();}}},0);
-  window.addEventListener('xmusic:family',()=>{if(document.getElementById('xm-dialog'))return;if(page==='aile_profili_se_imi')renderProfiles();if(profileState().role==='child'&&['ana_sayfa','kitapl_m','ocuk_modu_kids_safe'].includes(page))renderChildLibrary();});
+  window.addEventListener('xmusic:family',()=>{refreshAvatar();if(document.getElementById('xm-dialog'))return;if(page==='aile_profili_se_imi')renderProfiles();if(profileState().role==='child'&&['ana_sayfa','kitapl_m','ocuk_modu_kids_safe'].includes(page))renderChildLibrary();});
   if(profileState().role==='child'&&['ana_sayfa','kitapl_m','ocuk_modu_kids_safe'].includes(page))renderChildLibrary();
   window.__xmusicActionsAudit=()=>Array.from(document.querySelectorAll('button,a')).filter(b=>!b.closest('#xmusic-live-search')).map(b=>({label:b.getAttribute('aria-label')||b.textContent.trim(),action:b.dataset.xmAction|| (b.dataset.xmOwned?'owned':null),blocked:b.dataset.xmBlocked||null}));
 })();
