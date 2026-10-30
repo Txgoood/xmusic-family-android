@@ -15,6 +15,29 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
     private val profiles = ProfileStore(activity)
     private var libraryProfileId = profiles.activeId()
     private val prefs get() = activity.getSharedPreferences("xmusic_library_" + profiles.activeId(), Context.MODE_PRIVATE)
+    private val avatarPrefs get() = activity.getSharedPreferences("xmusic_profile_avatars", Context.MODE_PRIVATE)
+    @JavascriptInterface fun activeAvatar(): String = avatarPrefs.getString(profiles.activeId(), "") ?: ""
+    @JavascriptInterface fun setActiveAvatar(value: String): Boolean {
+        if (value !in setOf("🎵", "🎧", "🎸", "🌸", "🌟", "🐱", "🦊", "🐼")) return false
+        return avatarPrefs.edit().putString(profiles.activeId(), value).commit()
+    }
+    @JavascriptInterface fun pickActiveAvatar() { webView.post { activity.pickProfilePhoto() } }
+    @JavascriptInterface fun openEqualizer() { webView.post {
+        val session = com.example.playback.PlaybackService.activeService?.audioSessionId() ?: 0
+        if (session == 0) { android.widget.Toast.makeText(activity, "Önce bir parça çal", 0).show(); return@post }
+        try {
+            val intent = Intent(android.media.audiofx.AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL)
+                .putExtra(android.media.audiofx.AudioEffect.EXTRA_AUDIO_SESSION, session)
+                .putExtra(android.media.audiofx.AudioEffect.EXTRA_PACKAGE_NAME, activity.packageName)
+                .putExtra(android.media.audiofx.AudioEffect.EXTRA_CONTENT_TYPE, android.media.audiofx.AudioEffect.CONTENT_TYPE_MUSIC)
+            activity.startActivity(intent)
+        } catch (_: android.content.ActivityNotFoundException) {
+            android.widget.Toast.makeText(activity, "Bu cihazda ekolayzır ekranı bulunamadı", 0).show()
+        } catch (_: SecurityException) {
+            android.widget.Toast.makeText(activity, "Ekolayzır açılamadı", 0).show()
+        }
+    } }
+
     @JavascriptInterface fun profileState(): String = profiles.publicState()
     @JavascriptInterface fun changeProfile(action: String, id: String, name: String, oldPin: String, newPin: String): Boolean {
         val changed = profiles.change(action, id, name, oldPin, newPin)
@@ -306,4 +329,5 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         } catch (_: Exception) { android.widget.Toast.makeText(activity, "Dosya açılamadı. Dosyayı yeniden seç.", 0).show() }
     } }
 }
+
 
