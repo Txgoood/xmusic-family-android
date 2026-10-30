@@ -296,8 +296,10 @@ class ProfileStore(private val context: Context) {
         }
         val avatars = context.getSharedPreferences("xmusic_profile_avatars", Context.MODE_PRIVATE)
         val value = avatars.getString(activeId(), "").orEmpty()
+        var avatarTime = avatars.getLong("time_${activeId()}", 0L)
+        if (value.isNotEmpty() && avatarTime == 0L) { avatarTime = System.currentTimeMillis(); avatars.edit().putLong("time_${activeId()}", avatarTime).commit() }
         val avatar = JSONObject().put("profile", activeId()).put("value", if (value.length <= 200000) value else "")
-            .put("updatedAt", avatars.getLong("time_${activeId()}", 0L))
+            .put("updatedAt", avatarTime)
         return JSONObject().put("family", family).put("device", device).put("day", date()).put("updatedAt", System.currentTimeMillis()).put("profiles", shared).put("usage", usage).put("requests", requests).put("avatar", avatar)
     }
     fun mixProfileIds(): List<String> { val rows = records(); return (0 until rows.length()).map { rows.getJSONObject(it) }.filter { it.getString("role") != "child" && FamilySyncStore(context).isSharing(it.getString("id"), it.optBoolean("mixEnabled", false)) }.map { it.getString("id") } }
