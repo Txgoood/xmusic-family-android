@@ -28,7 +28,7 @@ class DriveFolderClient {
         return request("https://www.googleapis.com/drive/v3/files?fields=id", token, metadata).getString("id")
     }
 
-    data class Track(val id: String, val name: String)
+    data class Track(val id: String, val name: String, val sourceId: String = "")
 
     fun listAudio(token: String, folderId: String): List<Track> {
         require(folderId.matches(Regex("[A-Za-z0-9_-]{1,200}")))
@@ -38,7 +38,7 @@ class DriveFolderClient {
         var page = ""
         do {
             val address = "https://www.googleapis.com/drive/v3/files?q=" + URLEncoder.encode(query, "UTF-8") +
-                "&fields=nextPageToken,files(id,name,mimeType)&orderBy=name&pageSize=100" +
+                "&fields=nextPageToken,files(id,name,mimeType,appProperties)&orderBy=name&pageSize=100" +
                 if (page.isEmpty()) "" else "&pageToken=" + URLEncoder.encode(page, "UTF-8")
             val result = request(address, token, null)
             val rows = result.optJSONArray("files")
@@ -48,7 +48,7 @@ class DriveFolderClient {
                 val name = row.optString("name", "Ses dosyası")
                 val audio = row.optString("mimeType").startsWith("audio/") ||
                     name.substringAfterLast('.', "").lowercase(java.util.Locale.ROOT) in setOf("mp3", "m4a", "aac", "flac", "ogg", "opus", "wav")
-                if (audio && id.matches(Regex("[A-Za-z0-9_-]{1,200}"))) tracks.add(Track(id, name))
+                if (audio && id.matches(Regex("[A-Za-z0-9_-]{1,200}"))) tracks.add(Track(id, name, row.optJSONObject("appProperties")?.optString("youtubeId").orEmpty()))
             }
             page = result.optString("nextPageToken")
             if (page.isNotEmpty() && !seenPages.add(page)) throw IOException("Drive listeleme yanıtı tekrarlandı")
@@ -95,5 +95,6 @@ class DriveFolderClient {
         } finally { conn.disconnect() }
     }
 }
+
 
 
