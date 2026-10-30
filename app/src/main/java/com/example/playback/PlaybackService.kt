@@ -55,9 +55,14 @@ class PlaybackService : MediaSessionService() {
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
         player!!.addListener(object : androidx.media3.common.Player.Listener {
+            private var countedItem = false
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (!isPlaying) return
                 val item = player?.currentMediaItem ?: return
+                if (!countedItem) {
+                    com.example.MusicListeningStats(this@PlaybackService).record(item.mediaId)
+                    countedItem = true
+                }
                 if (item.mediaId.startsWith("experimental:")) {
                     com.example.data.drive.AutomaticDriveArchive.enqueue(
                         this@PlaybackService, item.mediaId.removePrefix("experimental:"),
@@ -74,6 +79,7 @@ class PlaybackService : MediaSessionService() {
                 }
             }
             override fun onMediaItemTransition(item: androidx.media3.common.MediaItem?, reason: Int) {
+                countedItem = false
                 if (sleepAtEnd && (reason == androidx.media3.common.Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
                     reason == androidx.media3.common.Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT)) stopPlayback.run()
             }
