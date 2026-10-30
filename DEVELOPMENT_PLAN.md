@@ -67,3 +67,7 @@ Durumları yalnız doğrulanan işin ardından güncelle.
 
 - #67 OAuth: Kullanıcı Google Cloud Android OAuth kaydını ve Drive API etkinleştirmesini tamamladı; hesap izni başarıyla alındı.
 - Sonraki test: Uygulamanın kendi XMusic Family klasörünü bulma/oluşturma ve telefondan seçilmiş ses dosyasını yükleme. Ön planda çalışma, 250 MB sınırı. Mevcut farklı klasör seçimi, Drive oynatma, otomatik kaynak indirme henüz yok.
+
+- Sabit imzalama: GitHub secret eklendi; #71 APK imzası kontrol edildi. Kullanıcı yeni OAuth imzasıyla bağlanıp gerçek MP3 yüklemesini doğruladı.
+- Drive arşivi: Sayfalı listeleme ve Media3 üzerinden yetkili dosya oynatma eklendi; cihaz testi bekliyor. Bağlantı izni bu oturum için alınmalı.
+- Otomatik dinleme arşivi/indirme kuyruğu ve çevrimdışı kalıcı dosyalar henüz yok.
