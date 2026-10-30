@@ -57,6 +57,7 @@ class PlaybackWebBridge(private val webView: WebView) {
             put("sleepRemaining", if ((service?.sleepDeadline ?: 0L) > 0L)
                 (service!!.sleepDeadline - android.os.SystemClock.elapsedRealtime()).coerceAtLeast(0L) else 0L)
             put("sleepAtEnd", service?.sleepAtEnd == true)
+            put("familyBlock", service?.familyBlockMessage.orEmpty())
             put("ready", player != null)
             put("id", item?.mediaId.orEmpty())
             put("title", item?.mediaMetadata?.title?.toString().orEmpty())
@@ -86,3 +87,4 @@ class PlaybackWebBridge(private val webView: WebView) {
         webView.evaluateJavascript("window.__xmusicPlayback && window.__xmusicPlayback($state)", null)
     }
 }
+
