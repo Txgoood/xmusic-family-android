@@ -177,6 +177,15 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         if (profiles.activeId() != libraryProfileId || value.length > 1_000_000) return false
         return try { JSONObject(value); prefs.edit().putString("data", value).commit() } catch (_: Exception) { false }
     }
+    @JavascriptInterface fun recordSearch(query: String) {
+        if (profiles.activeId() != libraryProfileId) return
+        try { SearchStatsStore(activity, libraryProfileId).record(query) } catch (_: Exception) { }
+    }
+    @JavascriptInterface fun topSearches(): String {
+        if (profiles.activeId() != libraryProfileId) return "[]"
+        return try { SearchStatsStore(activity, libraryProfileId).read().toString() } catch (_: Exception) { "[]" }
+    }
+
     @JavascriptInterface fun searchHistory(action: String, query: String): String {
         // Önceki profilin açık sayfasından yeni profile geçmiş yazılmasını engelle.
         if (profiles.activeId() != libraryProfileId) return "[]"
