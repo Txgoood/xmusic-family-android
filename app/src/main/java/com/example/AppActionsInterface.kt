@@ -38,6 +38,30 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         }
     } }
 
+    @JavascriptInterface fun setParentPin(oldPin: String, newPin: String): Boolean = profiles.setParentPin(oldPin, newPin)
+    @JavascriptInterface fun saveFamilyProfile(id: String, name: String, role: String, oldPin: String, newPin: String, parentPin: String, minutes: Int, mix: Boolean): Boolean =
+        profiles.saveProfile(id, name, role, oldPin, newPin, parentPin, minutes, mix)
+    @JavascriptInterface fun childTracks(id: String): String =
+        if (profiles.isAdmin() || id == profiles.activeId()) profiles.approved(id).toString() else "[]"
+    @JavascriptInterface fun approveChildTrack(id: String, track: String, remove: Boolean, parentPin: String): Boolean =
+        profiles.approve(id, track, remove, parentPin)
+    @JavascriptInterface fun familyMix(kind: String): String {
+        if (profiles.isChild()) return profiles.approved().toString()
+        if (kind !in setOf("favorites", "history")) return "[]"
+        val result = org.json.JSONArray(); val ids = mutableSetOf<String>()
+        for (id in profiles.mixProfileIds()) {
+            val data = try { JSONObject(activity.getSharedPreferences("xmusic_library_$id", Context.MODE_PRIVATE).getString("data", "{}") ?: "{}") } catch (_: Exception) { continue }
+            val rows = data.optJSONArray(kind) ?: continue
+            for (i in 0 until minOf(rows.length(), 100)) {
+                val row = rows.optJSONObject(i) ?: continue
+                val trackId = row.optString("id")
+                if (trackId.isNotBlank() && ids.add(trackId)) result.put(row)
+                if (result.length() >= 100) return result.toString()
+            }
+        }
+        return result.toString()
+    }
+
     @JavascriptInterface fun profileState(): String = profiles.publicState()
     @JavascriptInterface fun changeProfile(action: String, id: String, name: String, oldPin: String, newPin: String): Boolean {
         val changed = profiles.change(action, id, name, oldPin, newPin)
@@ -71,6 +95,7 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
     }
 
     @JavascriptInterface fun openPodcastPage(address: String) { webView.post {
+        if (profiles.isChild()) return@post
         try {
             val uri = android.net.Uri.parse(address)
             require(uri.scheme == "https" && uri.host == "podcasts.apple.com")
@@ -175,6 +200,7 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
     }
 
     @JavascriptInterface fun downloadPodcast(id: String) { webView.post {
+        if (profiles.isChild()) return@post
         val data = episodes[id] ?: return@post
         try {
             val manager = activity.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
@@ -250,6 +276,7 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
     @JavascriptInterface fun loadPlaybackResume(): String =
         if (profiles.activeId() == libraryProfileId) PlaybackResumeStore(activity).load(libraryProfileId) else "{}"
     @JavascriptInterface fun clearPlaybackResume() {
+        if (profiles.isChild()) return
         if (profiles.activeId() == libraryProfileId) PlaybackResumeStore(activity).clear(libraryProfileId)
     }
 
@@ -281,10 +308,12 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         android.widget.Toast.makeText(activity, "Web önbelleği temizlendi; kitaplık korundu", android.widget.Toast.LENGTH_SHORT).show()
     } }
     @JavascriptInterface fun openSoundSettings() { webView.post {
+        if (profiles.isChild()) return@post
         try { activity.startActivity(Intent(android.provider.Settings.ACTION_SOUND_SETTINGS)) }
         catch (_: Exception) { android.widget.Toast.makeText(activity, "Ses ayarları açılamadı", 0).show() }
     } }
     @JavascriptInterface fun shareText(value: String) { webView.post {
+        if (profiles.isChild()) return@post
         val intent = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, value.take(4000))
         activity.startActivity(Intent.createChooser(intent, "Paylaş"))
     } }
@@ -329,5 +358,6 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         } catch (_: Exception) { android.widget.Toast.makeText(activity, "Dosya açılamadı. Dosyayı yeniden seç.", 0).show() }
     } }
 }
+
 
 
