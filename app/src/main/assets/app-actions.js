@@ -265,6 +265,27 @@
     panel.append(create('h3','Onaylı kayıtlar'));
     approved.forEach(track=>panel.append(button('Kaldır · '+track.title,()=>act(track,true))));
     const seen=new Set();const candidates=[...(state.id?[trackData()]:[]),...library.favorites,...library.history].filter(t=>t.id&&!seen.has(t.id)&&seen.add(t.id)).slice(0,100);
+    let review={};
+    if(A.requestChildReview&&A.childReview){
+      candidates.forEach(t=>A.requestChildReview(profile.id,JSON.stringify(t)));
+      try{review=JSON.parse(A.childReview(profile.id)||'{}');}catch(_){}
+      panel.append(create('h3','Yaş grubu ve inceleme'));
+      const age=create('select',undefined,'xm-input');age.setAttribute('aria-label','Çocuğun yaş grubu');
+      [['under7','7 yaş altı'],['under13','7–12 yaş'],['teen','13–17 yaş']].forEach(([v,t])=>{const o=create('option',t);o.value=v;age.append(o);});age.value=review.ageGroup||'under13';
+      panel.append(age,button('Yaş grubunu kaydet',()=>N.showToast(A.setChildAge(profile.id,age.value,pin.value)?'Kaydedildi':'PIN’i kontrol et.')),
+        create('p','Yaş grubu ebeveyn incelemesi içindir. Tüm yaşlarda yalnızca onaylı kayıtlar çalınır. Başlık kontrolü söz analizi veya güvenlik garantisi değildir.'));
+      panel.append(create('h3','Onay bekleyenler · '+(review.pending||[]).length));
+      (review.pending||[]).forEach(t=>{
+        const row=create('div',undefined,'xm-row');row.append(create('strong',t.title+' — '+(t.artist||'')),create('p',t.reason));
+        const candidate=candidates.find(x=>x.id===t.id)||approved.find(x=>x.id===t.id);
+        if(candidate)row.append(button('Kaydı onayla',()=>{
+          if(A.approveChildTrack(profile.id,JSON.stringify(candidate),false,pin.value)&&A.resolveChildReview(profile.id,t.requestKey,false,pin.value)){row.remove();N.showToast('Onaylandı');}else N.showToast('PIN’i kontrol et.');
+        }));
+        else row.append(create('p','Bu bir şarkı isteği. Yetişkin profilinde doğru kaydı bulup dinle; ardından aşağıdan onayla.'));
+        row.append(button('Reddet',()=>{if(A.resolveChildReview(profile.id,t.requestKey,true,pin.value)){row.remove();N.showToast('Reddedildi');}else N.showToast('PIN’i kontrol et.');}));panel.append(row);
+      });
+      panel.append(create('p','Reddedilen istek: '+(review.denied||[]).length+' · İstekler ve kararlar bu cihazda saklanır.'));
+    }
     panel.append(create('h3','Bu profilden eklenecek kayıtlar'));
     if(!candidates.length)panel.append(create('p','Henüz kayıt yok. Önce bir kayıt dinle.'));
     candidates.forEach(track=>panel.append(button('Onayla · '+track.title+' — '+(track.artist||''),()=>act(track,false))));
@@ -277,7 +298,7 @@
     panel.append(button('Aktif profil görselini değiştir',avatarChooser));
     (data.profiles||[]).forEach(profile=>{
       const row=create('div',undefined,'xm-row');row.append(create('strong',profile.name+' · '+(roleNames[profile.role]||'Yetişkin')+(profile.id===data.active?' · Aktif':'')));
-      if(profile.role==='child')row.append(create('p',profile.usedMinutes+'/'+profile.dailyMinutes+' dk bugün · '+profile.approvedCount+' onaylı kayıt'));
+      if(profile.role==='child')row.append(create('p',profile.usedMinutes+'/'+profile.dailyMinutes+' dk bugün · '+profile.approvedCount+' onaylı kayıt · '+(profile.pendingCount||0)+' onay bekliyor'));
       row.append(button('Seç',()=>{
         if(profile.id===data.active){go('ana_sayfa');return;}
         if(!profile.hasPin&&!profile.needsParentPin){if(A.changeProfile('select',profile.id,'','',''))go('ana_sayfa');return;}
@@ -303,6 +324,12 @@
     const data=profileState(),active=data.profiles?.find(p=>p.id===data.active),panel=content((active?.name||'Çocuk')+' · Onaylı Kitaplık');if(!panel)return;
     panel.append(create('p','Yalnızca ebeveynin onayladığı kayıtlar çalınabilir. Günlük sınır: '+(active?.dailyMinutes||60)+' dakika.'),create('p','Bugün dinlenen: '+(active?.usedMinutes||0)+' dakika.'));
     const status=create('p','');status.id='xm-child-status';panel.append(status,button('Profil değiştir / Ebeveyn girişi',()=>go('aile_profili_se_imi')));
+    if(A.requestChildReview){
+      const request=create('input',undefined,'xm-input');request.placeholder='İstediğin şarkı ve sanatçı';request.maxLength=180;request.setAttribute('aria-label','Ebeveynden şarkı iste');
+      panel.append(request,button('Ebeveynden iste',()=>{const title=request.value.trim();if(!title)return;N.showToast(A.requestChildReview(data.active,JSON.stringify({title}))?'İstek bu cihazdaki ebeveyn onay listesine eklendi.':'İstek eklenemedi.');request.value='';}));
+      let review={};try{review=JSON.parse(A.childReview(data.active)||'{}');}catch(_){}
+      panel.append(create('p',(review.pending||[]).length+' istek onay bekliyor. Ebeveyn bu cihazdan inceleyebilir.'));
+    }
     let tracks=[];try{tracks=JSON.parse(A.childTracks(data.active)||'[]');}catch(_){}
     if(!Array.isArray(tracks)||!tracks.length)panel.append(create('p','Henüz onaylanmış kayıt yok. Ebeveyn profilinden içerik ekleyin.'));
     else tracks.forEach(t=>panel.append(trackRow(t)));
