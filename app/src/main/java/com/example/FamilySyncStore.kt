@@ -115,6 +115,20 @@ class FamilySyncStore(private val context: Context) {
         }
         return total
     }
+    fun syncedAvatar(id: String, fallback: String): String {
+        val avatars = context.getSharedPreferences("xmusic_profile_avatars", Context.MODE_PRIVATE)
+        var time = avatars.getLong("time_$id", 0L); var result = fallback
+        val devices = cached()
+        for (i in 0 until devices.length()) {
+            val avatar = devices.getJSONObject(i).optJSONObject("avatar") ?: continue
+            val stamp = avatar.optLong("updatedAt", 0L); val value = avatar.optString("value")
+            if (avatar.optString("profile") == id && stamp > time && stamp <= System.currentTimeMillis() + 300000 &&
+                (value in setOf("🎵", "🎧", "🎸", "🌸", "🌟", "🐱", "🦊", "🐼") || (value.startsWith("data:image/jpeg;base64,") && value.length <= 200000))) {
+                time = stamp; result = value
+            }
+        }
+        return result
+    }
     fun isSharing(id: String, fallback: Boolean): Boolean = prefs.getBoolean("share_$id", fallback)
     fun setSharing(id: String, value: Boolean) { prefs.edit().putBoolean("share_$id", value).commit() }
     fun remoteMix(kind: String): JSONArray {
