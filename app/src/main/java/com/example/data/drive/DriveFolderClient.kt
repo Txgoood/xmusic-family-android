@@ -58,6 +58,14 @@ class DriveFolderClient {
         return if (rows != null && rows.length() > 0) rows.getJSONObject(0).getString("id") else null
     }
 
+    fun findBySource(token: String, folderId: String, sourceId: String): String? {
+        require(folderId.matches(Regex("[A-Za-z0-9_-]{1,200}")) && sourceId.matches(Regex("[A-Za-z0-9_-]{11}")))
+        val query = "'$folderId' in parents and trashed=false and appProperties has { key='youtubeId' and value='$sourceId' }"
+        val rows = request("https://www.googleapis.com/drive/v3/files?q=" + URLEncoder.encode(query, "UTF-8") +
+            "&fields=files(id)&pageSize=1", token, null).optJSONArray("files")
+        return if (rows != null && rows.length() > 0) rows.getJSONObject(0).getString("id") else null
+    }
+
     private fun request(address: String, token: String, body: JSONObject?): JSONObject {
         val conn = URL(address).openConnection() as HttpURLConnection
         try {
