@@ -247,7 +247,15 @@
       const feed=library.feeds.find(f=>f.url===address);if(feed&&feed.title!==payload.title){feed.title=payload.title;save();}
       results.append(create('h3',payload.title||'Podcast'));
       if(!payload.items?.length)results.append(create('p','Desteklenen HTTPS ses bölümü bulunamadı.'));
-      (payload.items||[]).forEach(t=>{const row=create('div',undefined,'xm-row');row.append(create('strong',t.title),button('Oynat',()=>A.playPodcast(t.id,false)),button('+ Sıraya',()=>A.playPodcast(t.id,true)),button('İndir',()=>A.downloadPodcast(t.id)),button('Listeye Ekle',()=>addToPlaylist(t)));results.append(row);});
+      (payload.items||[]).forEach(t=>{
+        const card=create('div');card.style.cssText='padding:14px 0;border-bottom:1px solid #313539;';
+        card.append(create('strong',t.title));
+        if(t.published){const date=create('p',t.published);date.style.cssText='color:#b4c1c9;font-size:12px;margin:5px 0;';card.append(date);}
+        if(t.description){const description=create('p',t.description);description.style.cssText='color:#b4c1c9;font-size:13px;white-space:pre-line;margin:5px 0;';card.append(description);}
+        const controls=create('div',undefined,'xm-row');controls.style.border='0';
+        controls.append(button('Oynat',()=>A.playPodcast(t.id,false)),button('+ Sıraya',()=>A.playPodcast(t.id,true)),button('İndir',()=>A.downloadPodcast(t.id)),button('Listeye Ekle',()=>addToPlaylist(t)));
+        card.append(controls);results.append(card);
+      });
     };
     A.loadRss(address,id);
   }
