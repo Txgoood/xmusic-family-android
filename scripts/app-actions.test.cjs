@@ -5,7 +5,7 @@ const assets=process.env.XMUSIC_TEST_PAGES||path.join(root,'app/src/main/assets/
 const script=fs.readFileSync(path.join(root,'app/src/main/assets/app-actions.js'),'utf8');
 const player=fs.readFileSync(path.join(root,'app/src/main/assets/playback.js'),'utf8');
 const main=fs.readFileSync(path.join(root,'app/src/main/java/com/example/MainActivity.kt'),'utf8').split('evaluateJavascript("""')[1].split('""".trimIndent()')[0];
-let db='{}',checks=0,recentState=[],topState=[],resumeOverride={},profileMock={},approvedMock=[];const report=[];
+let db='{}',checks=0,recentState=[],topState=[],resumeOverride={},profileMock={},approvedMock=[],reviewMock={};const report=[];
 function open(folder,session={}){
  const f=path.join(assets,fs.existsSync(path.join(assets,folder+'.html'))?folder+'.html':folder+'/code.html');
  const dom=new JSDOM(fs.readFileSync(f,'utf8'),{url:'https://local.test/stitch/'+folder+'/code.html',runScripts:'outside-only'});
@@ -13,6 +13,8 @@ function open(folder,session={}){
  w.Android=new Proxy({}, {get:(_,key)=>(...args)=>{calls.push([key,...args]);return false;}});
  w.AndroidActions=new Proxy({}, {get:(_,key)=>(...args)=>{calls.push([key,...args]);if(key==='profileState')return JSON.stringify(profileMock);
  if(key==='childTracks')return JSON.stringify(approvedMock);
+ if(key==='childReview')return JSON.stringify(reviewMock);
+ if(['requestChildReview','setChildAge','resolveChildReview','approveChildTrack'].includes(key))return true;
  if(key==='familyMix')return JSON.stringify(approvedMock);
  if(key==='loadPlaybackResume')return JSON.stringify(resumeOverride);
  if(key==='topSearches')return JSON.stringify(topState);
@@ -352,6 +354,24 @@ x.d.querySelector('input[aria-label="Ebeveyn PIN’i"]').value='1357';
 [...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Kaydet').click();
 assert.deepEqual(x.calls.at(-2)?.[0]==='saveFamilyProfile'?x.calls.at(-2):x.calls.at(-1),['saveFamilyProfile','','Can','child','','','1357',60,false]);checks++;
 x.dom.window.close();profileMock={};approvedMock=[];
+
+// Çocuk istek oluşturabilir; yönetici gerekçeli kuyruğu inceler ve reddeder.
+profileMock={active:'kid',role:'child',parentConfigured:true,profiles:[{id:'kid',name:'Can',role:'child',dailyMinutes:30}]};
+x=open('ana_sayfa');
+x.d.querySelector('input[aria-label="Ebeveynden şarkı iste"]').value='İstediğim şarkı';
+[...x.d.querySelectorAll('button')].find(b=>b.textContent==='Ebeveynden iste').click();
+assert.equal(x.calls.find(c=>c[0]==='requestChildReview')[1],'kid');
+assert.equal(JSON.parse(x.calls.find(c=>c[0]==='requestChildReview')[2]).title,'İstediğim şarkı');checks+=2;x.dom.window.close();
+profileMock={active:'default',role:'admin',parentConfigured:true,profiles:[{id:'default',name:'Tolga',role:'admin'},{id:'kid',name:'Can',role:'child',approvedCount:0,pendingCount:1}]};
+reviewMock={ageGroup:'under7',pending:[{title:'Şüpheli kayıt',requestKey:'query:test',reason:'Bilgi eksik; onay gerekli'}],denied:[]};
+x=open('aile_profili_se_imi');
+[...x.d.querySelectorAll('button')].find(b=>b.textContent==='Onaylı içerikleri yönet').click();
+assert.equal(x.d.querySelector('select[aria-label="Çocuğun yaş grubu"]').value,'under7');
+assert.ok(x.d.querySelector('#xm-dialog').textContent.includes('Bilgi eksik; onay gerekli'));
+x.d.querySelector('input[aria-label="Ebeveyn PIN’i"]').value='1357';
+[...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Reddet').click();
+assert.deepEqual(x.calls.find(c=>c[0]==='resolveChildReview'),['resolveChildReview','kid','query:test',true,'1357']);checks+=3;
+x.dom.window.close();profileMock={};reviewMock={};
 
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
