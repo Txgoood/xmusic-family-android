@@ -65,7 +65,12 @@ class PlaybackService : MediaSessionService() {
     private fun checkFamilyPlayback(): Boolean {
         val p = player ?: return false
         if (checkingFamily || p.currentMediaItem == null) return true
-        val message = com.example.ProfileStore(this).playbackBlockReason(p.currentMediaItem!!.mediaId)
+        val family = com.example.ProfileStore(this)
+        val item = p.currentMediaItem!!
+        val message = family.playbackBlockReason(item.mediaId)
+        if (message != null && family.isChild()) family.requestReview(family.activeId(), org.json.JSONObject()
+            .put("id", item.mediaId).put("title", item.mediaMetadata.title?.toString().orEmpty())
+            .put("artist", item.mediaMetadata.artist?.toString().orEmpty()).toString())
         if (message != null) {
             familyBlockMessage = message
             checkingFamily = true
