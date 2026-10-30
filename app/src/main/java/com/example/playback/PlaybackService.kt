@@ -33,6 +33,7 @@ class PlaybackService : MediaSessionService() {
 
     private var player: ExoPlayer? = null
     private var mediaSession: MediaSession? = null
+    private var resumeProfileId: String? = null
 
     private fun saveResume() {
         val p = player ?: return
@@ -46,7 +47,7 @@ class PlaybackService : MediaSessionService() {
             .put("feed", item.mediaMetadata.extras?.getString("feed").orEmpty())
             .put("position", position).put("duration", p.duration.coerceAtLeast(0L))
             .put("updatedAt", System.currentTimeMillis())
-        com.example.PlaybackResumeStore(this).save(com.example.ProfileStore(this).activeId(), saved)
+        com.example.PlaybackResumeStore(this).save(resumeProfileId ?: com.example.ProfileStore(this).activeId(), saved)
     }
 
     private val resumeTicker = object : Runnable {
@@ -102,6 +103,7 @@ class PlaybackService : MediaSessionService() {
                 }
             }
             override fun onMediaItemTransition(item: androidx.media3.common.MediaItem?, reason: Int) {
+                if (item != null) resumeProfileId = com.example.ProfileStore(this@PlaybackService).activeId()
                 countedItem = false
                 if (sleepAtEnd && (reason == androidx.media3.common.Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
                     reason == androidx.media3.common.Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT)) stopPlayback.run()
