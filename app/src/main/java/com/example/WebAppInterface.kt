@@ -52,6 +52,10 @@ class WebAppInterface(private val context: Context, private val webView: WebView
 
     @JavascriptInterface
     fun navigateTo(pageFolder: String) {
+        if (ProfileStore(context).isChild() && pageFolder !in setOf("ana_sayfa", "kitapl_m", "aile_profili_se_imi", "imdi_al_yor", "uyku_zamanlay_c_s", "oynatma_s_ras_queue", "ocuk_modu_kids_safe")) {
+            webView.post { webView.loadUrl("file:///android_asset/stitch/ana_sayfa/code.html") }; return
+        }
+
         // Yalnızca önceden tanımlanmış Stitch ekranlarına geçişe izin ver.
         val allowedPages = setOf(
             "ana_sayfa", "podcast_merkezi", "imdi_al_yor", "i_ndirme_y_neticisi",
@@ -107,6 +111,7 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     @JavascriptInterface fun getDownloadWifiOnly(): Boolean =
         context.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE).getBoolean("download_unmetered_only", false)
     @JavascriptInterface fun setDownloadWifiOnly(enabled: Boolean) {
+        if (ProfileStore(context).isChild()) return
         context.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE)
             .edit().putBoolean("download_unmetered_only", enabled).apply()
     }
@@ -673,6 +678,7 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         this.mediaController = controller
     }
 }
+
 
 
 
