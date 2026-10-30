@@ -108,6 +108,8 @@
     top.insertAdjacentElement('afterend',searchInput);
     let filter='all',showFavorites=false;
     function draw(){
+      if(favoriteSub)favoriteSub.textContent=library.favorites.length+' şarkı';
+      if(localSub)localSub.textContent=library.local.length+' yerel kayıt';
       const q=searchInput.value.trim().toLocaleLowerCase('tr');
       pins.style.display=filter==='all'?'':'none';
       local.style.display=(filter==='all'||filter==='local')?'':'none';
