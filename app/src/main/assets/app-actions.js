@@ -816,6 +816,7 @@
       const position=Math.max(0,Number(track.position)||0);
       if(track.id.startsWith('experimental:')||track.id.startsWith('drive-source:'))
         N.resumeExperimentalSource(track.id.split(':')[1],track.title||'',track.artist||'',position);
+      else if(track.id.startsWith('drive:'))N.resumeDriveTrack(track.id.slice(6),track.title||'',track.artist||'',position);
       else if(track.id.startsWith('local:'))A.resumeLocalTrack(JSON.stringify(track),position);
       else if(track.id.startsWith('audius:'))N.resumeAudiusTrack(track.id.slice(7),position);
       else if(track.id.startsWith('podcast:')&&track.feed)A.resumePodcast(track.feed,track.id,position);
