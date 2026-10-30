@@ -47,11 +47,13 @@ class DriveUploadWorker(context: Context, params: WorkerParameters) : Worker(con
                 }
             } }
             val hash = digest.digest().joinToString("") { "%02x".format(it) }
-            val folder = client.getOrCreate(token)
-            val existing = client.findByHash(token, folder, hash)
-            val fileId = existing ?: DriveUploadClient().upload(token, folder, file, name,
-                resolver.getType(uri) ?: "application/octet-stream", hash).id
-            Result.success(workDataOf("name" to name, "fileId" to fileId, "duplicate" to (existing != null)))
+            val (fileId, duplicate) = synchronized(archiveLock) {
+                val folder = client.getOrCreate(token)
+                val existing = client.findByHash(token, folder, hash)
+                Pair(existing ?: DriveUploadClient().upload(token, folder, file, name,
+                    resolver.getType(uri) ?: "application/octet-stream", hash).id, existing != null)
+            }
+            Result.success(workDataOf("name" to name, "fileId" to fileId, "duplicate" to duplicate))
         } catch (e: java.io.IOException) {
             if (runAttemptCount < 2) Result.retry() else Result.failure(workDataOf("error" to (e.message ?: "Drive bağlantı hatası")))
         } catch (_: java.util.concurrent.TimeoutException) {
@@ -62,6 +64,7 @@ class DriveUploadWorker(context: Context, params: WorkerParameters) : Worker(con
     }
 
     companion object {
+        private val archiveLock = Any()
         fun enqueue(context: Context, uri: Uri, account: String) {
             val key = java.security.MessageDigest.getInstance("SHA-256")
                 .digest((account + ":" + uri).toByteArray()).joinToString("") { "%02x".format(it) }
@@ -70,7 +73,7 @@ class DriveUploadWorker(context: Context, params: WorkerParameters) : Worker(con
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .addTag("xmusic-drive-upload").build()
-            // Tek kuyruk paralel aynı içerik yüklemelerini önler.
+            // Aynı dosya adresi için eşzamanlı işleri önler.
             WorkManager.getInstance(context).enqueueUniqueWork("xmusic-drive-" + key, ExistingWorkPolicy.KEEP, request)
         }
     }
