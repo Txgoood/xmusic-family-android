@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
         }
     }
     private fun reconnectSharedDriveSilently() {
+        if (ProfileStore(this).isChild()) return
         syncInFlight = true
         lastDriveSync = android.os.SystemClock.elapsedRealtime()
         val request = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder()
@@ -69,6 +70,7 @@ class MainActivity : ComponentActivity() {
             }.addOnFailureListener { syncInFlight = false }
     }
     fun enableContinuousDrive() {
+        if (ProfileStore(this).isChild()) { showDriveError("Bu işlem için yetişkin profiline geç."); return }
         if (driveBusy || syncInFlight) { showDriveError("Drive işlemi sürüyor; biraz sonra tekrar dene."); return }
         if (driveFolderId == null) { showDriveError("Önce ortak müzik klasörünü seç."); return }
         android.app.AlertDialog.Builder(this).setTitle("Ortak arşivi otomatik yenile")
@@ -116,6 +118,7 @@ class MainActivity : ComponentActivity() {
     }
 
     fun toggleAutomaticArchive() {
+        if (ProfileStore(this).isChild()) { showDriveError("Bu işlem için yetişkin profiline geç."); return }
         val prefs = getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE)
         val enabled = !prefs.getBoolean("enabled", true)
         prefs.edit().putBoolean("enabled", enabled).apply()
@@ -160,6 +163,7 @@ class MainActivity : ComponentActivity() {
     }
 
     fun openDriveLibrary() {
+        if (ProfileStore(this).isChild()) { showDriveError("Bu işlem için yetişkin profiline geç."); return }
         val token = driveAccessToken
         val folder = driveFolderId
         if (driveBusy) { showDriveError("Drive işlemi sürüyor."); return }
@@ -212,6 +216,7 @@ class MainActivity : ComponentActivity() {
     }
 
     fun chooseDriveUpload() {
+        if (ProfileStore(this).isChild()) { showDriveError("Bu işlem için yetişkin profiline geç."); return }
         if (driveBusy) {
             showDriveError("Drive işlemi sürüyor; tamamlanmasını bekle.")
             return
@@ -233,6 +238,7 @@ class MainActivity : ComponentActivity() {
     }
 
     fun showDriveUploadQueue() {
+        if (ProfileStore(this).isChild()) { showDriveError("Bu işlem için yetişkin profiline geç."); return }
         runOnUiThread {
             if (isFinishing || isDestroyed) return@runOnUiThread
             val status = androidx.work.WorkManager.getInstance(this)
@@ -384,6 +390,7 @@ class MainActivity : ComponentActivity() {
     }
 
     fun authorizeExistingDriveAudio() {
+        if (ProfileStore(this).isChild()) { showDriveError("Bu işlem için yetişkin profiline geç."); return }
         if (driveBusy) { showDriveError("Drive işlemi sürüyor; tamamlanmasını bekle."); return }
         if (driveFolderId == null) { showDriveError("Önce ortak müzik klasörünü seç ve hesabını bağla."); return }
         val request = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder()
@@ -407,6 +414,7 @@ class MainActivity : ComponentActivity() {
     fun chooseSharedDriveFolder() { authorizeDrive(true) }
 
     fun authorizeDrive(pickFolder: Boolean = false) {
+        if (ProfileStore(this).isChild()) { showDriveError("Bu işlem için yetişkin profiline geç."); return }
         if (driveBusy) { showDriveError("Drive işlemi sürüyor; tamamlanmasını bekle."); return }
         selectingDriveFolder = pickFolder
         val scopes = mutableListOf(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file"))
@@ -454,7 +462,7 @@ class MainActivity : ComponentActivity() {
             } catch (_: Exception) { android.widget.Toast.makeText(this, "Dosyaya erişilemedi", 0).show() }
         }
     }
-    fun openLocalAudio() { audioPicker.launch(arrayOf("audio/*")) }
+    fun openLocalAudio() { if (!ProfileStore(this).isChild()) audioPicker.launch(arrayOf("audio/*")) }
     private val speechPicker = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             val phrase = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
@@ -463,6 +471,7 @@ class MainActivity : ComponentActivity() {
         }
     }
     fun openVoiceSearch() {
+        if (ProfileStore(this).isChild()) return
         try {
             speechPicker.launch(android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                 .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -1029,6 +1038,7 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 }
+
 
 
 
