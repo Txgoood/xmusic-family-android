@@ -68,9 +68,10 @@ class DriveUploadWorker(context: Context, params: WorkerParameters) : Worker(con
         fun enqueue(context: Context, uri: Uri, account: String) {
             val key = java.security.MessageDigest.getInstance("SHA-256")
                 .digest((account + ":" + uri).toByteArray()).joinToString("") { "%02x".format(it) }
+            val network = if (context.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE).getBoolean("download_unmetered_only", false)) NetworkType.UNMETERED else NetworkType.CONNECTED
             val request = OneTimeWorkRequestBuilder<DriveUploadWorker>()
                 .setInputData(workDataOf("uri" to uri.toString(), "account" to account))
-                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(network).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .addTag("xmusic-drive-upload").build()
             // Aynı dosya adresi için eşzamanlı işleri önler.
