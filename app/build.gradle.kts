@@ -109,6 +109,7 @@ dependencies {
   implementation(libs.androidx.core.ktx)
   // Deneysel kaynak çözümleyici; yalnızca deneme dalında kullanılır.
   implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
+  implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
   implementation("com.google.android.gms:play-services-auth:22.0.0")
   implementation("androidx.work:work-runtime-ktx:2.12.0")
   // Media3 dependencies
