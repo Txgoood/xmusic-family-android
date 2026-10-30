@@ -57,3 +57,5 @@ Durumları yalnız doğrulanan işin ardından güncelle.
 - #59: Kullanıcı sanatçı/albüm/şarkı geçişini ve oynatmayı başarılı bildirdi; başlatmada bazen 5–10 saniye bekleme var.
 - Hız denemesi: Çözülmüş bağlantıyı bellekte 90 saniye tut; oynatma hatasında sil. Bu ses dosyası önbelleği/çevrimdışı indirme değildir.
 - Drive OAuth ve yükleme entegrasyonu henüz bulunmuyor; Drive aktarımı hazır değildir.
+
+- #60: Kullanıcı aynı parçanın ikinci açılışının hızlandığını doğruladı. İlk açılış ve Drive arşivi ayrıca bekliyor.
