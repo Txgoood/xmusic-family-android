@@ -23,6 +23,16 @@ class PodcastRssParserTest {
         assertTrue(item.getString("id").startsWith("podcast:"))
         assertEquals("https://example.org/one.mp3", item.getString("url"))
     }
+    @Test fun readsEpisodeDateAndPlainTextDescription() {
+        val xml = """<rss><channel><title>Podcast</title><item><title>Bölüm</title>
+            <pubDate>Fri, 30 Oct 2026 10:00:00 GMT</pubDate>
+            <description><![CDATA[<p>Bilim ve <b>sanat</b></p>]]></description>
+            <enclosure url="https://example.org/episode.mp3" type="audio/mpeg"/>
+            </item></channel></rss>"""
+        val row = PodcastRssParser.parse(xml, "https://example.org/rss").getJSONArray("items").getJSONObject(0)
+        assertTrue(row.getString("published").contains("2026"))
+        assertEquals("Bilim ve sanat", row.getString("description"))
+    }
     @Test(expected = IllegalArgumentException::class)
     fun rejectsExternalEntities() {
         PodcastRssParser.parse("<!DOCTYPE rss [<!ENTITY secret SYSTEM 'file:///etc/passwd'>]><rss/>", "https://example.org/rss")
