@@ -75,3 +75,7 @@ Durumları yalnız doğrulanan işin ardından güncelle.
 - #72: Kullanıcı Drive arşivindeki dosyanın uygulamada çaldığını doğruladı.
 - Kalıcı yükleme kuyruğu: WorkManager ile seçilmiş yerel ses dosyası, hesap kimliği kontrolü, bağlantı bekleme ve en fazla üç deneme. Anahtarlar iş verisine kaydedilmez. Yeni yüklemeler SHA-256 ile etiketlenir; eski etiketsiz dosyalar içerik eşleştirmesine dahil değildir. Bu cihazda paralel aynı içerik yüklemesi kilitlenir.
 - Otomatik dinleme kaydı ve kaynak dosyası indirme henüz bu kuyruğa bağlı değil. Kuyruk cihazda doğrulanmadı; Android zorla durdurma ve süre sınırlamaları geçerlidir.
+
+- #75: Kullanıcı kalıcı yerel dosya yükleme kuyruğunun çalıştığını doğruladı.
+- Otomatik arşiv denemesi: Hesap yeniden bağlandıktan sonra gerçek experimental oynatma başlangıcı WorkManager işini tetikler; ses yt-dlp/FFmpeg ile hazırlanıp Drive'a yüklenir. Kaynak kimliği Drive appProperties alanına ve hesap bazlı yerel eşleştirmeye yazılır. Tekrar aynı YouTube kaydı seçilirse tamamlanmış Drive kopyası tercih edilir.
+- Varsayılan otomatik mod açık; Ayarlar'dan aç/kapat ve yükleme kuyruğu durum ekranı mevcut. Hesap izni gerektiğinde iş hata verir; uygulama zorla durdurulursa Android işleri yeniden başlatmayı bekletebilir. Kaynak indirme, FFmpeg cihaz desteği, otomatik yükleme ve tekrar Drive oynatma henüz uçtan uca cihaz testinden geçmedi.
