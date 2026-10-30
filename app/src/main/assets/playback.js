@@ -3,7 +3,16 @@
   if (window.__xmusicPlaybackInstalled) return;
   window.__xmusicPlaybackInstalled = true;
   const full = location.pathname.includes('/imdi_al_yor/');
-  const mini = document.querySelector('aside');
+  const settingsMini = location.pathname.includes('/ayarlar_ve_profil_y_netimi/')
+    ? document.querySelector('main .fixed.bottom-2.inset-x-2') : null;
+  const mini = document.querySelector('aside') || settingsMini;
+  if (settingsMini) {
+    settingsMini.querySelector('[aria-label="Google Cast"]')?.remove();
+    settingsMini.querySelector('.absolute.-bottom-1.-right-1')?.remove();
+    const play = settingsMini.querySelector('#miniPlayBtn');
+    if (play) { play.removeAttribute('onclick'); play.setAttribute('aria-label','Oynat veya Duraklat'); }
+  }
+  if (mini) mini.style.display = 'none';
   let state = {};
   const text = (node, value) => { if (node) node.textContent = value; };
   const time = ms => { const n = Math.floor(Math.max(0, ms || 0) / 1000); return Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0'); };
@@ -12,7 +21,7 @@
   const badge = title?.nextElementSibling;
   let artwork = full ? document.querySelector('main img') : null;
   if (mini) {
-    const box = mini.querySelector('.w-12.h-12');
+    const box = mini.querySelector('.w-12.h-12') || (settingsMini && mini.querySelector('.w-11.h-11')); 
     if (box) {
       box.replaceChildren();
       artwork = document.createElement('img');
@@ -74,6 +83,7 @@
   }, true);
   window.__xmusicPlayback = function (value) {
     state = value;
+    if (mini) mini.style.display = value.id ? '' : 'none';
     window.dispatchEvent(new CustomEvent('xmusic:playback', { detail: value }));
     text(title, value.title || 'Henüz parça seçilmedi');
     text(artist, value.artist || 'Keşfet bölümünden bir parça seç');
@@ -108,3 +118,4 @@
   };
   window.__xmusicPlayback({ ready: false });
 })();
+
