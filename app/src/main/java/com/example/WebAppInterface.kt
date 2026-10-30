@@ -65,6 +65,35 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         return org.json.JSONObject().put("free", stats.availableBytes).put("total", stats.totalBytes).toString()
     }
 
+    /** Şehir adıyla hava durumunu alır; konum izni istemez. */
+    @JavascriptInterface
+    fun fetchWeather(city: String, requestId: Int) {
+        if (city.trim().length !in 2..80) return
+        Thread {
+            fun readJson(address: String): org.json.JSONObject {
+                val conn = java.net.URL(address).openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout = 8000; conn.readTimeout = 8000
+                return try {
+                    if (conn.responseCode !in 200..299) throw java.io.IOException("weather HTTP")
+                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    require(body.length < 1_000_000)
+                    org.json.JSONObject(body)
+                } finally { conn.disconnect() }
+            }
+            val result = try {
+                val name = java.net.URLEncoder.encode(city.trim(), "UTF-8")
+                val geo = readJson("https://geocoding-api.open-meteo.com/v1/search?count=1&language=tr&format=json&name=$name")
+                    .getJSONArray("results").getJSONObject(0)
+                val lat = geo.getDouble("latitude"); val lon = geo.getDouble("longitude")
+                val current = readJson("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code&timezone=auto")
+                    .getJSONObject("current")
+                org.json.JSONObject().put("city", geo.getString("name")).put("country", geo.optString("country"))
+                    .put("temperature", current.getDouble("temperature_2m")).put("code", current.getInt("weather_code"))
+            } catch (_: Exception) { org.json.JSONObject().put("error", "Hava durumu alınamadı") }
+            webView.post { webView.evaluateJavascript("window.__xmusicWeatherResult && window.__xmusicWeatherResult($requestId,$result)", null) }
+        }.start()
+    }
+
     // Yeni indirme ve arşiv işleri için ağ tercihi. Mevcut işler kendi koşullarını korur.
     @JavascriptInterface fun getDownloadWifiOnly(): Boolean =
         context.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE).getBoolean("download_unmetered_only", false)
@@ -635,5 +664,6 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         this.mediaController = controller
     }
 }
+
 
 
