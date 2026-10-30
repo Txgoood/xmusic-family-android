@@ -21,6 +21,31 @@ class DriveFolderClient {
         return request("https://www.googleapis.com/drive/v3/files?fields=id", token, metadata).getString("id")
     }
 
+    data class Track(val id: String, val name: String)
+
+    fun listAudio(token: String, folderId: String): List<Track> {
+        require(folderId.matches(Regex("[A-Za-z0-9_-]{1,200}")))
+        val query = "'$folderId' in parents and trashed = false and mimeType contains 'audio/'"
+        val tracks = mutableListOf<Track>()
+        val seenPages = mutableSetOf<String>()
+        var page = ""
+        do {
+            val address = "https://www.googleapis.com/drive/v3/files?q=" + URLEncoder.encode(query, "UTF-8") +
+                "&fields=nextPageToken,files(id,name)&orderBy=name&pageSize=100" +
+                if (page.isEmpty()) "" else "&pageToken=" + URLEncoder.encode(page, "UTF-8")
+            val result = request(address, token, null)
+            val rows = result.optJSONArray("files")
+            if (rows != null) for (i in 0 until rows.length()) {
+                val row = rows.getJSONObject(i)
+                val id = row.optString("id")
+                if (id.matches(Regex("[A-Za-z0-9_-]{1,200}"))) tracks.add(Track(id, row.optString("name", "Ses dosyası")))
+            }
+            page = result.optString("nextPageToken")
+            if (page.isNotEmpty() && !seenPages.add(page)) throw IOException("Drive listeleme yanıtı tekrarlandı")
+        } while (page.isNotEmpty())
+        return tracks
+    }
+
     private fun request(address: String, token: String, body: JSONObject?): JSONObject {
         val conn = URL(address).openConnection() as HttpURLConnection
         try {
