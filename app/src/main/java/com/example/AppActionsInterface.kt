@@ -22,6 +22,7 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         if (changed && action == "delete") {
             activity.getSharedPreferences("xmusic_library_$id", Context.MODE_PRIVATE).edit().clear().commit()
             MusicListeningStats(activity).removeProfile(id)
+            PlaybackResumeStore(activity).clear(id)
             val removedDownloads = activity.getSharedPreferences("xmusic_downloads_$id", Context.MODE_PRIVATE)
             val manager = activity.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
             removedDownloads.all.values.forEach { raw ->
@@ -102,7 +103,8 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         val data = episodes[id]
         if (data == null) { android.widget.Toast.makeText(activity, "Önce podcast RSS kaynağını aç", 0).show(); return@post }
         val item = MediaItem.Builder().setMediaId(id).setUri(data.getString("url"))
-            .setMediaMetadata(MediaMetadata.Builder().setTitle(data.optString("title")).setArtist(data.optString("artist")).build()).build()
+            .setMediaMetadata(MediaMetadata.Builder().setTitle(data.optString("title")).setArtist(data.optString("artist"))
+                .setExtras(android.os.Bundle().apply { putString("feed", data.optString("feed")) }).build()).build()
         val p = controller ?: return@post
         if (enqueue) p.addMediaItem(item) else { p.setMediaItem(item); p.prepare(); p.play() }
     } }
@@ -138,7 +140,8 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
                 val track = data ?: throw java.io.IOException("Bölüm bulunamadı")
                 val uri = audioUri ?: android.net.Uri.parse(track.getString("url"))
                 val item = MediaItem.Builder().setMediaId(id).setUri(uri).setMediaMetadata(MediaMetadata.Builder()
-                    .setTitle(track.optString("title")).setArtist(track.optString("artist")).build()).build()
+                    .setTitle(track.optString("title")).setArtist(track.optString("artist"))
+                    .setExtras(android.os.Bundle().apply { putString("feed", track.optString("feed")) }).build()).build()
                 webView.post {
                     controller?.let { p ->
                         p.setMediaItem(item);p.seekTo(position.coerceIn(0L, 86_400_000L));p.prepare();p.play()
@@ -221,6 +224,12 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         if (profiles.activeId() != libraryProfileId || value.length > 1_000_000) return false
         return try { JSONObject(value); prefs.edit().putString("data", value).commit() } catch (_: Exception) { false }
     }
+    @JavascriptInterface fun loadPlaybackResume(): String =
+        if (profiles.activeId() == libraryProfileId) PlaybackResumeStore(activity).load(libraryProfileId) else "{}"
+    @JavascriptInterface fun clearPlaybackResume() {
+        if (profiles.activeId() == libraryProfileId) PlaybackResumeStore(activity).clear(libraryProfileId)
+    }
+
     @JavascriptInterface fun assignMusicGenre(videoId: String, genre: String) {
         if (profiles.activeId() == libraryProfileId) MusicListeningStats(activity).assign(videoId, genre)
     }
