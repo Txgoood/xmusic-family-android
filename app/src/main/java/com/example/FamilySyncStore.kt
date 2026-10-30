@@ -102,6 +102,11 @@ class FamilySyncStore(private val context: Context) {
     }
     fun revision(value: Long) { prefs.edit().putLong("revision", value).commit() }
     fun nextRevision(): Long = maxOf(System.currentTimeMillis(), prefs.getLong("revision", 0) + 1)
+    fun digest(value: String): String = java.security.MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it.toInt() and 255) }
+    fun remembered(key: String): String = prefs.getString(key, "").orEmpty()
+    fun remember(key: String, value: String) { prefs.edit().putString(key, value).commit() }
+    fun cachedFile(id: String, version: String): String? = if (version.isNotEmpty() && remembered("version_$id") == version) prefs.getString("file_$id", null) else null
+    fun cacheFile(id: String, version: String, raw: String) { prefs.edit().putString("version_$id", version).putString("file_$id", raw).commit() }
     fun deviceFile(): String = prefs.getString("deviceFile", "").orEmpty()
     fun deviceFile(id: String) { prefs.edit().putString("deviceFile", id).commit() }
     fun cache(devices: JSONArray) { prefs.edit().putString("devices", devices.toString()).putInt("members", devices.length()).commit() }
