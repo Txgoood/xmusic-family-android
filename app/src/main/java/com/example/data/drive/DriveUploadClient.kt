@@ -13,7 +13,7 @@ import java.net.URL
 class DriveUploadClient {
     data class UploadedFile(val id: String, val name: String)
 
-    fun upload(accessToken: String, folderId: String, file: File, displayName: String, mimeType: String): UploadedFile {
+    fun upload(accessToken: String, folderId: String, file: File, displayName: String, mimeType: String, contentHash: String? = null): UploadedFile {
         require(accessToken.isNotBlank() && !accessToken.contains('\n') && !accessToken.contains('\r'))
         require(folderId.matches(Regex("[A-Za-z0-9_-]{1,200}")))
         require(file.isFile && file.length() > 0)
@@ -22,6 +22,10 @@ class DriveUploadClient {
 
         val metadata = JSONObject().put("name", displayName)
             .put("parents", org.json.JSONArray().put(folderId))
+        if (contentHash != null) {
+            require(contentHash.matches(Regex("[a-f0-9]{64}")))
+            metadata.put("appProperties", JSONObject().put("contentSha256", contentHash))
+        }
         val endpoint = URL("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name")
         val create = endpoint.openConnection() as HttpURLConnection
         val sessionUrl: String
