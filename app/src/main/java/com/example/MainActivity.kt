@@ -14,6 +14,7 @@ class MainActivity : ComponentActivity() {
     private var driveFolderId: String? = null
     private var driveAccountId: String? = null
     private var driveBusy = false
+    private var selectingDriveFolder = false
     private val driveFolderWorker = java.util.concurrent.Executors.newSingleThreadExecutor()
     private val driveFilePicker = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
@@ -227,6 +228,12 @@ class MainActivity : ComponentActivity() {
     private fun receiveDriveAuthorization(result: com.google.android.gms.auth.api.identity.AuthorizationResult) {
         val token = result.accessToken
         if (token.isNullOrBlank()) { showDriveError("Drive erişimi alınamadı"); return }
+        val picked = result.tokenResponseParams?.getString("picked_file_ids").orEmpty().split(',').filter { it.isNotBlank() }
+        val choosing = selectingDriveFolder || picked.isNotEmpty()
+        selectingDriveFolder = false
+        if (choosing && (picked.size != 1 || !picked[0].matches(Regex("[A-Za-z0-9_-]{1,200}")))) {
+            showDriveError("Bir müzik klasörü seçilmedi. Mevcut bağlantı korunuyor."); return
+        }
         driveAccessToken = token
         driveFolderId = null
         driveAccountId = null
@@ -235,13 +242,24 @@ class MainActivity : ComponentActivity() {
             try {
                 val folderClient = com.example.data.drive.DriveFolderClient()
                 val account = folderClient.accountId(token)
-                val folder = folderClient.getOrCreate(token)
+                val folderPrefs = getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE)
+                val previous = folderPrefs.getString(account, "").orEmpty()
+                val wanted = if (choosing) picked.single() else previous
+                val folder = folderClient.getOrCreate(token, wanted)
+                if (choosing && previous != folder) {
+                    androidx.work.WorkManager.getInstance(this).cancelAllWorkByTag("xmusic-drive-upload")
+                    val archive = getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE)
+                    val edit = archive.edit()
+                    archive.all.keys.filter { it.startsWith(account + ":") }.forEach { edit.remove(it) }
+                    edit.commit()
+                }
+                folderPrefs.edit().putString(account, folder).commit()
                 runOnUiThread {
                     if (driveAccessToken == token) {
                         driveFolderId = folder; driveAccountId = account
                         getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE).edit().putString("account", account).apply()
                     }
-                    showDriveError("Drive bağlantısı hazır. XMusic Family klasörü bulundu veya oluşturuldu. Şimdi 'Drive’a ses dosyası yükle' düğmesini kullanabilirsin.")
+                    showDriveError("Drive bağlantısı hazır. Müzik klasörü hesabın için kaydedildi. Drive müzik arşivini açarak içerikleri kontrol edebilirsin.")
                 }
             } catch (e: Exception) {
                 runOnUiThread { showDriveError(e.message ?: "Drive klasörü hazırlanamadı") }
@@ -249,11 +267,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    fun authorizeDrive() {
+    fun chooseSharedDriveFolder() { authorizeDrive(true) }
+
+    fun authorizeDrive(pickFolder: Boolean = false) {
         if (driveBusy) { showDriveError("Drive işlemi sürüyor; tamamlanmasını bekle."); return }
-        val request = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder()
+        selectingDriveFolder = pickFolder
+        val builder = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder()
             .setRequestedScopes(listOf(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file")))
-            .build()
+        if (pickFolder) {
+            builder.setOptOutIncludingGrantedScopes(true)
+                .setPrompt(com.google.android.gms.auth.api.identity.AuthorizationRequest.Prompt.CONSENT or com.google.android.gms.auth.api.identity.AuthorizationRequest.Prompt.SELECT_ACCOUNT)
+                .addResourceParameter(com.google.android.gms.auth.api.identity.AuthorizationRequest.ResourceParameter.PICKER_OAUTH_TRIGGER, "true")
+                .addResourceParameter(com.google.android.gms.auth.api.identity.AuthorizationRequest.ResourceParameter.PICKER_ALLOW_FOLDER_SELECTION, "true")
+                .addResourceParameter(com.google.android.gms.auth.api.identity.AuthorizationRequest.ResourceParameter.PICKER_MIMETYPES, "application/vnd.google-apps.folder")
+                .addResourceParameter(com.google.android.gms.auth.api.identity.AuthorizationRequest.ResourceParameter.PICKER_ALLOW_MULTIPLE, "false")
+        }
+        val request = builder.build()
         val client = com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this)
         client.authorize(request).addOnSuccessListener { result ->
             if (result.hasResolution()) {
@@ -663,7 +692,9 @@ class MainActivity : ComponentActivity() {
                           summary.textContent='Google hesap ve Drive ayarları';
                           summary.dataset.xmOwned='true';summary.__xmOwnedRun=function(){details.open=!details.open;};
                           details.appendChild(summary);
-                          [btn,library,upload,queue,automatic].forEach(function(item){
+                          const shared=document.createElement('button');shared.type='button';shared.textContent='Ortak müzik klasörünü seç / değiştir';
+                          shared.dataset.xmOwned='true';shared.__xmOwnedRun=function(){window.Android.chooseSharedDriveFolder();};
+                          [btn,shared,library,upload,queue,automatic].forEach(function(item){
                             item.style.cssText='display:block;width:calc(100% - 32px);padding:14px;margin:8px 16px;text-align:left;border:1px solid #62796f;border-radius:12px;color:#e0e3e7;font:inherit;';
                             details.appendChild(item);
                           });
@@ -836,6 +867,7 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 }
+
 
 
 
