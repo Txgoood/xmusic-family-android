@@ -493,7 +493,10 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     }
 
     @JavascriptInterface
-    fun resolveAudiusTrack(trackId: String, enqueue: Boolean) {
+    fun resolveAudiusTrack(trackId: String, enqueue: Boolean) = resolveAudius(trackId, enqueue, 0L)
+    @JavascriptInterface
+    fun resumeAudiusTrack(trackId: String, position: Long) = resolveAudius(trackId, false, position.coerceIn(0L, 86_400_000L))
+    private fun resolveAudius(trackId: String, enqueue: Boolean, position: Long) {
         if (!trackId.matches(Regex("[a-zA-Z0-9]{1,64}"))) return
         Thread {
             try {
@@ -518,7 +521,7 @@ class WebAppInterface(private val context: Context, private val webView: WebView
                     .setMediaMetadata(metadata.build()).build()
                 webView.post {
                     val p = mediaController ?: return@post
-                    if (enqueue) p.addMediaItem(item) else { p.setMediaItem(item); p.prepare(); p.play() }
+                    if (enqueue) p.addMediaItem(item) else { p.setMediaItem(item); if (position > 0) p.seekTo(position); p.prepare(); p.play() }
                 }
             } catch (_: Exception) { showToast("Kayıt açılamadı. İnternet veya kaynak erişimi uygun değil.") }
         }.start()
