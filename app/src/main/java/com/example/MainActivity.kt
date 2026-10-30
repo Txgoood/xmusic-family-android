@@ -601,16 +601,14 @@ class MainActivity : ComponentActivity() {
                           main.prepend(automatic);main.prepend(queue);main.prepend(library);main.prepend(upload);main.prepend(btn);
                         }
                       }
-                      // Ayarlar ekranındaki anahtarları Android SharedPreferences ile sakla.
-                      // Gerçek işlevi olmayan anahtarın görüntüsü değişse de özellik tamamlandı sayılmaz.
+                      // Yalnız gerçek arka plan işlerine bağlı ağ tercihi etkin.
                       if ((location.pathname || '').includes('/ayarlar_ve_profil_y_netimi/')) {
                         document.querySelectorAll('input[type="checkbox"]').forEach(function(box, index) {
-                          const key = 'setting_' + index;
-                          if (window.Android) {
-                            box.checked = window.Android.loadSetting(key, box.checked);
-                            box.addEventListener('change', function() {
-                              window.Android.saveSetting(key, box.checked);
-                            });
+                          if(index===2 && window.Android){
+                            box.checked=window.Android.getDownloadWifiOnly();
+                            box.addEventListener('change',function(){window.Android.setDownloadWifiOnly(box.checked);});
+                          } else {
+                            box.checked=false;box.disabled=true;box.title='Bu özellik henüz hazır değil';
                           }
                         });
                       }
