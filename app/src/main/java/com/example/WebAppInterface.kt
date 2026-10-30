@@ -23,6 +23,11 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     fun toggleAutomaticArchive() { webView.post { (context as? MainActivity)?.toggleAutomaticArchive() } }
 
     @JavascriptInterface
+    fun resumeDriveTrack(id: String, title: String, artist: String, position: Long) {
+        webView.post { (context as? MainActivity)?.resumeDriveTrack(id, title, artist, position) }
+    }
+
+    @JavascriptInterface
     fun openDriveLibrary() { webView.post { (context as? MainActivity)?.openDriveLibrary() } }
 
     @JavascriptInterface
