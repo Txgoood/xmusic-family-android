@@ -363,7 +363,7 @@ class MainActivity : ComponentActivity() {
                           }
                           const recentItems=document.getElementById('history-items-wrapper');
                           const clearRecent=document.getElementById('clear-all-history-btn');
-                          let recentSearches=[],recentTimer;
+                          let recentSearches=[],recentTimer,lastCountedQuery='';
                           function editRecent(action,query){
                             try {
                               const result=JSON.parse(window.AndroidActions.searchHistory(action,query||''));
@@ -376,7 +376,14 @@ class MainActivity : ComponentActivity() {
                           function rememberQuery(){
                             if(state.view!=='search')return;
                             const query=input.value.replace(/\s+/g,' ').trim();
-                            if(query.length>=2&&query.length<=100)editRecent('add',query);
+                            if(query.length>=2&&query.length<=100){
+                              editRecent('add',query);
+                              const key=query.toLocaleLowerCase('tr');
+                              if(key!==lastCountedQuery){
+                                window.AndroidActions.recordSearch(query);lastCountedQuery=key;
+                                if(window.__xmusicRefreshTopSearches)window.__xmusicRefreshTopSearches();
+                              }
+                            }
                           }
                           function drawRecent(){
                             if(!recentItems)return;
@@ -564,6 +571,7 @@ class MainActivity : ComponentActivity() {
                             },350);
                           }
                           input.addEventListener('input',function(){
+                            if(!input.value.trim())lastCountedQuery='';
                             state=Object.assign({},state,{view:'search',id:'',name:''});history=[];runSearch();
                           });
                           const clear=document.getElementById('search-clear-btn');
