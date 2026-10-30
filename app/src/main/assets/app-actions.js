@@ -886,6 +886,16 @@
     });
   }
   function initSettings(){
+    // Şablondaki örnek çocuk güvenliği bilgileri mevcut özellik gibi görünmesin.
+    document.querySelectorAll('main h4').forEach(h=>{
+      const label=h.textContent.trim();
+      if(/Ebeveyn PIN Kodu|Uygunsuz İçerik|Günlük Dinleme Süresi Sınırı|Ekolayzır|Ses Normalleştirme|Otomatik Çalma|Android Auto/.test(label)){
+        const row=h.closest('.p-4');
+        const description=row?.querySelector('p');if(description)description.textContent='Henüz kullanıma hazır değil';
+        const badge=row?.querySelector('span.rounded-full');if(badge&&badge.textContent.trim()==='Etkin')badge.textContent='Hazır değil';
+      }
+    });
+    document.querySelectorAll('main footer p').forEach(p=>{if(/Dolby|Build 4120/.test(p.textContent))p.textContent='XMusic Family';});
     const section=Array.from(document.querySelectorAll('main section')).find(s=>s.querySelector('h2')?.textContent.includes('Aile Profilleri'));
     if(section){
       const grid=section.querySelector('.grid');
@@ -928,3 +938,4 @@
   if(page==='arama_ve_ke_fet')setTimeout(function seedSearch(){if(!window.__xmusicActionsInstalled){setTimeout(seedSearch,50);return;}const query=sessionStorage.getItem('xm-search');if(query!==null){sessionStorage.removeItem('xm-search');const input=document.getElementById('search-input');if(input){input.value=query;input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();}}},0);
   window.__xmusicActionsAudit=()=>Array.from(document.querySelectorAll('button,a')).filter(b=>!b.closest('#xmusic-live-search')).map(b=>({label:b.getAttribute('aria-label')||b.textContent.trim(),action:b.dataset.xmAction|| (b.dataset.xmOwned?'owned':null),blocked:b.dataset.xmBlocked||null}));
 })();
+
