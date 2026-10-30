@@ -47,6 +47,24 @@ class MainActivity : ComponentActivity() {
         return true
     }
 
+    fun resumeDriveTrack(fileId: String, title: String, artist: String, position: Long) {
+        val token = driveAccessToken
+        val controller = mediaController
+        val service = PlaybackService.activeService
+        if (token == null || controller == null || service == null) {
+            showDriveError("Drive dosyası için önce Ayarlar'dan hesabını bağla.")
+            return
+        }
+        if (!fileId.matches(Regex("[A-Za-z0-9_-]{1,200}"))) return
+        val url = "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media"
+        service.registerExperimentalStream(url, mapOf("Authorization" to "Bearer $token"))
+        val metadata = androidx.media3.common.MediaMetadata.Builder().setTitle(title.take(180)).setArtist(artist.take(180)).build()
+        controller.setMediaItem(androidx.media3.common.MediaItem.Builder().setMediaId("drive:" + fileId).setUri(url).setMediaMetadata(metadata).build())
+        controller.seekTo(position.coerceIn(0L, 86_400_000L))
+        controller.prepare()
+        controller.play()
+    }
+
     fun openDriveLibrary() {
         val token = driveAccessToken
         val folder = driveFolderId
