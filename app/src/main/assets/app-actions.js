@@ -256,7 +256,7 @@
     function own(node,fn){
       if(!node)return;
       node.dataset.xmOwned='true';delete node.dataset.xmBlocked;node.removeAttribute('aria-disabled');
-      node.disabled=false;node.title='';node.__xmOwnedRun=fn;
+      node.disabled=false;node.title='';node.querySelector('small')?.remove();node.__xmOwnedRun=fn;
     }
     function updateFollow(){
       if(followText)followText.textContent=library.feeds.some(f=>f.url===address)?'Takip Ediliyor':'Takip Et';
@@ -264,6 +264,7 @@
     }
     own(follow,()=>{toggleFeed(info,followText);updateFollow();});
     updateFollow();
+    if(follow&&!address)follow.style.display='none';
     if(descToggle){descToggle.style.display='none';own(descToggle,()=>{
       const expanded=desc.classList.toggle('line-clamp-2')===false;
       descToggle.querySelector('span:first-child').textContent=expanded?'Daha Az Gör':'Devamını Gör';
