@@ -107,6 +107,47 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         if (enqueue) p.addMediaItem(item) else { p.setMediaItem(item); p.prepare(); p.play() }
     } }
 
+    @JavascriptInterface fun resumePodcast(address: String, id: String, position: Long) {
+        if (!id.matches(Regex("podcast:[a-f0-9]{64}"))) return
+        Thread {
+            try {
+                var data = episodes[id]
+                var audioUri: android.net.Uri? = null
+                val manager = activity.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                val downloaded = downloadsPrefs.getString(id.removePrefix("podcast:"), null)
+                if (downloaded != null) {
+                    val saved = JSONObject(downloaded)
+                    audioUri = manager.getUriForDownloadedFile(saved.getLong("downloadId"))
+                    if (audioUri != null) data = saved
+                }
+                if (data == null) {
+                    val source = android.net.Uri.parse(address)
+                    require(source.scheme == "https" && !source.host.isNullOrBlank())
+                    val conn = java.net.URL(address).openConnection() as java.net.HttpURLConnection
+                    conn.connectTimeout = 10000; conn.readTimeout = 12000
+                    val xml = try {
+                        if (conn.responseCode !in 200..299) throw java.io.IOException("RSS bağlantısı açılamadı")
+                        conn.inputStream.use { String(it.readBytesLimited(2_000_000), Charsets.UTF_8) }
+                    } finally { conn.disconnect() }
+                    val items = PodcastRssParser.parse(xml, address).getJSONArray("items")
+                    for (i in 0 until items.length()) {
+                        val row = items.getJSONObject(i)
+                        if (row.optString("id") == id) { data = row; episodes[id] = row; break }
+                    }
+                }
+                val track = data ?: throw java.io.IOException("Bölüm bulunamadı")
+                val uri = audioUri ?: android.net.Uri.parse(track.getString("url"))
+                val item = MediaItem.Builder().setMediaId(id).setUri(uri).setMediaMetadata(MediaMetadata.Builder()
+                    .setTitle(track.optString("title")).setArtist(track.optString("artist")).build()).build()
+                webView.post {
+                    controller?.let { p ->
+                        p.setMediaItem(item);p.seekTo(position.coerceIn(0L, 86_400_000L));p.prepare();p.play()
+                    }
+                }
+            } catch (_: Exception) { webView.post { android.widget.Toast.makeText(activity, "Podcast bölümüne erişilemedi.", 0).show() } }
+        }.start()
+    }
+
     @JavascriptInterface fun downloadPodcast(id: String) { webView.post {
         val data = episodes[id] ?: return@post
         try {
