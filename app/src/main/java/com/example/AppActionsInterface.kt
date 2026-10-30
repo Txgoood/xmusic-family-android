@@ -120,6 +120,8 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
                 .setDescription("XMusic Family podcast")
                 .setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 .setDestinationInExternalFilesDir(activity, android.os.Environment.DIRECTORY_MUSIC, "$key.audio")
+            if (activity.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE).getBoolean("download_unmetered_only", false))
+                request.setAllowedNetworkTypes(android.app.DownloadManager.Request.NETWORK_WIFI)
             val downloadId = manager.enqueue(request)
             downloadsPrefs.edit().putString(key, JSONObject(data.toString()).put("downloadId", downloadId).toString()).apply()
             android.widget.Toast.makeText(activity, "Podcast indirme kuyruğuna eklendi", 0).show()
@@ -233,7 +235,9 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
             android.widget.Toast.makeText(activity, "Önce bir parça başlat", 0).show()
         } else { service.setSleepTimer(minutes); android.widget.Toast.makeText(activity, if (minutes == 0) "Zamanlayıcı iptal edildi" else "Zamanlayıcı ayarlandı", 0).show() }
     } }
-    @JavascriptInterface fun playSavedTrack(value: String, enqueue: Boolean) { webView.post {
+    @JavascriptInterface fun playSavedTrack(value: String, enqueue: Boolean) = startSavedTrack(value, enqueue, 0L)
+    @JavascriptInterface fun resumeLocalTrack(value: String, position: Long) = startSavedTrack(value, false, position.coerceIn(0L, 86_400_000L))
+    private fun startSavedTrack(value: String, enqueue: Boolean, position: Long) { webView.post {
         try {
             val data = JSONObject(value)
             val id = data.optString("id")
@@ -245,7 +249,7 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
             val item = MediaItem.Builder().setMediaId(id).setUri(uri).setMediaMetadata(MediaMetadata.Builder()
                 .setTitle(data.optString("title").take(180)).setArtist(data.optString("artist").take(180)).build()).build()
             val p = controller ?: return@post
-            if (enqueue) p.addMediaItem(item) else { p.setMediaItem(item); p.prepare(); p.play() }
+            if (enqueue) p.addMediaItem(item) else { p.setMediaItem(item); if (position > 0) p.seekTo(position); p.prepare(); p.play() }
         } catch (_: Exception) { android.widget.Toast.makeText(activity, "Dosya açılamadı. Dosyayı yeniden seç.", 0).show() }
     } }
 }
