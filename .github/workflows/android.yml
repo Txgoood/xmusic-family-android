@@ -49,6 +49,17 @@ jobs:
         run: gradle :app:testDebugUnitTest --stacktrace
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
+      - name: Verify final APK signing certificate
+        run: |
+          signer=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
+          test -n "$signer"
+          apk=$(find app/build/outputs/apk/debug -name '*.apk' -type f | head -1)
+          actual=$("$signer" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-1 digest: //p')
+          if [ "$actual" != "d1666252a15cb05dc2df52ab4700eaf0fafbe643" ]; then
+            echo "::error::Final APK has unexpected certificate: $actual"
+            exit 1
+          fi
+          echo "Final APK certificate verified."
       - name: Upload debug APK
         if: success()
         uses: actions/upload-artifact@v4
