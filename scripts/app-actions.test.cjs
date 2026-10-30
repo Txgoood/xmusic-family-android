@@ -5,13 +5,18 @@ const assets=process.env.XMUSIC_TEST_PAGES||path.join(root,'app/src/main/assets/
 const script=fs.readFileSync(path.join(root,'app/src/main/assets/app-actions.js'),'utf8');
 const player=fs.readFileSync(path.join(root,'app/src/main/assets/playback.js'),'utf8');
 const main=fs.readFileSync(path.join(root,'app/src/main/java/com/example/MainActivity.kt'),'utf8').split('evaluateJavascript("""')[1].split('""".trimIndent()')[0];
-let db='{}',checks=0,recentState=[];const report=[];
+let db='{}',checks=0,recentState=[],topState=[];const report=[];
 function open(folder,session={}){
  const f=path.join(assets,fs.existsSync(path.join(assets,folder+'.html'))?folder+'.html':folder+'/code.html');
  const dom=new JSDOM(fs.readFileSync(f,'utf8'),{url:'https://local.test/stitch/'+folder+'/code.html',runScripts:'outside-only'});
  const w=dom.window,calls=[];
  w.Android=new Proxy({}, {get:(_,key)=>(...args)=>{calls.push([key,...args]);return false;}});
- w.AndroidActions=new Proxy({}, {get:(_,key)=>(...args)=>{calls.push([key,...args]);if(key==='searchHistory'){
+ w.AndroidActions=new Proxy({}, {get:(_,key)=>(...args)=>{calls.push([key,...args]);if(key==='topSearches')return JSON.stringify(topState);
+ if(key==='recordSearch'){
+  const query=args[0],key=query.toLocaleLowerCase('tr');let item=topState.find(x=>x.query.toLocaleLowerCase('tr')===key);
+  if(!item){item={query,count:0};topState.push(item);}item.count++;topState.sort((a,b)=>b.count-a.count);return;
+ }
+ if(key==='searchHistory'){
  const [action,query]=args;const text=(query||'').replace(/\s+/g,' ').trim();
  const same=value=>value.toLocaleLowerCase('tr')===text.toLocaleLowerCase('tr');
  if(action==='add'&&text.length>=2&&text.length<=100)recentState=[text,...recentState.filter(v=>!same(v))].slice(0,12);
@@ -216,6 +221,33 @@ podcastsChip.click();
 assert.ok(x.d.getElementById('xm-library-tracks').textContent.includes('Tarih Sohbetleri'));checks++;
 x.d.getElementById('xm-library-tracks').querySelector('button').click();
 assert.deepEqual(x.calls.at(-1),['navigateTo','podcast_program_ve_b_l_m_detay']);checks++;
+x.dom.window.close();
+
+// Gerçek tür rafı ve kişisel arama sıralaması.
+topState=[];x=open('arama_ve_ke_fet');
+const genreSection=[...x.d.querySelectorAll('main section')].find(s=>s.querySelector('h2')?.textContent.includes('Hızlı Göz At'));
+const popCard=genreSection.querySelector('.grid').firstElementChild;popCard.click();
+let shelfCall=x.calls.filter(k=>k[0]==='searchMusicShelf').at(-1);
+assert.ok(shelfCall[1].includes('pop'));checks++;
+x.w.__xmusicMusicShelfResult(shelfCall[2],{items:[{id:'leTDrileoGI',title:'Örnek Şarkı',artist:'Sanatçı'}]});
+x.d.querySelector('#xm-dialog [aria-label="Örnek Şarkı oynat"]').click();
+assert.deepEqual(x.calls.at(-1),['playExperimentalSource','leTDrileoGI','Örnek Şarkı','Sanatçı']);checks++;
+[...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Kapat').click();
+const topInput=x.d.getElementById('search-input');
+topInput.value='Tarkan';topInput.dispatchEvent(new x.w.Event('input',{bubbles:true}));
+topInput.dispatchEvent(new x.w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+topInput.dispatchEvent(new x.w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+assert.equal(topState[0].count,1);checks++;
+x.d.getElementById('search-clear-btn').click();
+const topSection=[...x.d.querySelectorAll('main section')].find(s=>s.querySelector('h2')?.textContent.includes('En Çok Arananlar'));
+assert.ok(topSection.textContent.includes('Tarkan'));checks++;
+topSection.querySelector('button').click();assert.equal(topInput.value,'Tarkan');checks++;
+x.dom.window.close();
+x=open('m_zik_merkezi');
+assert.equal(x.d.querySelector('nav[data-active-classes] a[data-path="muzik"]').getAttribute('aria-current'),'page');checks++;
+const shelfRequests=x.calls.filter(k=>k[0]==='searchMusicShelf');assert.equal(shelfRequests.length,2);checks++;
+x.w.__xmusicMusicShelfResult(shelfRequests[0][2],{items:[{id:'leTDrileoGI',title:'Stüdyo kayıt',artist:'Sanatçı'}]});
+x.d.querySelector('[aria-label="Stüdyo kayıt oynat"]').click();assert.deepEqual(x.calls.at(-1),['playExperimentalSource','leTDrileoGI','Stüdyo kayıt','Sanatçı']);checks++;
 x.dom.window.close();
 
 console.log('Application actions: '+checks+' assertions passed.');
