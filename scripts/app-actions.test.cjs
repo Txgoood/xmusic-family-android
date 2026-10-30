@@ -153,6 +153,44 @@ assert.ok(x.d.getElementById('history-items-wrapper').textContent.includes('Hen�
 assert.equal(x.d.getElementById('clear-all-history-btn').style.display,'none');checks+=2;
 x.dom.window.close();
 
+// Podcast keşfi: arama, eski yanıtı reddetme, takip, bölüm ve indirme.
+x=open('podcast_merkezi');
+assert.ok(x.d.querySelector('main h1').textContent.includes('Podcast'));checks++;
+const podcastInput=x.d.getElementById('xm-podcast-search');
+assert.ok(podcastInput);checks++;
+podcastInput.value='bilim';podcastInput.dispatchEvent(new x.w.Event('input',{bubbles:true}));
+podcastInput.closest('form').dispatchEvent(new x.w.Event('submit',{bubbles:true,cancelable:true}));
+let podcastCall=x.calls.filter(t=>t[0]==='searchPodcasts').at(-1);
+assert.equal(podcastCall[1],'bilim');checks++;
+const oldPodcastId=podcastCall[2];
+podcastInput.value='tarih';podcastInput.dispatchEvent(new x.w.Event('input',{bubbles:true}));
+x.w.__xmusicPodcastSearchResult(oldPodcastId,{items:[{title:'Eski sonuç',feed:'https://example.org/old'}]});
+assert.ok(!x.d.getElementById('xm-podcast-results').textContent.includes('Eski sonuç'));checks++;
+podcastInput.closest('form').dispatchEvent(new x.w.Event('submit',{bubbles:true,cancelable:true}));
+podcastCall=x.calls.filter(t=>t[0]==='searchPodcasts').at(-1);
+const pod={title:'Tarih Sohbetleri',artist:'Yayıncı',feed:'https://example.org/rss',artwork:'https://example.org/img.jpg',genre:'Tarih',episodeCount:5,url:'https://podcasts.apple.com/tr/podcast/id1'};
+x.w.__xmusicPodcastSearchResult(podcastCall[2],{items:[pod]});
+let podcastResults=x.d.getElementById('xm-podcast-results');
+assert.ok(podcastResults.textContent.includes('Tarih Sohbetleri'));checks++;
+[...podcastResults.querySelectorAll('button')].find(b=>b.textContent==='Takip Et').click();
+assert.ok(JSON.parse(db).feeds.some(f=>f.url===pod.feed));checks++;
+[...podcastResults.querySelectorAll('button')].find(b=>b.textContent==='Bölümleri Aç').click();
+assert.deepEqual(x.calls.at(-1),['navigateTo','podcast_program_ve_b_l_m_detay']);checks++;
+const podInfo=x.w.sessionStorage.getItem('xm-feed-info');x.dom.window.close();
+x=open('podcast_program_ve_b_l_m_detay',{'xm-feed':pod.feed,'xm-feed-info':podInfo});
+const rssCall=x.calls.find(t=>t[0]==='loadRss');
+assert.equal(rssCall[1],pod.feed);checks++;
+x.w.__xmusicRssResult(rssCall[2],{feed:pod.feed,title:'Tarih Sohbetleri',items:[{id:'podcast:test',title:'İlk bölüm',artist:'Tarih Sohbetleri',published:'2026',description:'Yeni bölüm'}]});
+assert.ok(x.d.querySelector('main').textContent.includes('Yeni bölüm'));checks++;
+[...x.d.querySelectorAll('button')].find(b=>b.textContent==='Oynat').click();
+assert.deepEqual(x.calls.at(-1),['playPodcast','podcast:test',false]);checks++;
+[...x.d.querySelectorAll('button')].find(b=>b.textContent==='İndir').click();
+assert.deepEqual(x.calls.at(-1),['downloadPodcast','podcast:test']);checks++;
+x.dom.window.close();
+x=open('podcast_merkezi');
+assert.ok(x.d.getElementById('xm-podcast-following').textContent.includes('Tarih Sohbetleri'));checks++;
+x.dom.window.close();
+
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
 if(process.env.XMUSIC_AUDIT_OUTPUT)fs.writeFileSync(process.env.XMUSIC_AUDIT_OUTPUT,JSON.stringify(report,null,2));
