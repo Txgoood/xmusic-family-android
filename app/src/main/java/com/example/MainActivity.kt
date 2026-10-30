@@ -630,6 +630,7 @@ class MainActivity : ComponentActivity() {
                           const summary=document.createElement('summary');
                           summary.className='p-4 font-label-lg text-label-lg text-on-surface cursor-pointer';
                           summary.textContent='Google hesap ve Drive ayarları';
+                          summary.dataset.xmOwned='true';summary.__xmOwnedRun=function(){details.open=!details.open;};
                           details.appendChild(summary);
                           [btn,library,upload,queue,automatic].forEach(function(item){
                             item.style.cssText='display:block;width:calc(100% - 32px);padding:14px;margin:8px 16px;text-align:left;border:1px solid #62796f;border-radius:12px;color:#e0e3e7;font:inherit;';
@@ -804,4 +805,5 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 }
+
 
