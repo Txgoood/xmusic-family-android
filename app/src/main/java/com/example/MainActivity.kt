@@ -15,13 +15,33 @@ class MainActivity : ComponentActivity() {
         androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
         try {
-            val data = result.data ?: throw IllegalStateException("Yetkilendirme iptal edildi")
-            val auth = com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this)
-                .getAuthorizationResultFromIntent(data)
-            receiveDriveAuthorization(auth)
-        } catch (_: Exception) {
-            android.widget.Toast.makeText(this, "Google Drive bağlantısı tamamlanamadı", android.widget.Toast.LENGTH_LONG).show()
+            val data = result.data
+            if (data == null) {
+                val detail = if (result.resultCode == android.app.Activity.RESULT_CANCELED)
+                    "Google hesap ekranı iptal edildi veya sonuç döndürmedi." else
+                    "Google hesap ekranı sonuç döndürmedi. Sonuç kodu: " + result.resultCode
+                showDriveError(detail)
+            } else {
+                val auth = com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this)
+                    .getAuthorizationResultFromIntent(data)
+                receiveDriveAuthorization(auth)
+            }
+        } catch (e: Exception) {
+            showDriveException("Yetkilendirme sonucu", e)
         }
+    }
+
+    private fun showDriveError(detail: String) {
+        android.app.AlertDialog.Builder(this).setTitle("Google Drive bağlantısı")
+            .setMessage(detail).setPositiveButton("Tamam", null).show()
+    }
+
+    private fun showDriveException(stage: String, error: Exception) {
+        val api = error as? com.google.android.gms.common.api.ApiException
+        val detail = if (api != null) "Google hata kodu: " + api.statusCode +
+            "\nDurum: " + (api.status.statusMessage ?: "Açıklama yok") else
+            "Hata türü: " + error.javaClass.simpleName
+        showDriveError(stage + "\n" + detail)
     }
 
     private fun receiveDriveAuthorization(result: com.google.android.gms.auth.api.identity.AuthorizationResult) {
@@ -42,8 +62,8 @@ class MainActivity : ComponentActivity() {
                     driveAuthLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(pending.intentSender).build())
                 } else android.widget.Toast.makeText(this, "Google hesap seçimi açılamadı", android.widget.Toast.LENGTH_LONG).show()
             } else receiveDriveAuthorization(result)
-        }.addOnFailureListener {
-            android.widget.Toast.makeText(this, "Google Drive izni alınamadı. Hesap ve uygulama yapılandırmasını kontrol et.", android.widget.Toast.LENGTH_LONG).show()
+        }.addOnFailureListener { error ->
+            showDriveException("Google izin isteği", error)
         }
     }
 
