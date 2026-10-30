@@ -273,6 +273,15 @@ assert.ok(x.d.querySelector('main').textContent.includes('İstanbul · 20°'));c
 const playingHome={ready:true,id:'experimental:leTDrileoGI',title:'Son Parça',artist:'Sanatçı',artwork:'https://i.ytimg.com/vi/leTDrileoGI/mqdefault.jpg',playing:true,position:42000,duration:180000,queue:[]};
 x.w.__xmusicPlayback(playingHome);
 assert.equal(JSON.parse(db).resume.position,42000);checks++;
+assert.equal(x.d.getElementById('xm-resume-percentage').textContent,'%23');
+x.w.__xmusicPlayback({...playingHome,position:90000});
+assert.equal(x.d.getElementById('xm-resume-percentage').textContent,'%50');
+x.w.__xmusicPlayback({...playingHome,position:180000});
+assert.equal(x.d.getElementById('xm-resume-percentage').textContent,'%100');
+x.w.__xmusicPlayback({...playingHome,duration:0});
+assert.equal(x.d.getElementById('xm-resume-percentage').textContent,'');
+x.w.__xmusicPlayback(playingHome);checks+=4;
+
 let homeRecent=[...x.d.querySelectorAll('main section')].find(s=>s.querySelector('h2')?.textContent.trim()==='Son Dinlenenler');
 assert.ok(homeRecent.textContent.includes('Son Parça'));
 assert.ok(homeRecent.querySelector('.grid').children.length<=6);checks+=2;
@@ -322,6 +331,7 @@ x.dom.window.close();
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
 if(process.env.XMUSIC_AUDIT_OUTPUT)fs.writeFileSync(process.env.XMUSIC_AUDIT_OUTPUT,JSON.stringify(report,null,2));
+
 
 
 
