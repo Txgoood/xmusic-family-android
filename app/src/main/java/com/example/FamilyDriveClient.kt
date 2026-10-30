@@ -44,7 +44,8 @@ open class FamilyDriveClient(private val context: Context) {
         try {
             val revision = store.nextRevision()
             val id = create(token, folder, "root", store.seal(store.signedPolicy(profiles.policy(store.familyId(), revision))))
-            store.finishCreate(id); store.revision(revision); sync(token)
+            store.finishCreate(id); store.revision(revision)
+            try { sync(token) } catch (_: Exception) { store.status("Aile oluşturuldu; ilk eşitleme bağlantı geldiğinde yeniden denenecek.") }
         } catch (e: Exception) { store.abortCreate(); throw e }
     }
     fun preview(token: String, invitation: JSONObject): JSONObject {
