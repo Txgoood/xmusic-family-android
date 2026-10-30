@@ -52,7 +52,15 @@ android {
     debug {
       // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
       // AI Studio.
-      signingConfig = signingConfigs.getByName("debug")
+      signingConfig = signingConfigs.getByName("debug").apply {
+        if (System.getenv("CI") == "true") {
+          storeFile = file(System.getenv("HOME") + "/.android/debug.keystore")
+          storeType = "PKCS12"
+          storePassword = "android"
+          keyAlias = "androiddebugkey"
+          keyPassword = "android"
+        }
+      }
     }
   }
   compileOptions {
