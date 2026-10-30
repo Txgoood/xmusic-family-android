@@ -83,7 +83,7 @@ x.d.querySelector('article [aria-label="Oynat"]').click();assert.deepEqual(x.cal
 x.d.querySelector('article [aria-label="İndir"]').click();assert.deepEqual(x.calls.at(-1),['downloadPodcast','podcast:one']);checks++;
 x.w.__xmusicRssResult(999,{title:'Eski yanıt',items:[]});assert.ok(!x.d.querySelector('main').textContent.includes('Eski yanıt'));checks++;
 x.dom.window.close();
-x=open('kitapl_m');x.w.__xmusicLocalImported({id:'local:content://test',title:'Kendi Kaydım',artist:'Yerel'});assert.ok(JSON.parse(db).local.some(t=>t.title==='Kendi Kaydım'));checks++;x.dom.window.close();
+x=open('kitapl_m');x.w.__xmusicLocalImported({id:'local:content://test',title:'Kendi Kaydım',artist:'Yerel'});assert.ok(JSON.parse(db).local.some(t=>t.title==='Kendi Kaydım'));assert.ok(x.d.getElementById('xm-library-tracks').textContent.includes('Kendi Kaydım'));assert.ok(x.d.querySelector('main h1').textContent.includes('Kitaplığım'));checks+=3;x.dom.window.close();
 // Keşfet regresyonu: gerçek filtre yönlendirmesi, yerleşim, eski yanıt ve çalma yolu.
 x=open('arama_ve_ke_fet');
 let searchTimers=[];
