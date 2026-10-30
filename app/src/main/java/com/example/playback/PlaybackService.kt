@@ -13,9 +13,29 @@ class PlaybackService : MediaSessionService() {
         private set
     var sleepAtEnd = false
         private set
-    private val stopPlayback = Runnable { player?.pause(); sleepDeadline = 0L; sleepAtEnd = false }
+    private var fadeEnabled = false
+    private var originalVolume: Float? = null
+    private fun restoreVolume() { originalVolume?.let { player?.volume = it }; originalVolume = null }
+    private val stopPlayback = Runnable { player?.pause(); sleepDeadline = 0L; sleepAtEnd = false; restoreVolume() }
+    private val fadeTicker = object : Runnable {
+        override fun run() {
+            val p = player
+            if (fadeEnabled && p != null && (sleepDeadline > 0L || sleepAtEnd)) {
+                val remaining = if (sleepAtEnd) {
+                    if (p.isPlaying && p.duration > 0) (p.duration - p.currentPosition).coerceAtLeast(0L) else Long.MAX_VALUE
+                } else (sleepDeadline - android.os.SystemClock.elapsedRealtime()).coerceAtLeast(0L)
+                if (remaining <= 30000L) {
+                    if (originalVolume == null) originalVolume = p.volume
+                    p.volume = (originalVolume!! * remaining / 30000f).coerceIn(0f, 1f)
+                } else restoreVolume()
+            }
+            timerHandler.postDelayed(this, 250L)
+        }
+    }
+    fun setSleepFade(enabled: Boolean) { fadeEnabled = enabled; if (!enabled) restoreVolume() }
     fun setSleepTimer(minutes: Int) {
         timerHandler.removeCallbacks(stopPlayback)
+        restoreVolume()
         sleepDeadline = 0L
         sleepAtEnd = minutes == -1
         if (minutes in 1..120) {
@@ -113,6 +133,7 @@ class PlaybackService : MediaSessionService() {
             }
         })
         timerHandler.post(resumeTicker)
+        timerHandler.post(fadeTicker)
         // Uygulamaya dönüş ve kilit ekranı aynı MediaSession'ı kullanır.
         val intent = android.content.Intent(this, com.example.MainActivity::class.java)
             .addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
@@ -126,6 +147,8 @@ class PlaybackService : MediaSessionService() {
     override fun onDestroy() {
         saveResume()
         timerHandler.removeCallbacks(resumeTicker)
+        timerHandler.removeCallbacks(fadeTicker)
+        restoreVolume()
         timerHandler.removeCallbacks(stopPlayback)
         activeService = null
         mediaSession?.release()
@@ -135,3 +158,4 @@ class PlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 }
+
