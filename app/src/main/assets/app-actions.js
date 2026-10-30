@@ -67,18 +67,116 @@
     main.replaceChildren();const panel=create('section',undefined,'xm-panel');panel.style.margin='16px';panel.append(create('h2',title));main.append(panel);return panel;
   }
   function renderLibrary() {
-    const panel=content('Kitaplığım');if(!panel)return;
-    panel.append(create('p','Bu cihazda kayıtlı içerikler'),button('Yeni Çalma Listesi Oluştur',newPlaylist),button('Yerel Dosyaları Aç',()=>A.openLocalAudio()));
-    const input=create('input',undefined,'xm-input');input.placeholder='Kitaplıkta ara';input.setAttribute('aria-label','Kitaplıkta ara');panel.append(input);
-    const listArea=create('div');panel.append(listArea);
-    function draw(){listArea.replaceChildren();const q=input.value.toLocaleLowerCase('tr');
-      [['Favoriler',library.favorites],['Yerel Dosyalar',library.local],['Dinleme Geçmişi',library.history]].forEach(([title,tracks])=>{
-        listArea.append(create('h3',title));const filtered=tracks.filter(t=>(t.title+' '+t.artist).toLocaleLowerCase('tr').includes(q));
-        if(!filtered.length)listArea.append(create('p','Kayıt yok.'));
-        filtered.forEach(t=>listArea.append(trackRow(t,row=>row.append(button('Listeye Ekle',()=>addToPlaylist(t)),button('Kaldır',()=>{const i=tracks.findIndex(x=>x.id===t.id);if(i>=0)tracks.splice(i,1);if(save())draw();})))));
+    const main=document.querySelector('main'),host=main?.firstElementChild;
+    if(!host||host.children.length<8)return;
+    const [top,filters,toolbar,pins,artists,playlists,local,shared]=Array.from(host.children);
+    // Aile senkronizasyonu ve sanatçı takibi henüz gerçek veri sağlamıyor.
+    const sync=top.querySelector('h1')?.nextElementSibling;if(sync)sync.style.display='none';
+    artists.style.display='none';shared.style.display='none';
+    if(pins.children[2])pins.children[2].style.display='none';
+    const sort=toolbar.querySelector('#sortDropdownBtn');if(sort)sort.style.display='none';
+    const listBtn=toolbar.querySelector('#viewListBtn'),gridBtn=toolbar.querySelector('#viewGridBtn');
+    if(listBtn)listBtn.style.display='none';if(gridBtn)gridBtn.style.display='none';
+    toolbar.style.display='none';
+    function own(el,fn){
+      if(!el)return;el.dataset.xmOwned='true';delete el.dataset.xmBlocked;el.removeAttribute('aria-disabled');el.disabled=false;el.querySelector('small')?.remove();el.__xmOwnedRun=fn;
+    }
+    function clickable(el,fn){
+      if(!el)return;el.setAttribute('role','button');el.tabIndex=0;
+      el.addEventListener('click',e=>{if(!e.target.closest('button'))fn();});
+      el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fn();}});
+    }
+    const favoriteCard=pins.children[0],downloadCard=pins.children[1];
+    const favoriteSub=favoriteCard?.querySelector('h2')?.parentElement?.nextElementSibling;
+    if(favoriteSub)favoriteSub.textContent=library.favorites.length+' şarkı';
+    const downloadSub=downloadCard?.querySelector('h2')?.nextElementSibling;
+    let downloads=[];try{downloads=JSON.parse(A.listDownloads()||'[]');}catch(_){}
+    if(downloadSub)downloadSub.textContent=downloads.filter(d=>d.status===8).length+' indirilmiş podcast bölümü';
+    const localSub=local.querySelector('h4')?.nextElementSibling;
+    if(localSub)localSub.textContent=library.local.length+' yerel kayıt';
+    const playlistTitle=playlists.querySelector('h3'),playlistHeader=playlistTitle?.parentElement?.parentElement;
+    // Template’in liste satırını kendi verilerimizle tekrar kullan.
+    const template=playlists.children[1]?.cloneNode(true);
+    Array.from(playlists.children).slice(1).forEach(n=>n.remove());
+    const rows=create('div');rows.id='xm-library-tracks';rows.className='px-4 flex flex-col gap-2';
+    pins.insertAdjacentElement('afterend',rows);
+    const searchInput=create('input',undefined,'xm-input');searchInput.placeholder='Kitaplıkta ara';
+    searchInput.setAttribute('aria-label','Kitaplıkta ara');searchInput.style.cssText='display:none;margin:4px 16px 12px;width:calc(100% - 32px);padding:12px;background:#1c2023;border-radius:14px;color:#e0e3e7;';
+    top.insertAdjacentElement('afterend',searchInput);
+    let filter='all',showFavorites=false;
+    function draw(){
+      const q=searchInput.value.trim().toLocaleLowerCase('tr');
+      pins.style.display=filter==='all'?'':'none';
+      local.style.display=(filter==='all'||filter==='local')?'':'none';
+      playlists.style.display=(filter==='all'||filter==='playlists')?'':'none';
+      rows.replaceChildren();
+      const lookup=t=>((t.title||'')+' '+(t.artist||'')).toLocaleLowerCase('tr').includes(q);
+      const sections=[];
+      if((filter==='all'&&(showFavorites||q))||filter==='favorites')sections.push(['Beğenilen Şarkılar',library.favorites]);
+      if(filter==='all'||filter==='local')sections.push(['Yerel Kayıtlar',library.local]);
+      if(filter==='all'&&(library.history.length||q))sections.push(['Dinleme Geçmişi',library.history]);
+      if(filter==='podcasts')sections.push(['Takip Edilen Podcastler',library.feeds]);
+      sections.forEach(([label,tracks])=>{
+        const matching=tracks.filter(t=>lookup(t));
+        if(!matching.length&&!q&&label!=='Beğenilen Şarkılar'&&filter!=='podcasts')return;
+        const section=create('section',undefined,'flex flex-col gap-2 pt-3');
+        section.append(create('h3',label,'font-headline-sm text-headline-sm text-on-surface'));
+        if(!matching.length)section.append(create('p','Henüz kayıt yok.','text-on-surface-variant'));
+        matching.forEach(t=>{
+          if(label==='Takip Edilen Podcastler'){
+            const row=button(t.title,()=>openFeed(t));row.className='w-full text-left p-3 rounded-xl bg-surface-container-low text-on-surface';section.append(row);return;
+          }
+          const row=trackRow(t,r=>r.append(button('Listeye Ekle',()=>addToPlaylist(t)),button('Kaldır',()=>{
+            const index=tracks.findIndex(x=>x.id===t.id);if(index>=0)tracks.splice(index,1);if(save())draw();
+          })));
+          row.className='flex items-center gap-2 flex-wrap p-3 rounded-xl bg-surface-container-low';section.append(row);
+        });
+        rows.append(section);
       });
-      listArea.append(create('h3','Çalma Listeleri'));library.playlists.filter(l=>l.name.toLocaleLowerCase('tr').includes(q)).forEach(l=>listArea.append(button(l.name+' ('+l.tracks.length+')',()=>{sessionStorage.setItem('xm-playlist',l.id);go('alma_listesi_y_netimi');})));
-    }input.addEventListener('input',draw);draw();
+      Array.from(playlists.children).slice(1).forEach(n=>n.remove());
+      const matches=library.playlists.filter(l=>(l.name||'').toLocaleLowerCase('tr').includes(q));
+      const heading=playlists.firstElementChild;
+      const badge=heading?.querySelector('span');if(badge)badge.textContent=matches.length+' Liste';
+      if(!matches.length){const empty=create('p','Henüz çalma listesi yok.','text-on-surface-variant');playlists.append(empty);}
+      matches.forEach(l=>{
+        if(!template)return;
+        const row=template.cloneNode(true),name=row.querySelector('p.font-headline-sm')||row.querySelector('p');
+        if(name)name.textContent=l.name;
+        const subtitle=name?.nextElementSibling;if(subtitle)subtitle.textContent=(l.tracks||[]).length+' parça';
+        const image=row.querySelector('img');const artwork=(l.tracks||[]).find(t=>t.artwork?.startsWith('https://'))?.artwork;
+        if(image){if(artwork)image.src=artwork;else image.removeAttribute('src');image.alt='';}
+        row.querySelectorAll('.absolute').forEach(n=>n.style.display='none');
+        const menu=row.querySelector('button');if(menu)own(menu,()=>{sessionStorage.setItem('xm-playlist',l.id);go('alma_listesi_y_netimi');});
+        clickable(row,()=>{sessionStorage.setItem('xm-playlist',l.id);go('alma_listesi_y_netimi');});
+        playlists.appendChild(row);
+      });
+    }
+    clickable(favoriteCard,()=>{filter='favorites';showFavorites=true;draw();});
+    own(favoriteCard?.querySelector('button'),()=>{filter='favorites';showFavorites=true;draw();});
+    clickable(downloadCard,()=>go('i_ndirme_y_neticisi'));
+    const localCard=local.firstElementChild;clickable(localCard,()=>{filter='local';draw();});
+    own(local.querySelector('[aria-label="Yerel Dosyaları Aç"]'),()=>A.openLocalAudio());
+    const chips=Array.from(filters.querySelectorAll('button'));
+    const modes=['all','playlists','downloads','artists','albums','podcasts','local'];
+    chips.forEach((chip,index)=>{
+      const mode=modes[index];if(mode==='artists'||mode==='albums'){chip.style.display='none';return;}
+      own(chip,()=>{
+        if(mode==='downloads'){go('i_ndirme_y_neticisi');return;}
+        filter=mode;showFavorites=false;
+        chips.forEach((b,i)=>{const active=i===index;b.classList.toggle('bg-primary',active);b.classList.toggle('text-on-primary',active);b.classList.toggle('bg-surface-container-high',!active);b.classList.toggle('text-on-surface-variant',!active);b.setAttribute('aria-pressed',String(active));});
+        draw();
+      });
+    });
+    own(document.getElementById('searchToggleBtn'),()=>{
+      searchInput.style.display=searchInput.style.display==='none'?'block':'none';if(searchInput.style.display==='block')searchInput.focus();
+      else {searchInput.value='';draw();}
+    });
+    searchInput.addEventListener('input',draw);
+    const nav=document.querySelector('nav');if(nav)nav.querySelectorAll('a[data-path]').forEach(a=>{
+      const active=a.dataset.path==='kitapligim';a.classList.toggle('text-primary',active);a.classList.toggle('font-bold',active);a.classList.toggle('text-on-surface-variant',!active);
+      if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');
+    });
+    draw();
   }
   function renderPlaylist() {
     const id=sessionStorage.getItem('xm-playlist');const list=library.playlists.find(l=>l.id===id);const panel=content('Çalma Listesi');if(!panel)return;
