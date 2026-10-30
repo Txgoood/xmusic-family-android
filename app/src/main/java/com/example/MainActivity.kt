@@ -21,6 +21,37 @@ class MainActivity : ComponentActivity() {
         if (uri != null) uploadLocalFileToDrive(uri)
     }
 
+    private var avatarTargetProfile: String? = null
+    private val avatarPicker = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri ->
+        val target = avatarTargetProfile
+        avatarTargetProfile = null
+        if (uri != null && target != null && target == ProfileStore(this).activeId()) {
+            try {
+                val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+                require(bounds.outWidth > 0 && bounds.outHeight > 0)
+                var sample = 1
+                while (bounds.outWidth / sample > 512 || bounds.outHeight / sample > 512) sample *= 2
+                val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+                val bitmap = contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, options) }
+                    ?: throw IllegalArgumentException("invalid image")
+                val bytes = java.io.ByteArrayOutputStream()
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 82, bytes)
+                bitmap.recycle()
+                val value = "data:image/jpeg;base64," + android.util.Base64.encodeToString(bytes.toByteArray(), android.util.Base64.NO_WRAP)
+                getSharedPreferences("xmusic_profile_avatars", MODE_PRIVATE).edit().putString(target, value).apply()
+                if (::appWebView.isInitialized) appWebView.evaluateJavascript("window.__xmusicRefreshAvatar && window.__xmusicRefreshAvatar()", null)
+                android.widget.Toast.makeText(this, "Profil fotoğrafı kaydedildi", 0).show()
+            } catch (_: Exception) { android.widget.Toast.makeText(this, "Fotoğraf açılamadı", 0).show() }
+        }
+    }
+    fun pickProfilePhoto() {
+        avatarTargetProfile = ProfileStore(this).activeId()
+        avatarPicker.launch("image/*")
+    }
+
     fun toggleAutomaticArchive() {
         val prefs = getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE)
         val enabled = !prefs.getBoolean("enabled", true)
@@ -805,5 +836,6 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 }
+
 
 
