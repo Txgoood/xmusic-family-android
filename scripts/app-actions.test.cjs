@@ -299,6 +299,10 @@ assert.equal(switches.length,3);
 assert.equal(switches[0].disabled,true);assert.equal(switches[1].disabled,false);assert.equal(switches[2].disabled,true);checks+=4;
 const automaticSync=[...x.d.querySelectorAll('details button')].find(b=>b.textContent==='Otomatik ortak arşiv bağlantısını aç');
 automaticSync.click();assert.deepEqual(x.calls.at(-1),['enableContinuousDrive']);checks++;
+const advancedDrive=[...x.d.querySelectorAll('summary')].find(n=>n.textContent==='Gelişmiş işlemler');
+assert.ok(advancedDrive);assert.equal(advancedDrive.parentElement.open,false);
+advancedDrive.click();assert.equal(advancedDrive.parentElement.open,true);
+advancedDrive.click();assert.equal(advancedDrive.parentElement.open,false);checks+=4;
 const musicAccess=[...x.d.querySelectorAll('details button')].find(b=>b.textContent==='Mevcut müziklere erişim ver');
 musicAccess.click();assert.deepEqual(x.calls.at(-1),['authorizeExistingDriveAudio']);checks++;
 const sharedFolder=[...x.d.querySelectorAll('details button')].find(b=>b.textContent==='Ortak müzik klasörünü seç / değiştir');
@@ -318,6 +322,7 @@ x.dom.window.close();
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
 if(process.env.XMUSIC_AUDIT_OUTPUT)fs.writeFileSync(process.env.XMUSIC_AUDIT_OUTPUT,JSON.stringify(report,null,2));
+
 
 
 
