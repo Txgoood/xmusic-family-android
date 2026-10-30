@@ -65,7 +65,14 @@ x=open('alma_listesi_y_netimi',{'xm-playlist':playlist.id});x.w.__xmusicPlayback
 [...x.d.querySelectorAll('button')].find(b=>b.textContent==='Çalan Parçayı Ekle').click();assert.equal(JSON.parse(db).playlists[0].tracks[0].id,state.id);checks++;
 [...x.d.querySelectorAll('button')].find(b=>b.textContent==='Dinle').click();assert.deepEqual(x.calls.at(-1),['resolveAudiusTrack','test123',false]);checks++;
 x.dom.window.close();
-x=open('uyku_zamanlay_c_s');x.d.querySelector('[data-minutes="15"]').click();x.d.getElementById('submit-timer-btn').click();assert.deepEqual(x.calls.at(-1),['setSleepTimer',15]);checks++;
+x=open('uyku_zamanlay_c_s');
+assert.equal(x.d.querySelector('header h1').textContent,'Uyku Zamanlayıcısı');
+assert.ok(!x.d.querySelector('main').textContent.includes('Boran’ın Odası'));
+x.w.__xmusicPlayback({...state,duration:120000,position:30000});
+assert.ok(x.d.getElementById('xm-timer-track').textContent.includes('Gerçek Parça'));
+assert.ok(x.d.getElementById('xm-timer-track-remaining').textContent.includes('1:30'));
+x.d.getElementById('toggle-fade').checked=true;checks+=4;
+x.d.querySelector('[data-minutes="15"]').click();x.d.getElementById('submit-timer-btn').click();assert.deepEqual(x.calls.at(-1),['setSleepTimer',15]);checks++;
 x.d.getElementById('cancel-timer-btn').click();assert.deepEqual(x.calls.at(-1),['setSleepTimer',0]);checks++;
 x.w.__xmusicPlayback({...state,sleepRemaining:60000});assert.ok(x.d.getElementById('xm-sleep-status').textContent.includes('1 dakika'));checks++;
 x.dom.window.close();
@@ -254,6 +261,11 @@ x.dom.window.close();
 
 // Ana sayfa: gerçek geçmiş, 6 kayıt, devam etme, iki kaynak seçkisi.
 x=open('ana_sayfa');
+assert.ok(!x.d.querySelector('main h1').textContent.includes('Burak'));
+assert.ok(!x.d.querySelector('main').textContent.includes('4/6'));
+assert.ok(x.calls.some(c=>c[0]==='fetchWeather'));checks+=3;
+x.w.__xmusicWeatherResult(1,{city:'İstanbul',temperature:20,code:61});
+assert.ok(x.d.querySelector('main').textContent.includes('İstanbul · 20°'));checks++;
 const playingHome={ready:true,id:'experimental:leTDrileoGI',title:'Son Parça',artist:'Sanatçı',artwork:'https://i.ytimg.com/vi/leTDrileoGI/mqdefault.jpg',playing:true,position:42000,duration:180000,queue:[]};
 x.w.__xmusicPlayback(playingHome);
 assert.equal(JSON.parse(db).resume.position,42000);checks++;
@@ -294,5 +306,6 @@ x.dom.window.close();
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
 if(process.env.XMUSIC_AUDIT_OUTPUT)fs.writeFileSync(process.env.XMUSIC_AUDIT_OUTPUT,JSON.stringify(report,null,2));
+
 
 
