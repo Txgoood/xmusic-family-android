@@ -56,6 +56,40 @@ class PlaybackService : MediaSessionService() {
     private var player: ExoPlayer? = null
     private var mediaSession: MediaSession? = null
     private var resumeProfileId: String? = null
+    var familyBlockMessage: String = ""
+        private set
+    private var checkingFamily = false
+    private var familyTickAt = 0L
+    private var listeningProfile: String? = null
+    private var wasPlaying = false
+    private fun checkFamilyPlayback(): Boolean {
+        val p = player ?: return false
+        if (checkingFamily || p.currentMediaItem == null) return true
+        val message = com.example.ProfileStore(this).playbackBlockReason(p.currentMediaItem!!.mediaId)
+        if (message != null) {
+            familyBlockMessage = message
+            checkingFamily = true
+            try { p.pause(); p.clearMediaItems() } finally { checkingFamily = false }
+            return false
+        }
+        familyBlockMessage = ""
+        return true
+    }
+    private fun accountListening() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        val store = com.example.ProfileStore(this)
+        val id = store.activeId()
+        if (wasPlaying && listeningProfile == id && familyTickAt > 0) store.recordListening(id, now - familyTickAt)
+        familyTickAt = now; listeningProfile = id; wasPlaying = player?.isPlaying == true
+    }
+    private val familyTicker = object : Runnable {
+        override fun run() {
+            accountListening()
+            checkFamilyPlayback()
+            timerHandler.postDelayed(this, 1000L)
+        }
+    }
+
 
     private fun saveResume() {
         val p = player ?: return
@@ -103,13 +137,15 @@ class PlaybackService : MediaSessionService() {
         player!!.addListener(object : androidx.media3.common.Player.Listener {
             private var countedItem = false
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                accountListening()
+                if (isPlaying && !checkFamilyPlayback()) return
                 if (!isPlaying) { saveResume(); return }
                 val item = player?.currentMediaItem ?: return
                 if (!countedItem) {
                     com.example.MusicListeningStats(this@PlaybackService).record(item.mediaId)
                     countedItem = true
                 }
-                if (item.mediaId.startsWith("experimental:")) {
+                if (item.mediaId.startsWith("experimental:") && !com.example.ProfileStore(this@PlaybackService).isChild()) {
                     com.example.data.drive.AutomaticDriveArchive.enqueue(
                         this@PlaybackService, item.mediaId.removePrefix("experimental:"),
                         item.mediaMetadata.title?.toString().orEmpty()
@@ -127,6 +163,7 @@ class PlaybackService : MediaSessionService() {
             override fun onMediaItemTransition(item: androidx.media3.common.MediaItem?, reason: Int) {
                 if (item != null) resumeProfileId = com.example.ProfileStore(this@PlaybackService).activeId()
                 countedItem = false
+                if (!checkFamilyPlayback()) return
                 if (sleepAtEnd && (reason == androidx.media3.common.Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
                     reason == androidx.media3.common.Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT)) stopPlayback.run()
             }
@@ -136,6 +173,7 @@ class PlaybackService : MediaSessionService() {
         })
         timerHandler.post(resumeTicker)
         timerHandler.post(fadeTicker)
+        timerHandler.post(familyTicker)
         // Uygulamaya dönüş ve kilit ekranı aynı MediaSession'ı kullanır.
         val intent = android.content.Intent(this, com.example.MainActivity::class.java)
             .addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
@@ -147,7 +185,9 @@ class PlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
 
     override fun onDestroy() {
+        accountListening()
         saveResume()
+        timerHandler.removeCallbacks(familyTicker)
         timerHandler.removeCallbacks(resumeTicker)
         timerHandler.removeCallbacks(fadeTicker)
         restoreVolume()
@@ -160,5 +200,6 @@ class PlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 }
+
 
 
