@@ -64,3 +64,6 @@ Durumları yalnız doğrulanan işin ardından güncelle.
 - Drive: Dosya yükleme istemcisi eklendi; kullanıcı yetkilendirmesi, indirme kuyruğu, hesap ve klasör seçimi, yeniden deneme ve cihaz testi henüz tamamlanmadı.
 
 - #66: Kullanıcı Google Drive bağlantısının tamamlanamadığını bildirdi. Hata kodu önceki sürümde gizlendi; OAuth ve imza yapılandırması doğrulanmış değil.
+
+- #67 OAuth: Kullanıcı Google Cloud Android OAuth kaydını ve Drive API etkinleştirmesini tamamladı; hesap izni başarıyla alındı.
+- Sonraki test: Uygulamanın kendi XMusic Family klasörünü bulma/oluşturma ve telefondan seçilmiş ses dosyasını yükleme. Ön planda çalışma, 250 MB sınırı. Mevcut farklı klasör seçimi, Drive oynatma, otomatik kaynak indirme henüz yok.
