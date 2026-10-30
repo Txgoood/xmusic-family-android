@@ -51,6 +51,8 @@ class PlaybackService : MediaSessionService() {
         experimentalHeaders[url] = headers
     }
 
+    fun audioSessionId(): Int = player?.audioSessionId ?: 0
+
     private var player: ExoPlayer? = null
     private var mediaSession: MediaSession? = null
     private var resumeProfileId: String? = null
@@ -158,4 +160,5 @@ class PlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 }
+
 
