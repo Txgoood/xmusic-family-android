@@ -5,13 +5,14 @@ const assets=process.env.XMUSIC_TEST_PAGES||path.join(root,'app/src/main/assets/
 const script=fs.readFileSync(path.join(root,'app/src/main/assets/app-actions.js'),'utf8');
 const player=fs.readFileSync(path.join(root,'app/src/main/assets/playback.js'),'utf8');
 const main=fs.readFileSync(path.join(root,'app/src/main/java/com/example/MainActivity.kt'),'utf8').split('evaluateJavascript("""')[1].split('""".trimIndent()')[0];
-let db='{}',checks=0,recentState=[],topState=[];const report=[];
+let db='{}',checks=0,recentState=[],topState=[],resumeOverride={};const report=[];
 function open(folder,session={}){
  const f=path.join(assets,fs.existsSync(path.join(assets,folder+'.html'))?folder+'.html':folder+'/code.html');
  const dom=new JSDOM(fs.readFileSync(f,'utf8'),{url:'https://local.test/stitch/'+folder+'/code.html',runScripts:'outside-only'});
  const w=dom.window,calls=[];
  w.Android=new Proxy({}, {get:(_,key)=>(...args)=>{calls.push([key,...args]);return false;}});
- w.AndroidActions=new Proxy({}, {get:(_,key)=>(...args)=>{calls.push([key,...args]);if(key==='topSearches')return JSON.stringify(topState);
+ w.AndroidActions=new Proxy({}, {get:(_,key)=>(...args)=>{calls.push([key,...args]);if(key==='loadPlaybackResume')return JSON.stringify(resumeOverride);
+ if(key==='topSearches')return JSON.stringify(topState);
  if(key==='recordSearch'){
   const query=args[0],key=query.toLocaleLowerCase('tr');let item=topState.find(x=>x.query.toLocaleLowerCase('tr')===key);
   if(!item){item={query,count:0};topState.push(item);}item.count++;topState.sort((a,b)=>b.count-a.count);return;
@@ -269,6 +270,11 @@ let resumeCard=[...x.d.querySelectorAll('main section')].find(s=>s.textContent.i
 resumeCard.click();
 assert.deepEqual(x.calls.at(-1),['resumeExperimentalSource','leTDrileoGI','Son Parça','Sanatçı',42000]);checks++;
 x.dom.window.close();
+resumeOverride={id:'experimental:leTDrileoGI',title:'Son Parça',artist:'Sanatçı',position:99000,duration:180000,updatedAt:Date.now()+1000};
+x=open('ana_sayfa');
+resumeCard=[...x.d.querySelectorAll('main section')].find(s=>s.textContent.includes('Kaldığın Yerden Devam Et')).children[1];
+resumeCard.click();assert.deepEqual(x.calls.at(-1),['resumeExperimentalSource','leTDrileoGI','Son Parça','Sanatçı',99000]);checks++;
+x.dom.window.close();resumeOverride={};
 x=open('ayarlar_ve_profil_y_netimi');
 const switches=[...x.d.querySelectorAll('main input[type="checkbox"]')];
 assert.equal(switches.length,4);
