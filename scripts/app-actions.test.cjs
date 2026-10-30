@@ -5,7 +5,7 @@ const assets=process.env.XMUSIC_TEST_PAGES||path.join(root,'app/src/main/assets/
 const script=fs.readFileSync(path.join(root,'app/src/main/assets/app-actions.js'),'utf8');
 const player=fs.readFileSync(path.join(root,'app/src/main/assets/playback.js'),'utf8');
 const main=fs.readFileSync(path.join(root,'app/src/main/java/com/example/MainActivity.kt'),'utf8').split('evaluateJavascript("""')[1].split('""".trimIndent()')[0];
-let db='{}',checks=0,recentState=[],topState=[],resumeOverride={},profileMock={},approvedMock=[],reviewMock={};const report=[];
+let db='{}',checks=0,recentState=[],topState=[],resumeOverride={},profileMock={},approvedMock=[],reviewMock={},familyMock={};const report=[];
 function open(folder,session={}){
  const f=path.join(assets,fs.existsSync(path.join(assets,folder+'.html'))?folder+'.html':folder+'/code.html');
  const dom=new JSDOM(fs.readFileSync(f,'utf8'),{url:'https://local.test/stitch/'+folder+'/code.html',runScripts:'outside-only'});
@@ -14,6 +14,9 @@ function open(folder,session={}){
  w.AndroidActions=new Proxy({}, {get:(_,key)=>(...args)=>{calls.push([key,...args]);if(key==='profileState')return JSON.stringify(profileMock);
  if(key==='childTracks')return JSON.stringify(approvedMock);
  if(key==='childReview')return JSON.stringify(reviewMock);
+ if(key==='familySyncState')return JSON.stringify(familyMock);
+ if(key==='familySharing')return false;
+ if(key==='setFamilySharing')return true;
  if(['requestChildReview','setChildAge','resolveChildReview','approveChildTrack'].includes(key))return true;
  if(key==='familyMix')return JSON.stringify(approvedMock);
  if(key==='loadPlaybackResume')return JSON.stringify(resumeOverride);
@@ -372,6 +375,29 @@ x.d.querySelector('input[aria-label="Ebeveyn PIN’i"]').value='1357';
 [...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Reddet').click();
 assert.deepEqual(x.calls.find(c=>c[0]==='resolveChildReview'),['resolveChildReview','kid','query:test',true,'1357']);checks+=3;
 x.dom.window.close();profileMock={};reviewMock={};
+
+// Bir defalık aile kurulumu ve katılan cihazda yönetici kısıtları.
+profileMock={active:'default',role:'admin',parentConfigured:true,profiles:[{id:'default',name:'Tolga',role:'admin'}]};
+x=open('aile_profili_se_imi');
+[...x.d.querySelectorAll('button')].find(b=>b.textContent==='Aile bağlantısı · Kurulum ve durum').click();
+assert.ok(x.d.querySelector('#xm-dialog').textContent.includes('aynı ortak müzik klasörünü'));
+[...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Bu telefonda aileyi oluştur').click();
+assert.deepEqual(x.calls.find(c=>c[0]==='familySetup'),['familySetup','create','']);checks+=2;
+x.d.querySelector('textarea[aria-label="Aile bağlantı kodu"]').value='XMF1.test';
+[...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Aileye katıl').click();
+assert.deepEqual(x.calls.filter(c=>c[0]==='familySetup').at(-1),['familySetup','join','XMF1.test']);checks++;x.dom.window.close();
+familyMock={enabled:true,owner:false,lastSync:123456789};
+x=open('aile_profili_se_imi');
+assert.ok(![...x.d.querySelectorAll('button')].some(b=>b.textContent==='Yeni Profil Ekle'));
+[...x.d.querySelectorAll('button')].find(b=>b.textContent==='Aile bağlantısı · Kurulum ve durum').click();
+assert.ok(![...x.d.querySelectorAll('#xm-dialog button')].some(b=>b.textContent==='Aile bağlantı kodunu kopyala'));
+const sharing=x.d.querySelector('input[aria-label="Bu profilin miks paylaşımı"]');sharing.checked=true;sharing.dispatchEvent(new x.w.Event('change'));
+assert.deepEqual(x.calls.find(c=>c[0]==='setFamilySharing'),['setFamilySharing',true]);checks+=3;x.dom.window.close();
+profileMock={active:'kid',role:'child',parentConfigured:true,profiles:[{id:'kid',name:'Can',role:'child'}]};
+approvedMock=[{id:'drive:audiofile123',title:'Drive çocuk kaydı'}];
+x=open('ana_sayfa');[...x.d.querySelectorAll('button')].find(b=>b.textContent==='Dinle').click();
+assert.deepEqual(x.calls.find(c=>c[0]==='resumeDriveTrack'),['resumeDriveTrack','audiofile123','Drive çocuk kaydı','',0]);checks++;x.dom.window.close();
+profileMock={};familyMock={};approvedMock=[];
 
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
