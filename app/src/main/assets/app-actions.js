@@ -279,7 +279,7 @@
         const row=create('div',undefined,'xm-row');row.append(create('strong',t.title+' — '+(t.artist||'')),create('p',t.reason));
         const candidate=candidates.find(x=>x.id===t.id)||approved.find(x=>x.id===t.id);
         if(candidate)row.append(button('Kaydı onayla',()=>{
-          if(A.approveChildTrack(profile.id,JSON.stringify(candidate),false,pin.value)&&A.resolveChildReview(profile.id,t.requestKey,false,pin.value)){row.remove();N.showToast('Onaylandı');}else N.showToast('PIN’i kontrol et.');
+          if(A.approveChildTrack(profile.id,JSON.stringify(candidate),false,pin.value)){row.remove();N.showToast('Onaylandı');}else N.showToast('PIN’i kontrol et.');
         }));
         else row.append(create('p','Bu bir şarkı isteği. Yetişkin profilinde doğru kaydı bulup dinle; ardından aşağıdan onayla.'));
         row.append(button('Reddet',()=>{if(A.resolveChildReview(profile.id,t.requestKey,true,pin.value)){row.remove();N.showToast('Reddedildi');}else N.showToast('PIN’i kontrol et.');}));panel.append(row);
