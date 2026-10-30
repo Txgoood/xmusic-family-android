@@ -568,9 +568,9 @@
     if(/Önbelleği Temizle|Temizle \(1.2 GB|1.2 GB Temizle/.test(label)){b.textContent='Web Önbelleğini Temizle';bind(b,'cache',()=>confirmAction('Web önbelleği temizlensin mi?',()=>A.clearWebCache()));return;}
     if(label==='Bağlı Cihaz'||/Cihaza Bağlan|Google Cast|Yansıt/.test(label)){b.textContent='Cihaz Ses Ayarları';bind(b,'audioSettings',()=>A.openSoundSettings());return;}
     if(/uyku sayacı|Uyku zamanlayıcısı/i.test(label)){bind(b,'sleepPage',()=>go('uyku_zamanlay_c_s'));return;}
-    if(b.id==='submit-timer-btn'){bind(b,'timer',()=>{A.setSleepTimer(timerMinutes);});return;}
+    if(b.id==='submit-timer-btn'){bind(b,'timer',()=>{A.setSleepFade(!!document.getElementById('toggle-fade')?.checked);A.setSleepTimer(timerMinutes);});return;}
     if(b.id==='cancel-timer-btn'){bind(b,'cancelTimer',()=>A.setSleepTimer(0));return;}
-    if(page==='uyku_zamanlay_c_s'&&/Dakika|Şarkı Bitiminde/.test(label)){bind(b,'timerOption',()=>{timerMinutes=label.includes('Şarkı Bitiminde')?-1:Number(label.match(/(\d+) Dakika/)[1]);const slider=document.getElementById('duration-slider');if(timerMinutes>0&&slider)slider.value=timerMinutes;const val=document.getElementById('custom-slider-val');if(val)val.textContent=timerMinutes<0?'Şarkı Sonu':timerMinutes+' dk';document.querySelectorAll('[data-minutes]').forEach(n=>n.setAttribute('aria-pressed',String(n===b)));N.showToast(timerMinutes<0?'Şarkı bitimi seçildi':'Seçildi: '+timerMinutes+' dakika');});return;}
+    if(page==='uyku_zamanlay_c_s'&&/Dakika|Şarkı Bitiminde/.test(label)){bind(b,'timerOption',()=>{timerMinutes=label.includes('Şarkı Bitiminde')?-1:Number(label.match(/(\d+) Dakika/)[1]);const slider=document.getElementById('duration-slider');if(timerMinutes>0&&slider)slider.value=timerMinutes;const val=document.getElementById('custom-slider-val');if(val)val.textContent=timerMinutes<0?'Şarkı Sonu':timerMinutes+' dk';document.querySelectorAll('[data-minutes]').forEach(n=>{const selected=n===b;n.setAttribute('aria-pressed',String(selected));n.classList.toggle('active-preset',selected);n.classList.toggle('bg-primary/15',selected);n.classList.toggle('ring-1',selected);n.classList.toggle('ring-primary/40',selected);n.classList.toggle('bg-surface-container',!selected);n.querySelector('.check-icon')?.classList.toggle('hidden',!selected);});N.showToast(timerMinutes<0?'Şarkı bitimi seçildi':'Seçildi: '+timerMinutes+' dakika');});return;}
     if(page==='imdi_al_yor'&&label==='Seçenekler'){bind(b,'more',more);return;}
     if(label==='Çalma Listesine Ekle'||label==='Listeye Ekle'){bind(b,'playlist',()=>addToPlaylist());return;}
     if(b.id==='search-mic-btn'){bind(b,'voice',()=>A.voiceSearch());return;}
@@ -795,6 +795,30 @@
 
 
   function initHome(){
+    const greeting=document.querySelector('main h1');
+    const profile=profileState(), person=profile.profiles?.find(p=>p.id===profile.active)?.name||'Ben';
+    const hour=new Date().getHours(), day=Math.floor(Date.now()/86400000);
+    const period=hour<5?'İyi geceler':hour<11?'Günaydın':hour<17?'İyi günler':hour<22?'İyi akşamlar':'İyi geceler';
+    if(greeting)greeting.textContent=period+', '+person;
+    const member=Array.from(document.querySelectorAll('main p')).find(p=>p.textContent.includes('4/6'));
+    if(member)member.textContent='Aktif profil · '+person;
+    if(greeting){
+      let city=localStorage.getItem('xm-weather-city')||'İstanbul', request=0;
+      const widget=create('div',undefined,'flex items-center gap-2 mt-1');
+      const weather=create('span','Hava durumu yükleniyor…','text-on-surface-variant');
+      const choose=button('Şehir değiştir',()=>modal('Hava durumu şehri',(panel,close)=>{
+        const input=create('input',undefined,'xm-input');input.value=city;input.maxLength=80;input.placeholder='Şehir adı';input.setAttribute('aria-label','Şehir adı');
+        panel.append(input,button('Kaydet',()=>{const value=input.value.trim();if(value.length<2){N.showToast('Şehir adı gir.');return;}city=value;localStorage.setItem('xm-weather-city',city);close();loadWeather();}));
+      }));choose.style.cssText='font-size:12px;color:#5cf187;background:transparent;border:0;';widget.append(weather,choose);greeting.parentElement.parentElement.append(widget);
+      window.__xmusicWeatherResult=(id,data)=>{
+        if(id!==request)return;
+        if(data.error){weather.textContent='Hava durumu alınamadı · '+city;return;}
+        const c=Number(data.code), phrases=c===0?['Güneşe bir şarkı eşlik etsin ☀️','Gökyüzü açık, müziğin sesi açık ☀️']:c<=3?['Bulutların arasından müzik geçsin ☁️','Bugünün havasına güzel bir ritim ☁️']:c>=95?['Dışarıda fırtına, içeride müzik ⛈️']:c>=71&&c<=86?['Kar tanelerine eşlik eden melodiler ❄️']:c>=51?['Yağmurun ritmine bir şarkı ekle 🌧️','Yağmura müzik yakışır 🌧️']:['Biraz müzik havayı değiştirir 🎵'];
+        weather.textContent=data.city+' · '+Math.round(data.temperature)+'° · '+phrases[day%phrases.length];
+      };
+      function loadWeather(){weather.textContent='Hava durumu yükleniyor…';N.fetchWeather(city,++request);}
+      loadWeather();
+    }
     try {
       const native=JSON.parse(A.loadPlaybackResume()||'{}');
       if(native.id && (!library.resume || (native.updatedAt||0)>(library.resume.updatedAt||0))){
@@ -930,12 +954,24 @@
   if(page==='alma_listesi_y_netimi')renderPlaylist();
   if(page==='oynatma_s_ras_queue')renderQueue();
   if(page==='uyku_zamanlay_c_s'){
-    const banner=document.getElementById('cancel-timer-btn')?.closest('.rounded-2xl');if(banner){banner.querySelectorAll('p,span').forEach(n=>{if(/25 dakika|Şu Anda Aktif|Bitiş saati/.test(n.textContent))n.textContent='';});}
-    const panel=create('p','Zamanlayıcı kapalı','xm-panel');panel.id='xm-sleep-status';document.querySelector('main')?.prepend(panel);
-    document.getElementById('duration-slider')?.addEventListener('input',e=>{timerMinutes=Number(e.target.value);});
-    ['toggle-fade','toggle-screen'].forEach(id=>{const input=document.getElementById(id);if(input){input.checked=false;input.disabled=true;input.title='Bu ek seçenek henüz bağlı değil';}});
+    const title=document.querySelector('header h1');if(title)title.textContent='Uyku Zamanlayıcısı';
+    const backdrop=document.querySelector('main .opacity-40');if(backdrop)backdrop.remove();
+    const family=Array.from(document.querySelectorAll('main p')).find(n=>n.textContent.includes('Boran’ın Odası'));family?.parentElement?.remove();
+    const desc=Array.from(document.querySelectorAll('main p')).find(n=>n.textContent.includes('kademeli olarak kısarak'));if(desc)desc.textContent='Müzik veya podcast seçtiğin süre sonunda durur.';
+    const banner=document.getElementById('cancel-timer-btn')?.closest('.rounded-2xl');
+    if(banner){const label=banner.querySelector('.flex.flex-col');if(label){label.replaceChildren();const status=create('p','Zamanlayıcı kapalı','font-headline-sm text-headline-sm text-on-surface');status.id='xm-sleep-status';label.append(status);}}
+    const track=Array.from(document.querySelectorAll('main p')).find(n=>n.textContent.includes('Şu an çalan:'));
+    if(track){track.textContent='Henüz parça seçilmedi';track.id='xm-timer-track';const remaining=track.nextElementSibling;if(remaining){remaining.id='xm-timer-track-remaining';remaining.textContent='';}}
+    const slider=document.getElementById('duration-slider');slider?.addEventListener('input',e=>{
+      timerMinutes=Number(e.target.value);const value=document.getElementById('custom-slider-val');if(value)value.textContent=timerMinutes+' dk';
+      document.querySelectorAll('[data-minutes]').forEach(n=>{const selected=n.dataset.minutes===String(timerMinutes);n.setAttribute('aria-pressed',String(selected));n.classList.toggle('active-preset',selected);n.classList.toggle('bg-primary/15',selected);n.classList.toggle('ring-1',selected);n.classList.toggle('ring-primary/40',selected);n.classList.toggle('bg-surface-container',!selected);n.querySelector('.check-icon')?.classList.toggle('hidden',!selected);});
+    });
+    const fade=document.getElementById('toggle-fade');if(fade)fade.checked=false;
+    const screen=document.getElementById('toggle-screen');if(screen){screen.checked=false;screen.disabled=true;screen.title='Ekran kilitleme henüz kullanılamıyor';const row=screen.closest('.flex.items-center.justify-between');if(row){const labels=row.querySelectorAll('span');labels.forEach(n=>{if(n.textContent.trim()==='Zamanlayıcı bittiğinde ekranı kilitle')n.textContent='Henüz kullanıma hazır değil';});}}
+    window.addEventListener('xmusic:playback',e=>{const v=e.detail,t=document.getElementById('xm-timer-track'),r=document.getElementById('xm-timer-track-remaining');if(t)t.textContent=v.id?'Şu an seçili: '+(v.title||'Parça'):'Henüz parça seçilmedi';if(r){const sec=Math.max(0,Math.ceil(((v.duration||0)-(v.position||0))/1000));r.textContent=v.id&&v.duration>0?'Kalan çalma süresi: '+Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0'):'';}});
   }
   if(page==='arama_ve_ke_fet')setTimeout(function seedSearch(){if(!window.__xmusicActionsInstalled){setTimeout(seedSearch,50);return;}const query=sessionStorage.getItem('xm-search');if(query!==null){sessionStorage.removeItem('xm-search');const input=document.getElementById('search-input');if(input){input.value=query;input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();}}},0);
   window.__xmusicActionsAudit=()=>Array.from(document.querySelectorAll('button,a')).filter(b=>!b.closest('#xmusic-live-search')).map(b=>({label:b.getAttribute('aria-label')||b.textContent.trim(),action:b.dataset.xmAction|| (b.dataset.xmOwned?'owned':null),blocked:b.dataset.xmBlocked||null}));
 })();
+
 
