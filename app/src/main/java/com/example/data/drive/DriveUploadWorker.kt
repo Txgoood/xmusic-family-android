@@ -48,7 +48,7 @@ class DriveUploadWorker(context: Context, params: WorkerParameters) : Worker(con
             } }
             val hash = digest.digest().joinToString("") { "%02x".format(it) }
             val (fileId, duplicate) = synchronized(archiveLock) {
-                val folder = client.getOrCreate(token)
+                val folder = client.getOrCreate(token, inputData.getString("folder").orEmpty())
                 val existing = client.findByHash(token, folder, hash)
                 Pair(existing ?: DriveUploadClient().upload(token, folder, file, name,
                     resolver.getType(uri) ?: "application/octet-stream", hash).id, existing != null)
@@ -70,7 +70,7 @@ class DriveUploadWorker(context: Context, params: WorkerParameters) : Worker(con
                 .digest((account + ":" + uri).toByteArray()).joinToString("") { "%02x".format(it) }
             val network = if (context.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE).getBoolean("download_unmetered_only", false)) NetworkType.UNMETERED else NetworkType.CONNECTED
             val request = OneTimeWorkRequestBuilder<DriveUploadWorker>()
-                .setInputData(workDataOf("uri" to uri.toString(), "account" to account))
+                .setInputData(workDataOf("uri" to uri.toString(), "account" to account, "folder" to context.getSharedPreferences("xmusic_drive_folders", Context.MODE_PRIVATE).getString(account, "").orEmpty()))
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(network).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .addTag("xmusic-drive-upload").build()
@@ -79,3 +79,4 @@ class DriveUploadWorker(context: Context, params: WorkerParameters) : Worker(con
         }
     }
 }
+
