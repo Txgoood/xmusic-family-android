@@ -8,7 +8,14 @@ import java.io.IOException
 
 /** Yalnızca uygulamanın oluşturduğu klasörü bulur veya oluşturur. */
 class DriveFolderClient {
-    fun getOrCreate(token: String): String {
+    fun getOrCreate(token: String, selectedFolder: String = ""): String {
+        if (selectedFolder.isNotEmpty()) {
+            require(selectedFolder.matches(Regex("[A-Za-z0-9_-]{1,200}")))
+            val info = request("https://www.googleapis.com/drive/v3/files/$selectedFolder?fields=id,name,mimeType,trashed,capabilities(canAddChildren)", token, null)
+            require(info.optString("mimeType") == "application/vnd.google-apps.folder" && !info.optBoolean("trashed")) { "Seçilen öğe erişilebilir bir klasör değil." }
+            require(info.optJSONObject("capabilities")?.optBoolean("canAddChildren") == true) { "Bu klasörde yükleme izni yok. Klasör sahibi seni Düzenleyici olarak eklemeli." }
+            return info.getString("id")
+        }
         require(token.isNotBlank() && !token.contains('\n') && !token.contains('\r'))
         val query = "trashed = false and mimeType = 'application/vnd.google-apps.folder' and appProperties has { key='xmusicRole' and value='musicLibrary' }"
         val endpoint = "https://www.googleapis.com/drive/v3/files?q=" + URLEncoder.encode(query, "UTF-8") +
@@ -85,3 +92,4 @@ class DriveFolderClient {
         } finally { conn.disconnect() }
     }
 }
+
