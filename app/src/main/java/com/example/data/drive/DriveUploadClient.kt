@@ -13,7 +13,7 @@ import java.net.URL
 class DriveUploadClient {
     data class UploadedFile(val id: String, val name: String)
 
-    fun upload(accessToken: String, folderId: String, file: File, displayName: String, mimeType: String, contentHash: String? = null, youtubeId: String? = null): UploadedFile {
+    fun upload(accessToken: String, folderId: String, file: File, displayName: String, mimeType: String, contentHash: String? = null, youtubeId: String? = null, onProgress: ((Long, Long) -> Unit)? = null): UploadedFile {
         require(accessToken.isNotBlank() && !accessToken.contains('\n') && !accessToken.contains('\r'))
         require(folderId.matches(Regex("[A-Za-z0-9_-]{1,200}")))
         require(file.isFile && file.length() > 0)
@@ -63,7 +63,19 @@ class DriveUploadClient {
             upload.setRequestProperty("Authorization", "Bearer " + accessToken)
             upload.setRequestProperty("Content-Type", mimeType)
             upload.setFixedLengthStreamingMode(file.length())
-            upload.outputStream.use { out -> file.inputStream().use { input -> input.copyTo(out) } }
+            val total = file.length()
+            onProgress?.invoke(0L, total)
+            upload.outputStream.use { out -> file.inputStream().use { input ->
+                val buffer = ByteArray(65536)
+                var sent = 0L
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    out.write(buffer, 0, count)
+                    sent += count
+                    onProgress?.invoke(sent, total)
+                }
+            } }
             val code = upload.responseCode
             if (code !in 200..299) throw IOException("Drive yüklemesi tamamlanamadı (HTTP $code)")
             val result = JSONObject(upload.inputStream.bufferedReader().use { it.readText() })
