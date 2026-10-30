@@ -8,11 +8,11 @@ import java.net.URL
 import java.net.URLEncoder
 
 /** Her cihaz yalnızca kendi dosyasını yazar; ortak ayar dosyasını kurucu imzalar. */
-class FamilyDriveClient(private val context: Context) {
+open class FamilyDriveClient(private val context: Context) {
     private val store = FamilySyncStore(context)
     private val profiles = ProfileStore(context)
     private fun valid(id: String): String { require(id.matches(Regex("[A-Za-z0-9_-]{1,200}"))); return id }
-    private fun request(url: String, token: String, method: String = "GET", body: String? = null, type: String = "application/json; charset=UTF-8"): String {
+    protected open fun request(url: String, token: String, method: String = "GET", body: String? = null, type: String = "application/json; charset=UTF-8"): String {
         val conn = URL(url).openConnection() as HttpURLConnection
         try {
             conn.connectTimeout = 12000; conn.readTimeout = 20000; conn.instanceFollowRedirects = false
@@ -58,7 +58,7 @@ class FamilyDriveClient(private val context: Context) {
         store.accept(invitation, account)
         profiles.applyPolicy(freshPolicy, profile); store.revision(freshPolicy.getLong("revision"))
         store.setSharing(profile, true)
-        sync(token)
+        try { sync(token) } catch (_: Exception) { store.status("Bağlandı; ilk eşitleme internet ve Drive izinleri geldiğinde yeniden denenecek.") }
     }
     fun sync(token: String): Boolean {
         require(store.enabled())
