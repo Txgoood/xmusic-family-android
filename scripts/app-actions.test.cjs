@@ -277,9 +277,10 @@ resumeCard.click();assert.deepEqual(x.calls.at(-1),['resumeExperimentalSource','
 x.dom.window.close();resumeOverride={};
 x=open('ayarlar_ve_profil_y_netimi');
 const switches=[...x.d.querySelectorAll('main input[type="checkbox"]')];
-assert.equal(switches.length,4);
-assert.equal(switches[0].disabled,true);assert.equal(switches[1].disabled,true);assert.equal(switches[3].disabled,true);checks+=4;
-switches[2].checked=true;switches[2].dispatchEvent(new x.w.Event('change',{bubbles:true}));
+assert.equal(switches.length,3);
+assert.equal(switches[0].disabled,true);assert.equal(switches[1].disabled,false);assert.equal(switches[2].disabled,true);checks+=4;
+assert.ok(x.d.querySelector('details summary').textContent.includes('Google hesap ve Drive'));checks++;
+switches[1].checked=true;switches[1].dispatchEvent(new x.w.Event('change',{bubbles:true}));
 assert.deepEqual(x.calls.at(-1),['setDownloadWifiOnly',true]);checks++;
 const profileSection=[...x.d.querySelectorAll('main section')].find(s=>s.querySelector('h2')?.textContent.includes('Aile Profilleri'));
 assert.equal(profileSection.querySelector('.grid').children.length,1);assert.ok(profileSection.querySelector('.grid').textContent.includes('Ben'));checks+=2;
@@ -288,3 +289,4 @@ x.dom.window.close();
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
 if(process.env.XMUSIC_AUDIT_OUTPUT)fs.writeFileSync(process.env.XMUSIC_AUDIT_OUTPUT,JSON.stringify(report,null,2));
+
