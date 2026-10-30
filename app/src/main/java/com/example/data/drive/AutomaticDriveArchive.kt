@@ -40,19 +40,47 @@ class AutomaticDriveArchive(context: Context, params: WorkerParameters) : Worker
                 val engine = YoutubeDL.getInstance()
                 engine.init(applicationContext)
                 FFmpeg.getInstance().init(applicationContext)
-                val request = YoutubeDLRequest("https://www.youtube.com/watch?v=$source")
-                request.addOption("--no-playlist")
-                request.addOption("--match-filter", "!is_live")
-                request.addOption("--extractor-args", "youtube:player_client=web_safari")
-                request.addOption("--socket-timeout", "15")
-                request.addOption("--retries", "1")
-                request.addOption("--fragment-retries", "1")
-                request.addOption("--max-filesize", "250M")
-                request.addOption("-f", "bestaudio/best")
-                request.addOption("-x")
-                request.addOption("--audio-format", "m4a")
-                request.addOption("-o", java.io.File(dir, "audio.%(ext)s").absolutePath)
-                engine.execute(request, id.toString()) { _, _, _ -> }
+                // Oynatıcıyla aynı iki yolu kullan: yalnız HLS, sonra varsayılan istemci.
+                // Tek bir istemciye sabitlenmek bazı kayıtlarda sadece resim biçimleri döndürür.
+                val failures = mutableListOf<String>()
+                var downloaded = false
+                for (hls in listOf(true, false)) {
+                    if (isStopped || !prefs.getBoolean("enabled", true)) return Result.failure()
+                    dir.deleteRecursively()
+                    check(dir.mkdirs()) { "Geçici ses klasörü oluşturulamadı." }
+                    try {
+                        val request = YoutubeDLRequest("https://www.youtube.com/watch?v=$source")
+                        request.addOption("--no-playlist")
+                        request.addOption("--match-filter", "!is_live")
+                        request.addOption("--socket-timeout", "15")
+                        request.addOption("--retries", "1")
+                        request.addOption("--fragment-retries", "1")
+                        request.addOption("--max-filesize", "250M")
+                        if (hls) {
+                            request.addOption("--extractor-args", "youtube:player_client=web_safari")
+                            request.addOption("-f", "bestaudio[protocol^=m3u8]/best[protocol^=m3u8]")
+                        } else {
+                            request.addOption("-f", "bestaudio/best")
+                        }
+                        request.addOption("-x")
+                        request.addOption("--audio-format", "m4a")
+                        request.addOption("-o", java.io.File(dir, "audio.%(ext)s").absolutePath)
+                        engine.execute(request, id.toString()) { _, _, _ -> }
+                        val output = java.io.File(dir, "audio.m4a")
+                        require(output.isFile && output.length() in 1..(250L * 1024 * 1024)) {
+                            "Ses dosyası hazırlanamadı."
+                        }
+                        downloaded = true
+                        break
+                    } catch (e: Exception) {
+                        if (isStopped) return Result.failure()
+                        val detail = (e.message ?: e.javaClass.simpleName)
+                            .replace(Regex("https?://\\S+"), "[bağlantı]")
+                            .replace(Regex("\\u001B\\[[0-9;]*m"), "").takeLast(220)
+                        failures.add((if (hls) "HLS" else "Varsayılan") + ": " + detail)
+                    }
+                }
+                check(downloaded) { failures.joinToString("\n") }
                 if (isStopped) return Result.failure()
                 val audio = java.io.File(dir, "audio.m4a")
                 require(audio.isFile && audio.length() in 1..(250L * 1024 * 1024)) { "Ses dosyası hazırlanamadı." }
