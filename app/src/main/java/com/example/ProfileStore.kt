@@ -209,8 +209,10 @@ class ProfileStore(private val context: Context) {
         val data = source.getString("data", if (from == "default") context.getSharedPreferences("xmusic_library", Context.MODE_PRIVATE).getString("data", "{}") else "{}") ?: "{}"
         // Kaynak kopya korunur; aynı isim farklı cihazlarda kimlik yerine kullanılmaz.
         if (!target.contains("data")) target.edit().putString("data", data).commit()
+        val resume = context.getSharedPreferences("xmusic_playback_resume", Context.MODE_PRIVATE)
+        if (!resume.contains(to)) resume.getString(from, null)?.let { resume.edit().putString(to, it).commit() }
         val avatars = context.getSharedPreferences("xmusic_profile_avatars", Context.MODE_PRIVATE)
-        avatars.getString(from, null)?.let { avatars.edit().putString(to, it).commit() }
+        avatars.getString(from, null)?.let { avatars.edit().putString(to, it).putLong("time_$to", avatars.getLong("time_$from", System.currentTimeMillis())).commit() }
     }
     internal fun makeGlobalIds() {
         val rows = records(); var active = activeId()
@@ -292,7 +294,11 @@ class ProfileStore(private val context: Context) {
             }
             shared.put(profile)
         }
-        return JSONObject().put("family", family).put("device", device).put("day", date()).put("updatedAt", System.currentTimeMillis()).put("profiles", shared).put("usage", usage).put("requests", requests)
+        val avatars = context.getSharedPreferences("xmusic_profile_avatars", Context.MODE_PRIVATE)
+        val value = avatars.getString(activeId(), "").orEmpty()
+        val avatar = JSONObject().put("profile", activeId()).put("value", if (value.length <= 200000) value else "")
+            .put("updatedAt", avatars.getLong("time_${activeId()}", 0L))
+        return JSONObject().put("family", family).put("device", device).put("day", date()).put("updatedAt", System.currentTimeMillis()).put("profiles", shared).put("usage", usage).put("requests", requests).put("avatar", avatar)
     }
     fun mixProfileIds(): List<String> { val rows = records(); return (0 until rows.length()).map { rows.getJSONObject(it) }.filter { it.getString("role") != "child" && FamilySyncStore(context).isSharing(it.getString("id"), it.optBoolean("mixEnabled", false)) }.map { it.getString("id") } }
 }
