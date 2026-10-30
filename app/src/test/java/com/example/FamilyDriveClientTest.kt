@@ -26,9 +26,10 @@ class FamilyDriveClientTest {
                     val id = "file" + (files.size + 1); files[id] = data; kinds[id] = metadata.getJSONObject("appProperties").getString("xmusicFamilyKind")
                     return JSONObject().put("id", id).toString()
                 }
-                if (url.contains("/files?q=")) return JSONObject().put("files", JSONArray().also { rows -> kinds.filterValues { it == "device" }.keys.forEach { rows.put(JSONObject().put("id", it)) } }).toString()
+                if (url.contains("/files?q=")) return JSONObject().put("files", JSONArray().also { rows -> kinds.filterValues { it == "device" }.keys.forEach { rows.put(JSONObject().put("id", it).put("modifiedTime", files[it].hashCode().toString())) } }).toString()
                 val id = url.substringAfter("/files/").substringBefore('?')
                 if (method == "PATCH") { require(files.containsKey(id)); files[id] = body!!; return JSONObject().put("id", id).toString() }
+                if (url.contains("fields=modifiedTime")) return JSONObject().put("modifiedTime", files[id].hashCode().toString()).toString()
                 return files[id] ?: error("not found")
             }
         }
