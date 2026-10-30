@@ -361,6 +361,56 @@ class MainActivity : ComponentActivity() {
                             b.style.cssText='padding:9px 12px;border:1px solid #3c4a3c;border-radius:18px;color:#4efd7d;font-size:13px;';
                             owned(b,run);return b;
                           }
+                          const recentItems=document.getElementById('history-items-wrapper');
+                          const clearRecent=document.getElementById('clear-all-history-btn');
+                          let recentSearches=[],recentTimer;
+                          function editRecent(action,query){
+                            try {
+                              const result=JSON.parse(window.AndroidActions.searchHistory(action,query||''));
+                              if(!Array.isArray(result))throw new Error('Geçmiş kaydedilemedi');
+                              recentSearches=result;drawRecent();
+                            }catch(_){
+                              if(action!=='read')window.Android.showToast('Arama geçmişi kaydedilemedi.');
+                            }
+                          }
+                          function rememberQuery(){
+                            if(state.view!=='search')return;
+                            const query=input.value.replace(/\s+/g,' ').trim();
+                            if(query.length>=2&&query.length<=100)editRecent('add',query);
+                          }
+                          function drawRecent(){
+                            if(!recentItems)return;
+                            recentItems.replaceChildren();
+                            if(clearRecent)clearRecent.style.display=recentSearches.length?'':'none';
+                            if(!recentSearches.length){
+                              const empty=document.createElement('span');
+                              empty.textContent='Henüz arama yapmadın.';
+                              empty.className='font-body-sm text-body-sm text-on-surface-variant py-2';
+                              recentItems.appendChild(empty);return;
+                            }
+                            recentSearches.forEach(function(query){
+                              const chip=document.createElement('div');
+                              chip.className='history-chip flex items-center gap-1.5 pl-3.5 pr-1.5 py-1.5 rounded-full bg-surface-container-low text-on-surface shadow-sm';
+                              chip.style.maxWidth='100%';
+                              const search=button(query,function(){
+                                state={filter:'all',view:'search',id:'',name:''};history=[];
+                                updateChips();input.value=query;
+                                input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();
+                              });
+                              search.setAttribute('aria-label',query+' yeniden ara');search.title=query;
+                              search.style.cssText='padding:2px 0;color:inherit;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+                              const remove=button('×',function(){editRecent('remove',query);});
+                              remove.setAttribute('aria-label','Kaldır '+query);
+                              remove.style.cssText='flex-shrink:0;width:28px;height:28px;color:#bbcbb8;border-radius:50%;font-size:22px;';
+                              chip.append(search,remove);recentItems.appendChild(chip);
+                            });
+                          }
+                          if(clearRecent)owned(clearRecent,function(){editRecent('clear','');});
+                          editRecent('read','');
+                          input.addEventListener('keydown',function(event){
+                            if(event.key==='Enter'){event.preventDefault();rememberQuery();input.blur();}
+                          });
+                          input.addEventListener('blur',rememberQuery);
                           function updateChips(){
                             document.querySelectorAll('.search-filter-chip').forEach(function(chip){
                               const selected=chip.dataset.filter===state.filter;
@@ -383,6 +433,7 @@ class MainActivity : ComponentActivity() {
                             });
                           });
                           function enter(view,id,name){
+                            rememberQuery();
                             history.push(Object.assign({},state));
                             state=Object.assign({},state,{view:view,id:id||'',name:name||''});
                             runSearch();
@@ -481,7 +532,7 @@ class MainActivity : ComponentActivity() {
                             }));
                           };
                           function runSearch(){
-                            clearTimeout(debounce);generation++;pending.clear();
+                            clearTimeout(debounce);clearTimeout(recentTimer);generation++;pending.clear();
                             const query=input.value.trim();
                             panel.style.display=query?'block':'none';
                             if(browse)browse.style.display=query?'none':'';
@@ -492,6 +543,10 @@ class MainActivity : ComponentActivity() {
                             debounce=setTimeout(function(){
                               if(epoch!==generation)return;
                               body.replaceChildren();
+                              // Yazım durakladığında son sorguyu kaydet; hızlı ara harfleri kaydetme.
+                              if(state.view==='search')recentTimer=setTimeout(function(){
+                                if(epoch===generation)rememberQuery();
+                              },1200);
                               if(state.view==='versions'){
                                 body.textContent='Kayıtlar aranıyor…';
                                 const request=++requestId;pending.set(request,{container:body,epoch:epoch});
