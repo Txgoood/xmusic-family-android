@@ -328,314 +328,194 @@ class MainActivity : ComponentActivity() {
                           icon.style.fontSize = '0';
                         }
                       });
-                      // Stitch arama ekranına gerçek Audius sonuçları ekle; HTML şablonunu koru.
+                      // Keşfet: Stitch arama çubuğu ve filtrelerini gerçek aramaya bağla.
                       if ((location.pathname || '').includes('/arama_ve_ke_fet/')) {
                         const input = document.getElementById('search-input');
-                        if (input && window.Android) {
+                        const shell = input && input.closest('section');
+                        if (shell && window.Android) {
                           const panel = document.createElement('section');
-                          panel.id = 'xmusic-live-search';
-                          panel.style.cssText = 'display:none;margin:8px 16px 18px;padding:12px;background:#181c1f;border-radius:16px;color:#e0e3e7;';
-                          const heading = document.createElement('h2');
-                          heading.textContent = 'Audius topluluk araması';
-                          heading.style.cssText = 'font-weight:700;font-size:16px;margin-bottom:6px;';
-                          const list = document.createElement('div');
-                          const disclaimer=document.createElement('p');
-                          disclaimer.textContent='Bu sonuçlar Audius kullanıcı yüklemeleridir; resmî sanatçı diskografisi veya doğrulanmış albümler değildir.';
-                          disclaimer.style.cssText='color:#b4c1c9;font-size:11px;line-height:1.4;margin-bottom:8px;';;
-                          panel.append(heading,disclaimer,list);
-                          const main = document.querySelector('main');
-                          if (main) main.insertBefore(panel,main.firstChild);
-                          let currentId = 0;
-                          let debounce;
-                          window.__xmusicSearchResult = function(id,payload) {
-                            if(id!==currentId)return;
-                            list.replaceChildren();
-                            if(payload.error){list.textContent=payload.error;return;}
-                            const entries=payload.items||[];
-                            if(!entries.length){list.textContent='Sonuç bulunamadı';return;}
-                            entries.forEach(function(item) {
-                              const line=document.createElement('div');
-                              line.style.cssText='display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid #313539;';
-                              if(item.artwork && item.artwork.startsWith('https://')){
-                                const img=document.createElement('img');img.src=item.artwork;
-                                img.style.cssText='width:48px;height:48px;object-fit:cover;border-radius:8px;';
-                                line.appendChild(img);
-                              }
-                              const caption=document.createElement('div');
-                              const name=document.createElement('strong');name.textContent=item.title||'İsimsiz parça';
-                              const artist=document.createElement('div');artist.textContent=item.artist||'Bilinmeyen sanatçı';artist.style.color='#bbcbb8';
-                              const access=document.createElement('small');access.textContent=item.playable?'Audius · Akış denenebilir':'Bu kayıt için oynatma erişimi yok';caption.append(name,artist,access);line.appendChild(caption);
-                              if(item.playable && item.id && /^[a-zA-Z0-9]{1,64}$/.test(item.id)){
-                                const play=document.createElement('button');play.type='button';
-                                play.textContent='▶ Dinle';play.setAttribute('aria-label',item.title+' oynat');
-                                play.style.cssText='margin-left:auto;flex-shrink:0;color:#9af0ba;border:1px solid #36584d;padding:8px;border-radius:12px;font-size:12px;';
-                                play.addEventListener('click',function(e){
-                                  e.stopPropagation();
-                                  window.Android.playAudiusTrack(item.id,item.title||'',item.artist||'');
-                                });
-                                line.appendChild(play);
-                                const queue=document.createElement('button');queue.type='button';queue.textContent='+ Sıraya';
-                                queue.style.cssText=play.style.cssText;
-                                queue.addEventListener('click',function(){window.Android.enqueueAudiusTrack(item.id);});
-                                line.appendChild(queue);
-                              }
-                              list.appendChild(line);
-                            });
-                          };
-                          // Sanatçı ve albüm/koleksiyon aramalarını mevcut arama paneline ekle.
-                          const categories = document.createElement('div');
-                          categories.style.cssText='display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;';
-                          const modes=[['tracks','Şarkılar'],['users','Sanatçılar'],['playlists','Kullanıcı listeleri']];
-                          let mode='tracks';
-                          const buttons=[];
-                          modes.forEach(function(pair){
-                            const btn=document.createElement('button');btn.textContent=pair[1];
-                            btn.type='button';btn.style.cssText='border:1px solid #5b6369;border-radius:18px;padding:7px 12px;color:white;';
-                            btn.addEventListener('click',function(){
-                              mode=pair[0];buttons.forEach(function(b){b.style.background=b===btn?'#36584d':'transparent';});
-                              runSearch();
-                            });
-                            categories.appendChild(btn);buttons.push(btn);
+                          panel.id='xmusic-live-search';
+                          panel.setAttribute('aria-label','Arama sonuçları');
+                          panel.style.cssText='display:none;margin:8px 16px 18px;padding:12px;background:#181c1f;border-radius:16px;color:#e0e3e7;';
+                          shell.insertAdjacentElement('afterend',panel);
+                          const browse=panel.nextElementSibling;
+                          shell.style.top=Math.ceil(document.querySelector('header')?.getBoundingClientRect().height||64)+'px';
+                          const nav=document.querySelector('nav');
+                          if(nav)nav.querySelectorAll('a[data-path]').forEach(function(a){
+                            const active=a.dataset.path==='kesfet-ara';
+                            a.classList.toggle('text-primary',active);
+                            a.classList.toggle('font-bold',active);
+                            a.classList.toggle('text-on-surface-variant',!active);
+                            if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');
                           });
-                          buttons[0].style.background='#36584d';
-                          panel.insertBefore(categories,list);
-                          const official=document.createElement('button');
-                          official.type='button';official.textContent='Doğrulanabilir sanatçı / albüm kataloğu';
-                          official.style.cssText='flex:1;padding:8px;border:1px solid #62796f;border-radius:10px;color:#e0e3e7;text-align:center;font-size:12px;';
-                          panel.insertBefore(official,list);
-                          const appleButton=document.createElement('button');
-                          appleButton.type='button';appleButton.textContent='Apple Türkiye müzik kataloğu';
-                          appleButton.style.cssText='flex:1;padding:8px;border:1px solid #62796f;border-radius:10px;color:#e0e3e7;text-align:center;font-size:12px;';
-                          panel.insertBefore(appleButton,official);
-                          // Kaynak anahtarları iki büyük satır yerine kompakt yatay sekmeler.
-                          const sourceRow=document.createElement('div');
-                          sourceRow.style.cssText='display:flex;gap:8px;margin:4px 0 8px;';
-                          const sourceAnchor=appleButton.parentNode;
-                          sourceAnchor.insertBefore(sourceRow,appleButton);
-                          sourceRow.append(appleButton,official);
-                          const experimentalButton=document.createElement('button');
-                          experimentalButton.type='button';experimentalButton.textContent='YouTube · Deneme';
-                          experimentalButton.style.cssText='flex:1;padding:8px;border:1px solid #62796f;border-radius:10px;color:#e0e3e7;font-size:12px;';
-                          sourceRow.appendChild(experimentalButton);
-                          let experimentalMode=false, experimentalQuery='', fromAlbum=false;
-                          experimentalButton.addEventListener('click',function(){
-                            experimentalMode=!experimentalMode;experimentalQuery='';fromAlbum=false;appleMode=false;verifiedMode=false;
-                            appleButton.style.background='transparent';official.style.background='transparent';
-                            experimentalButton.style.background=experimentalMode?'#36584d':'transparent';
-                            categories.style.display=experimentalMode?'none':'flex';
-                            heading.textContent=experimentalMode?'YouTube araması · Deneme':'Audius topluluk araması';
-                            disclaimer.textContent=experimentalMode?'Sonuçlar YouTube yüklemeleridir. Sürümü seçmeden önce başlığı ve yükleyeni kontrol et.':'Bu sonuçlar Audius kullanıcı yüklemeleridir.';
+                          const labels={all:'Tümü',songs:'Şarkılar',artists:'Sanatçılar',albums:'Albümler'};
+                          let state={filter:'all',view:'search',id:'',name:''};
+                          let history=[],generation=0,requestId=0,debounce;
+                          const pending=new Map();
+                          function owned(button,run){
+                            button.type='button';button.dataset.xmOwned='true';button.__xmOwnedRun=run;
+                            delete button.dataset.xmBlocked;
+                          }
+                          function button(text,run){
+                            const b=document.createElement('button');b.textContent=text;
+                            b.style.cssText='padding:9px 12px;border:1px solid #3c4a3c;border-radius:18px;color:#4efd7d;font-size:13px;';
+                            owned(b,run);return b;
+                          }
+                          function updateChips(){
+                            document.querySelectorAll('.search-filter-chip').forEach(function(chip){
+                              const selected=chip.dataset.filter===state.filter;
+                              chip.setAttribute('aria-pressed',String(selected));
+                              chip.classList.toggle('bg-primary',selected);chip.classList.toggle('text-on-primary',selected);
+                              chip.classList.toggle('shadow-sm',selected);
+                              chip.classList.toggle('bg-surface-container-high',!selected);
+                              chip.classList.toggle('text-on-surface-variant',!selected);
+                            });
+                          }
+                          function selectFilter(filter){
+                            state={filter:filter,view:'search',id:'',name:''};history=[];
+                            updateChips();runSearch();
+                          }
+                          document.querySelectorAll('.search-filter-chip').forEach(function(chip){
+                            const filter=chip.dataset.filter;
+                            if(labels[filter])owned(chip,function(){selectFilter(filter);});
+                            else if(filter==='playlists'||filter==='podcasts')owned(chip,function(){
+                              window.Android.navigateTo(filter==='playlists'?'kitapl_m':'podcast_merkezi');
+                            });
+                          });
+                          function enter(view,id,name){
+                            history.push(Object.assign({},state));
+                            state=Object.assign({},state,{view:view,id:id||'',name:name||''});
                             runSearch();
-                          });
-                          window.__xmusicExperimentalResult=function(id,payload){
-                            if(id!==currentId || !experimentalMode)return;
-                            list.replaceChildren();
-                            if(fromAlbum){
-                              const back=document.createElement('button');back.type='button';back.textContent='← Albüm şarkılarına dön';
-                              back.style.cssText='display:block;padding:9px;color:#9af0ba;';
-                              back.addEventListener('click',function(){
-                                fromAlbum=false;experimentalMode=false;experimentalQuery='';appleMode=true;
-                                experimentalButton.style.background='transparent';appleButton.style.background='#36584d';
-                                heading.textContent='Albüm şarkıları';runSearch();
-                              });list.appendChild(back);
-                            }
-                            if(payload.error){const error=document.createElement('p');error.textContent=payload.error;list.appendChild(error);return;}
-                            if(!(payload.items||[]).length){const empty=document.createElement('p');empty.textContent='Sonuç bulunamadı';list.appendChild(empty);return;}
-                            payload.items.forEach(function(item){
-                              const row=document.createElement('button');row.type='button';
-                              row.style.cssText='display:block;width:100%;text-align:left;padding:12px 4px;border-bottom:1px solid #313539;color:#e0e3e7;';
-                              const image=document.createElement('img');
-                              image.src='https://i.ytimg.com/vi/'+item.id+'/mqdefault.jpg';image.alt='';
-                              image.style.cssText='width:72px;height:48px;object-fit:cover;border-radius:8px;float:left;margin-right:12px;';
+                          }
+                          function renderFrame(){
+                            panel.replaceChildren();
+                            if(history.length)panel.appendChild(button('← Geri',function(){
+                              state=history.pop();updateChips();runSearch();
+                            }));
+                            const heading=document.createElement('h2');
+                            heading.textContent=state.view==='search'?'Arama sonuçları':state.view==='versions'?'Dinlenecek kaydı seç':state.name;
+                            heading.style.cssText='font-weight:700;font-size:17px;margin:8px 0 12px;';
+                            panel.appendChild(heading);
+                          }
+                          function requestCatalog(kind,id,container,epoch){
+                            const request=++requestId;
+                            pending.set(request,{kind:kind,container:container,epoch:epoch});
+                            window.Android.searchAppleCatalog(input.value.trim(),id,kind,request);
+                            setTimeout(function(){
+                              const entry=pending.get(request);
+                              if(entry && entry.epoch===generation){container.textContent='Arama yanıt vermedi. Yeniden dene.';pending.delete(request);}
+                            },16000);
+                          }
+                          function catalogRow(item,kind){
+                            const row=document.createElement('button');
+                            row.style.cssText='display:flex;gap:12px;align-items:center;text-align:left;width:100%;padding:12px 0;color:#e0e3e7;border-bottom:1px solid #313539;';
+                            if(item.artwork && item.artwork.startsWith('https://')){
+                              const image=document.createElement('img');image.src=item.artwork;image.alt='';image.loading='lazy';
+                              image.style.cssText='width:48px;height:48px;flex-shrink:0;object-fit:cover;border-radius:9px;';
                               row.appendChild(image);
-                              const name=document.createElement('strong');name.textContent=item.title||'İsimsiz';
-                              const artist=document.createElement('div');artist.textContent=item.artist||'Yükleyen bilinmiyor';artist.style.color='#b4c1c9';
-                              row.append(name,artist);
-                              row.addEventListener('click',function(){window.Android.playExperimentalSource(item.id,item.title||'',item.artist||'');});
-                              list.appendChild(row);
+                            }
+                            const text=document.createElement('div');text.style.minWidth='0';
+                            const title=document.createElement('strong');title.textContent=item.title||'İsimsiz';
+                            const sub=document.createElement('div');
+                            sub.textContent=(kind==='albums'?(item.category||'Albüm')+' · ':'')+(item.subtitle||'');
+                            sub.style.cssText='font-size:13px;color:#b4c1c9;margin-top:4px;';
+                            text.append(title,sub);row.appendChild(text);
+                            owned(row,function(){
+                              if(kind==='artists')enter('albums',item.id,item.title);
+                              else if(kind==='albums')enter('songs',item.id,item.title);
+                              else enter('versions','',((item.subtitle||'')+' '+(item.title||'')).trim());
                             });
-                            if(payload.limit===10 && payload.items.length===10){
-                              const more=document.createElement('button');
-                              more.type='button';more.textContent='Daha fazla sonuç';
-                              more.style.cssText='padding:12px;color:#9af0ba;';
-                              more.addEventListener('click',function(){
-                                more.disabled=true;more.textContent='Daha fazla sonuç aranıyor...';
-                                currentId+=1;
-                                window.Android.searchExperimentalSourceMore(experimentalQuery||input.value.trim(),currentId,30);
-                              });
-                              list.appendChild(more);
-                            }
-                          };
-                          let appleMode=true, appleId='', appleStage='artists', appleName='';
-                          categories.style.display='none';appleButton.style.background='#36584d';
-                          heading.textContent='Sanatçı ve albüm ara';
-                          disclaimer.textContent='Sanatçı seç, albümlerini ve şarkılarını gör.';
-                          let releaseFilter='Albüm';
-                          function showApple(id,payload){
-                            if(id!==currentId || !appleMode)return;
-                            list.replaceChildren();
-                            if(payload.error){list.textContent=payload.error;return;}
+                            return row;
+                          }
+                          window.__xmusicAppleResult=function(id,payload){
+                            const entry=pending.get(id);pending.delete(id);
+                            if(!entry || entry.epoch!==generation)return;
+                            const target=entry.container;target.replaceChildren();
+                            if(payload.error){target.textContent='Aramaya ulaşılamadı. İnternet bağlantısını kontrol edip yeniden dene.';return;}
                             const items=payload.items||[];
-                            if(!items.length){list.textContent='Apple Türkiye kataloğunda sonuç bulunamadı';return;}
-                            if(appleStage!=='artists'){
-                              const back=document.createElement('button');
-                              back.type='button';back.textContent='← Geri';
-                              back.style.cssText='display:block;padding:9px;color:#9af0ba;';
-                              back.addEventListener('click',function(){
-                                if(appleStage==='songs'){appleStage='albums';appleId=window.__appleArtistId||'';}
-                                else {appleStage='artists';appleId='';}
-                                runSearch();
-                              });list.appendChild(back);
+                            if(!items.length){target.textContent='Sonuç bulunamadı.';return;}
+                            let release='Tümü';
+                            const rows=document.createElement('div');
+                            function draw(){
+                              rows.replaceChildren();
+                              const visible=items.filter(function(item){return release==='Tümü'||item.category===release;});
+                              const preview=state.view==='search'&&state.filter==='all';
+                              visible.slice(0,preview?6:visible.length).forEach(function(item){rows.appendChild(catalogRow(item,entry.kind));});
+                              if(!visible.length)rows.textContent='Bu türde kayıt bulunamadı.';
+                              if(preview && visible.length>6)rows.appendChild(button('Tümünü gör',function(){selectFilter(entry.kind);}));
                             }
-                            if(appleStage==='albums'){
-                              const counts={};
-                              items.forEach(function(item){const c=item.category||'Albüm';counts[c]=(counts[c]||0)+1;});
-                              const summary=document.createElement('div');
-                              summary.textContent=Object.keys(counts).map(function(k){return k+': '+counts[k];}).join('  ·  ');
-                              summary.style.cssText='color:#9af0ba;font-size:12px;padding:6px 0 10px;';
-                              list.appendChild(summary);
+                            if(entry.kind==='albums'&&state.view==='albums'){
                               const filters=document.createElement('div');
-                              filters.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;';
-                              ['Albüm','EP','Single','Tümü'].forEach(function(category){
-                                const chip=document.createElement('button');
-                                chip.type='button';chip.textContent=category+' ('+(category==='Tümü'?items.length:(counts[category]||0))+')';
-                                chip.style.cssText='border-radius:16px;padding:7px 11px;font-size:12px;border:1px solid #62796f;color:#e0e3e7;background:'+(releaseFilter===category?'#36584d':'transparent');
-                                chip.addEventListener('click',function(){releaseFilter=category;showApple(id,payload);});
-                                filters.appendChild(chip);
-                              });
-                              list.appendChild(filters);
-                              items.sort(function(a,b){
-                                const order={'Albüm':0,'EP':1,'Single':2};
-                                return (order[a.category]??3)-(order[b.category]??3);
-                              });
+                              filters.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;';
+                              ['Tümü','Albüm','EP','Single'].forEach(function(category){
+                                const count=items.filter(function(item){return category==='Tümü'||item.category===category;}).length;
+                                const chip=button(category+' ('+count+')',function(){
+                                  release=category;
+                                  Array.from(filters.children).forEach(function(b){b.setAttribute('aria-pressed',String(b===chip));b.style.background=b===chip?'#36584d':'transparent';});
+                                  draw();
+                                });
+                                chip.setAttribute('aria-pressed',String(category===release));
+                                chip.style.background=category===release?'#36584d':'transparent';filters.appendChild(chip);
+                              });target.appendChild(filters);
                             }
-                            items.forEach(function(item){
-                              if(appleStage==='albums' && releaseFilter!=='Tümü' && item.category!==releaseFilter)return;
-                              const row=document.createElement('button');
-                              row.type='button';row.style.cssText='display:flex;gap:12px;align-items:center;text-align:left;width:100%;padding:10px 0;color:#e0e3e7;border-bottom:1px solid #313539;';
-                              if(item.artwork && item.artwork.startsWith('https://')){
-                                const img=document.createElement('img');img.src=item.artwork;
-                                img.style.cssText='width:48px;height:48px;object-fit:cover;border-radius:8px;';
-                                row.appendChild(img);
-                              }
-                              const cell=document.createElement('div');
-                              const title=document.createElement('strong');title.textContent=item.title||'İsimsiz';
-                              const sub=document.createElement('div');sub.textContent=(appleStage==='albums'?((item.category||'Albüm')+' · '):appleStage==='songs'?'Yalnızca katalog · ':'')+(item.subtitle||'');sub.style.cssText='color:#b4c1c9;font-size:13px;';
-                              cell.append(title,sub);row.appendChild(cell);
-                              row.addEventListener('click',function(){
-                                if(appleStage==='artists'){
-                                  appleId=item.id;window.__appleArtistId=item.id;appleName=item.title;
-                                  appleStage='albums';runSearch();
-                                }else if(appleStage==='albums'){
-                                  appleId=item.id;appleStage='songs';runSearch();
-                                }else{
-                                  // Katalog kaydını ses kaynağı sanma; olası sürümler arasından kullanıcı seçsin.
-                                  experimentalQuery=(appleName+' '+(item.title||'')).trim();
-                                  fromAlbum=true;appleMode=false;experimentalMode=true;
-                                  appleButton.style.background='transparent';experimentalButton.style.background='#36584d';
-                                  heading.textContent='Şarkı için YouTube sonuçları';
-                                  disclaimer.textContent='Doğru sürümü ve yükleyeni kontrol ederek seç.';
-                                  runSearch();
-                                }
-                              });
-                              list.appendChild(row);
-                            });
-                          }
-                          window.__xmusicAppleResult=showApple;
-                          appleButton.addEventListener('click',function(){
-                            experimentalMode=false;experimentalButton.style.background='transparent';
-                            appleMode=!appleMode;appleStage='artists';appleId='';
-                            if(appleMode){verifiedMode=false;official.style.background='transparent';}
-                            appleButton.style.background=appleMode?'#36584d':'transparent';
-                            categories.style.display=appleMode?'none':'flex';
-                            heading.textContent=appleMode?'Apple Türkiye sanatçı ve albüm kataloğu':'Audius topluluk araması';
-                            disclaimer.textContent=appleMode?
-                              'Sanatçı → albüm → şarkı listesi. Apple kayıt bilgileri gösterilir; tam şarkı oynatma bu katalogdan yapılmaz.':
-                              'Bu sonuçlar Audius kullanıcı yüklemeleridir; resmî sanatçı diskografisi veya doğrulanmış albümler değildir.';
-                            runSearch();
-                          });
-                          let verifiedMode=false;
-                          let selectedArtist='';
-                          function showVerified(payload,id) {
-                            if(id!==currentId || !verifiedMode)return;
-                            list.replaceChildren();
-                            if(payload.error){list.textContent=payload.error;return;}
-                            const items=payload.items||[];
-                            if(!items.length){list.textContent='Katalogda sonuç bulunamadı';return;}
-                            if(selectedArtist){
-                              const back=document.createElement('button');
-                              back.textContent='← Sanatçılara dön';
-                              back.style.cssText='padding:8px;color:#9af0ba;';
-                              back.addEventListener('click',function(){selectedArtist='';runSearch();});
-                              list.appendChild(back);
-                            }
-                            items.forEach(function(item){
-                              const row=document.createElement('button');
-                              row.type='button';row.style.cssText='display:block;width:100%;text-align:left;padding:12px 4px;border-bottom:1px solid #313539;color:#e0e3e7;';
-                              const title=document.createElement('strong');title.textContent=item.title;
-                              const desc=document.createElement('div');desc.textContent=item.subtitle||'';
-                              desc.style.cssText='color:#b4c1c9;font-size:13px;margin-top:4px;';
-                              row.append(title,desc);
-                              if(!selectedArtist){
-                                row.addEventListener('click',function(){selectedArtist=item.id;runSearch();});
-                              }else{row.disabled=true;}
-                              list.appendChild(row);
-                            });
-                          }
-                          window.__xmusicVerifiedCatalog=showVerified;
-                          official.addEventListener('click',function(){
-                            experimentalMode=false;experimentalButton.style.background='transparent';
-                            verifiedMode=!verifiedMode;selectedArtist='';appleMode=false;appleButton.style.background='transparent';
-                            official.style.background=verifiedMode?'#36584d':'transparent';
-                            categories.style.display=verifiedMode?'none':'flex';
-                            heading.textContent=verifiedMode?'MusicBrainz sanatçı ve albümleri':'Audius topluluk araması';
-                            disclaimer.textContent=verifiedMode?
-                              'Sanatçı seçip kayıtlı albümlerini görebilirsin. Bu yalnızca katalog bilgisidir; ses dosyası veya oynatma hakkı içermez.':
-                              'Bu sonuçlar Audius kullanıcı yüklemeleridir; resmî sanatçı diskografisi veya doğrulanmış albümler değildir.';
-                            runSearch();
-                          });
-
-                          const renderCatalog=function(id,type,payload){
-                            if(id!==currentId || type!==mode)return;
-                            list.replaceChildren();
-                            if(payload.error){list.textContent=payload.error;return;}
-                            const entries=payload.items||[];
-                            if(!entries.length){list.textContent='Sonuç bulunamadı';return;}
-                            entries.forEach(function(item){
-                              const line=document.createElement('div');
-                              line.style.cssText='display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #313539;';
-                              if(item.artwork && item.artwork.startsWith('https://')){
-                                const img=document.createElement('img');img.src=item.artwork;
-                                img.style.cssText='width:48px;height:48px;object-fit:cover;border-radius:8px;';
-                                line.appendChild(img);
-                              }
-                              const info=document.createElement('div');
-                              const title=document.createElement('strong');title.textContent=item.title||'İsimsiz';
-                              const sub=document.createElement('div');sub.textContent=item.artist||'';sub.style.color='#b4c1c9';
-                              info.append(title,sub);line.appendChild(info);list.appendChild(line);
-                            });
+                            target.appendChild(rows);draw();
                           };
-                          window.__xmusicCatalogResult=renderCatalog;
+                          window.__xmusicExperimentalResult=function(id,payload){
+                            const entry=pending.get(id);pending.delete(id);
+                            if(!entry || entry.epoch!==generation || state.view!=='versions')return;
+                            const target=entry.container;target.replaceChildren();
+                            if(payload.error){target.textContent=payload.error;return;}
+                            const items=payload.items||[];
+                            if(!items.length){target.textContent='Dinlenebilir kayıt bulunamadı.';return;}
+                            const hint=document.createElement('p');hint.textContent='Dinlemek istediğin sürümü ve yükleyeni kontrol ederek seç.';
+                            hint.style.cssText='font-size:12px;color:#b4c1c9;margin-bottom:8px;';target.appendChild(hint);
+                            items.forEach(function(item){
+                              const row=catalogRow({title:item.title,subtitle:item.artist,artwork:'https://i.ytimg.com/vi/'+item.id+'/mqdefault.jpg'},'songs');
+                              owned(row,function(){window.Android.playExperimentalSource(item.id,item.title||'',item.artist||'');});
+                              target.appendChild(row);
+                            });
+                            if(payload.limit===10&&items.length===10)target.appendChild(button('Daha fazla sonuç',function(){
+                              target.textContent='Aranıyor…';
+                              const request=++requestId;pending.set(request,{container:target,epoch:generation});
+                              window.Android.searchExperimentalSourceMore(state.name,request,30);
+                            }));
+                          };
                           function runSearch(){
-                            clearTimeout(debounce);currentId+=1;
-                            const id=currentId;const q=input.value.trim();
-                            if(!q){panel.style.display='none';return;}
-                            panel.style.display='block';list.textContent='Aranıyor...';
+                            clearTimeout(debounce);generation++;pending.clear();
+                            const query=input.value.trim();
+                            panel.style.display=query?'block':'none';
+                            if(browse)browse.style.display=query?'none':'';
+                            if(!query){panel.replaceChildren();return;}
+                            renderFrame();
+                            const epoch=generation;
+                            const body=document.createElement('div');body.textContent='Aranıyor…';panel.appendChild(body);
                             debounce=setTimeout(function(){
-                              if(verifiedMode){
-                                setTimeout(function(){if(verifiedMode && id===currentId && list.textContent==='Aranıyor...'){list.textContent='Katalog yanıt vermedi. Aramayı yeniden dene.';}},16000);
+                              if(epoch!==generation)return;
+                              body.replaceChildren();
+                              if(state.view==='versions'){
+                                body.textContent='Kayıtlar aranıyor…';
+                                const request=++requestId;pending.set(request,{container:body,epoch:epoch});
+                                window.Android.searchExperimentalSource(state.name,request);return;
                               }
-                              if(experimentalMode)window.Android.searchExperimentalSource(experimentalQuery||q,id);
-                              else if(appleMode)window.Android.searchAppleCatalog(q,appleId,appleStage,id);
-                              else if(verifiedMode)window.Android.searchVerifiedCatalog(q,selectedArtist,id);
-                              else if(mode==='tracks')window.Android.searchMusic(q,id);
-                              else window.Android.searchAudiusCatalog(q,mode,id);
+                              const kinds=state.view==='search'?(state.filter==='all'?['artists','albums','songs']:[state.filter]):[state.view];
+                              kinds.forEach(function(kind){
+                                const group=document.createElement('div');group.style.marginBottom='16px';
+                                if(kinds.length>1){
+                                  const h=document.createElement('h3');h.textContent=labels[kind];h.style.cssText='font-weight:600;color:#4efd7d;margin-bottom:6px;';group.appendChild(h);
+                                }
+                                const results=document.createElement('div');results.textContent='Aranıyor…';group.appendChild(results);body.appendChild(group);
+                                requestCatalog(kind,state.view==='search'?'':state.id,results,epoch);
+                              });
                             },350);
                           }
-                          input.addEventListener('input',function() {
-                            experimentalQuery='';fromAlbum=false;
-                            runSearch();
+                          input.addEventListener('input',function(){
+                            state=Object.assign({},state,{view:'search',id:'',name:''});history=[];runSearch();
                           });
+                          const clear=document.getElementById('search-clear-btn');
+                          if(clear)owned(clear,function(){
+                            input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();
+                          });
+                          updateChips();
                         }
                       }
                       if ((location.pathname || '').includes('/ayarlar_ve_profil_y_netimi/')) {
