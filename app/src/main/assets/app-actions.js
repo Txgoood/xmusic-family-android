@@ -203,6 +203,35 @@
     (state.queue||[]).forEach((t,i)=>{const row=create('div',undefined,'xm-row');row.append(create('span',(i===state.index?'▶ ':'')+t.title+' — '+t.artist),button('Oynat',()=>A.queueAction('play',i,0)),button('↑',()=>A.queueAction('move',i,i-1)),button('↓',()=>A.queueAction('move',i,i+1)),button('Kaldır',()=>A.queueAction('remove',i,0)));panel.append(row);});
   }
   function profileState(){try{return JSON.parse(A.profileState()||'{}');}catch(_){return {};}}
+  function familySyncState(){try{return JSON.parse(A.familySyncState?.()||'{}')||{};}catch(_){return {};}}
+  function canManageFamily(){const f=familySyncState();return profileState().role==='admin'&&(!f.enabled||f.owner);}
+  function familyConnection(){modal('Aile bağlantısı · Kurulum',(panel)=>{
+    const data=profileState(),family=familySyncState();
+    if(family.enabled){
+      panel.append(create('strong',family.owner?'Bu telefon aile kurucusu':'Bu telefon aileye bağlı'));
+      panel.append(create('p',family.lastSync?'Son eşitleme: '+new Date(family.lastSync).toLocaleString('tr-TR'):'İlk eşitleme bekleniyor.'));
+      if(family.error)panel.append(create('p',family.error));
+      panel.append(create('p','İki telefonda aynı ortak Drive klasörü ve Otomatik ortak arşiv bağlantısı açık olmalı. Uygulama açıkken yaklaşık bir dakikada yenilenir; kapalıyken anlık bildirim gelmez. İnternet yokken son alınan kurallar kullanılır.'));
+      if(data.role!=='child'){
+        const share=create('input');share.type='checkbox';share.checked=!!A.familySharing();share.setAttribute('aria-label','Bu profilin miks paylaşımı');
+        const label=create('label',' Bu profildeki beğeni ve son dinlemelerimi aile miksine kat');label.prepend(share);panel.append(label);
+        share.addEventListener('change',()=>N.showToast(A.setFamilySharing(share.checked)?'Miks paylaşımı kaydedildi':'Kaydedilemedi'));
+        panel.append(button('Şimdi eşitle',()=>A.familySetup('sync','')));
+        if(family.owner&&canManageFamily())panel.append(button('Aile bağlantı kodunu kopyala',()=>A.copyFamilyInvitation()));
+      }
+      panel.append(create('p',family.owner?'Fatma ve çocuk profillerini buradan ekleyip düzenleyebilirsin. Çocuk istekleri Onaylı içerikleri yönet bölümüne gelir.':'Profil ekleme, roller, çocuk onayları ve süre sınırları aile kurucusunun telefonundan yönetilir. Kendi profilini Seç ile aç.'));
+    }else{
+      panel.append(create('h3','1 · Önce iki telefonda Drive'));
+      panel.append(create('p','Ayarlar → Google hesap ve Drive ayarları: aynı ortak müzik klasörünü seçin; Otomatik ortak arşiv bağlantısını açın. Herkes kendi Google hesabını kullanır.'));
+      panel.append(create('h3','2 · Tolga’nın telefonunda aileyi oluştur'));
+      panel.append(create('p','Yönetici profilinde ebeveyn PIN’i belirle. Fatma’yı yetişkin, çocukları çocuk rolüyle bu telefonda ekle. Sonra aşağıdaki düğmeye bas. Yeni profil sonradan da eklenebilir.'));
+      if(data.role==='admin')panel.append(button('Bu telefonda aileyi oluştur',()=>A.familySetup('create','')));
+      panel.append(create('h3','3 · Diğer telefonda aileye katıl'));
+      panel.append(create('p','Kurucu telefondan Aile bağlantı kodunu kopyala. Buraya yapıştır, Aileye katıl de ve bu telefonu kullanacak kişiyi seç (örneğin Fatma). Telefonundaki aktif profilin kitaplığı o aile profiline taşınır; eski kopya korunur. Çocuk telefonu kurulurken ebeveyn çocuk profilini seçer.'));
+      const code=create('textarea',undefined,'xm-input');code.placeholder='XMF1. ile başlayan aile bağlantı kodu';code.maxLength=4000;code.setAttribute('aria-label','Aile bağlantı kodu');panel.append(code,button('Aileye katıl',()=>A.familySetup('join',code.value.trim())));
+      panel.append(create('p','Kod aile verilerine erişim anahtarıdır; yalnızca ailenle paylaş. Aile ayarları Drive’a şifreli yazılır.'));
+    }
+  });}
   function avatarNode(value){
     const wrap=create('span',undefined,'flex items-center justify-center rounded-full bg-surface-container-high overflow-hidden');
     wrap.style.cssText='width:48px;height:48px;font-size:27px;flex-shrink:0;';
@@ -234,7 +263,7 @@
     }));
   });}
   function profileForm(profile){
-    const data=profileState(),manager=data.role==='admin';
+    const data=profileState(),manager=canManageFamily();
     modal(profile?'Profil Düzenle':'Yeni Profil',(p,close)=>{
       const name=create('input',undefined,'xm-input');name.maxLength=60;name.placeholder='Profil adı';name.setAttribute('aria-label','Profil adı');name.value=profile?.name||'';
       const current=create('input',undefined,'xm-input');current.type='password';current.inputMode='numeric';current.maxLength=8;current.placeholder='Mevcut profil PIN’i';current.setAttribute('aria-label','Mevcut PIN');
@@ -277,7 +306,8 @@
       panel.append(create('h3','Onay bekleyenler · '+(review.pending||[]).length));
       (review.pending||[]).forEach(t=>{
         const row=create('div',undefined,'xm-row');row.append(create('strong',t.title+' — '+(t.artist||'')),create('p',t.reason));
-        const candidate=candidates.find(x=>x.id===t.id)||approved.find(x=>x.id===t.id);
+        const candidate=candidates.find(x=>x.id===t.id)||approved.find(x=>x.id===t.id)||(/^(experimental:|drive-source:|drive:)/.test(t.id||'')?t:null);
+        if(candidate)row.append(button('Önce dinle',()=>playTrack(candidate)));
         if(candidate)row.append(button('Kaydı onayla',()=>{
           if(A.approveChildTrack(profile.id,JSON.stringify(candidate),false,pin.value)){row.remove();N.showToast('Onaylandı');}else N.showToast('PIN’i kontrol et.');
         }));
@@ -292,8 +322,8 @@
   });}
   function renderProfiles(){
     const heading=document.querySelector('header h1');if(heading)heading.textContent='Aile Profilleri';
-    const data=profileState(),manager=data.role==='admin',child=data.role==='child',panel=content('Aile Profilleri');if(!panel)return;
-    panel.append(create('p','Bu cihazdaki roller ve dinleme verileri. Ortak Drive müzikleri paylaşılır; profil kuralları ve miks tercihleri henüz telefonlar arasında eşitlenmez.'));
+    const data=profileState(),manager=canManageFamily(),child=data.role==='child',panel=content('Aile Profilleri');if(!panel)return;
+    panel.append(create('p',familySyncState().enabled?'Aile profilleri ortak Drive üzerinden otomatik eşitlenir. Çocuk kurallarını aile kurucusu yönetir.':'Telefonlar arası aile miksini ve çocuk denetimlerini kullanmak için Aile bağlantısı kurulumunu bir kez tamamla.'),button('Aile bağlantısı · Kurulum ve durum',familyConnection));
     if(manager)panel.append(button('Yeni Profil Ekle',()=>profileForm()),button(data.parentConfigured?'Ebeveyn PIN’ini değiştir':'Ebeveyn PIN’i belirle',parentPinForm));
     panel.append(button('Aktif profil görselini değiştir',avatarChooser));
     (data.profiles||[]).forEach(profile=>{
@@ -314,8 +344,8 @@
     modal(kind==='favorites'?'Aile Beğenileri':'Aile Son Dinlenenler',panel=>{
       let tracks=[];try{tracks=JSON.parse(A.familyMix(kind)||'[]');}catch(_){}
       if(!Array.isArray(tracks))tracks=[];
-      panel.append(create('p','Bu cihazda aile miksine katılmayı seçen yetişkin profilleri.'));
-      if(!tracks.length){panel.append(create('p','Henüz ortak kayıt yok. Profilini düzenleyip Aile miksine katıl seçeneğini aç; ardından birkaç kayıt dinle veya beğen.'),button('Profilleri aç',()=>go('aile_profili_se_imi')));return;}
+      panel.append(create('p',familySyncState().enabled?'Aile bağlantısında paylaşımı açık yetişkinlerin ortak kayıtları.':'Bu cihazda aile miksine katılmayı seçen yetişkin profilleri.'));
+      if(!tracks.length){panel.append(create('p','Henüz ortak kayıt yok. Aile bağlantısı ekranında bu profilin miks paylaşımını aç; birkaç kayıt dinle veya beğen.'),button('Aile bağlantısını aç',familyConnection));return;}
       const offset=Math.floor(Date.now()/604800000)%tracks.length;tracks=tracks.slice(offset).concat(tracks.slice(0,offset));
       tracks.forEach(t=>panel.append(trackRow(t)));
     });
@@ -1004,7 +1034,7 @@
     }
     window.__xmusicHomeRefresh=refreshHome;refreshHome();
     const mixGrid=mixes.children[1];mixGrid.replaceChildren();
-    const summary=mixes.querySelector('p');if(summary)summary.textContent='Bu cihazdaki paylaşılan yetişkin tercihleri';
+    const summary=mixes.querySelector('p');if(summary)summary.textContent=familySyncState().enabled?'Ailenin paylaşılan beğeni ve dinlemeleri':'Bu cihazdaki paylaşılan yetişkin tercihleri';
     [['Aile Beğenileri','favorites','from-secondary-container to-surface-container'],['Aile Son Dinlenenler','history','from-primary-container to-surface-container']].forEach(([name,kind,gradient])=>{
       const card=button('',()=>showFamilyMix(kind));card.className='flex-shrink-0 w-44 flex flex-col text-left group';
       const art=create('div',undefined,'relative w-44 h-44 rounded-2xl overflow-hidden bg-gradient-to-br '+gradient+' flex items-center justify-center mb-2.5');
@@ -1099,6 +1129,7 @@
     window.addEventListener('xmusic:playback',e=>{const v=e.detail,t=document.getElementById('xm-timer-track'),r=document.getElementById('xm-timer-track-remaining');if(t)t.textContent=v.id?'Şu an seçili: '+(v.title||'Parça'):'Henüz parça seçilmedi';if(r){const sec=Math.max(0,Math.ceil(((v.duration||0)-(v.position||0))/1000));r.textContent=v.id&&v.duration>0?'Kalan çalma süresi: '+Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0'):'';}});
   }
   if(page==='arama_ve_ke_fet')setTimeout(function seedSearch(){if(!window.__xmusicActionsInstalled){setTimeout(seedSearch,50);return;}const query=sessionStorage.getItem('xm-search');if(query!==null){sessionStorage.removeItem('xm-search');const input=document.getElementById('search-input');if(input){input.value=query;input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();}}},0);
+  window.addEventListener('xmusic:family',()=>{if(document.getElementById('xm-dialog'))return;if(page==='aile_profili_se_imi')renderProfiles();if(profileState().role==='child'&&['ana_sayfa','kitapl_m','ocuk_modu_kids_safe'].includes(page))renderChildLibrary();});
   if(profileState().role==='child'&&['ana_sayfa','kitapl_m','ocuk_modu_kids_safe'].includes(page))renderChildLibrary();
   window.__xmusicActionsAudit=()=>Array.from(document.querySelectorAll('button,a')).filter(b=>!b.closest('#xmusic-live-search')).map(b=>({label:b.getAttribute('aria-label')||b.textContent.trim(),action:b.dataset.xmAction|| (b.dataset.xmOwned?'owned':null),blocked:b.dataset.xmBlocked||null}));
 })();
