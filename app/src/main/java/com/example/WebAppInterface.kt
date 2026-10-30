@@ -58,6 +58,13 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         webView.post { webView.loadUrl(url) }
     }
 
+    // StatFs genel alan bilgisini verir; kişisel dosyalara erişim izni gerektirmez.
+    @JavascriptInterface
+    fun deviceStorageInfo(): String {
+        val stats = android.os.StatFs(context.filesDir.absolutePath)
+        return org.json.JSONObject().put("free", stats.availableBytes).put("total", stats.totalBytes).toString()
+    }
+
     // Yeni indirme ve arşiv işleri için ağ tercihi. Mevcut işler kendi koşullarını korur.
     @JavascriptInterface fun getDownloadWifiOnly(): Boolean =
         context.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE).getBoolean("download_unmetered_only", false)
@@ -628,4 +635,5 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         this.mediaController = controller
     }
 }
+
 
