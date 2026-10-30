@@ -69,6 +69,7 @@ assert.equal(x.d.querySelector('section.mt-6 h3').textContent,'Bölüm');checks+
 x.d.getElementById('heroPlayBtn').click();assert.deepEqual(x.calls.at(-1),['playPodcast','podcast:one',false]);checks++;
 x.d.querySelector('#filterContainer button:nth-child(2)').click();assert.ok(x.d.querySelector('main').textContent.includes('Bu filtrede bölüm yok.'));checks++;
 x.d.querySelector('#filterContainer button:first-child').click();
+x.w.__xmusicPlayback({ready:true,id:'podcast:one',title:'Bölüm',artist:'Program',playing:true,queue:[]});
 x.d.querySelector('aside [aria-label="Oynat veya Duraklat"]').click();assert.deepEqual(x.calls.at(-1),['togglePlayPause']);checks++;
 x.d.querySelector('article [aria-label="Oynat"]').click();assert.deepEqual(x.calls.at(-1),['playPodcast','podcast:one',false]);checks++;
 x.d.querySelector('article [aria-label="İndir"]').click();assert.deepEqual(x.calls.at(-1),['downloadPodcast','podcast:one']);checks++;
