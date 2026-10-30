@@ -47,7 +47,7 @@ class AutomaticDriveArchive(context: Context, params: WorkerParameters) : Worker
             synchronized(downloadLock) {
                 if (isStopped) return Result.failure()
                 report(name, "Drive arşivi kontrol ediliyor")
-                val folder = client.getOrCreate(token)
+                val folder = client.getOrCreate(token, inputData.getString("folder").orEmpty())
                 val existing = client.findBySource(token, folder, source)
                 if (existing != null) {
                     prefs.edit().putString(account + ":" + source, existing).commit()
@@ -138,7 +138,7 @@ class AutomaticDriveArchive(context: Context, params: WorkerParameters) : Worker
             if (prefs.contains(account + ":" + source)) return
             val network = if (context.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE).getBoolean("download_unmetered_only", false)) NetworkType.UNMETERED else NetworkType.CONNECTED
             val work = OneTimeWorkRequestBuilder<AutomaticDriveArchive>()
-                .setInputData(workDataOf("source" to source, "title" to title, "account" to account))
+                .setInputData(workDataOf("source" to source, "title" to title, "account" to account, "folder" to context.getSharedPreferences("xmusic_drive_folders", Context.MODE_PRIVATE).getString(account, "").orEmpty()))
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(network).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .addTag("xmusic-drive-upload").addTag("xmusic-auto-archive").build()
@@ -146,3 +146,4 @@ class AutomaticDriveArchive(context: Context, params: WorkerParameters) : Worker
         }
     }
 }
+
