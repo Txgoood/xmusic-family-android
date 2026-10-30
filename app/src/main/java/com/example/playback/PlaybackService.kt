@@ -34,6 +34,29 @@ class PlaybackService : MediaSessionService() {
     private var player: ExoPlayer? = null
     private var mediaSession: MediaSession? = null
 
+    private fun saveResume() {
+        val p = player ?: return
+        val item = p.currentMediaItem ?: return
+        if (item.mediaId.isBlank()) return
+        val position = if (p.playbackState == androidx.media3.common.Player.STATE_ENDED) 0L else p.currentPosition.coerceAtLeast(0L)
+        val saved = org.json.JSONObject().put("id", item.mediaId)
+            .put("title", item.mediaMetadata.title?.toString().orEmpty())
+            .put("artist", item.mediaMetadata.artist?.toString().orEmpty())
+            .put("artwork", item.mediaMetadata.artworkUri?.toString().orEmpty())
+            .put("feed", item.mediaMetadata.extras?.getString("feed").orEmpty())
+            .put("position", position).put("duration", p.duration.coerceAtLeast(0L))
+            .put("updatedAt", System.currentTimeMillis())
+        com.example.PlaybackResumeStore(this).save(com.example.ProfileStore(this).activeId(), saved)
+    }
+
+    private val resumeTicker = object : Runnable {
+        override fun run() {
+            if (player?.isPlaying == true) saveResume()
+            timerHandler.postDelayed(this, 5000L)
+        }
+    }
+
+
     override fun onCreate() {
         super.onCreate()
         activeService = this
@@ -57,7 +80,7 @@ class PlaybackService : MediaSessionService() {
         player!!.addListener(object : androidx.media3.common.Player.Listener {
             private var countedItem = false
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                if (!isPlaying) return
+                if (!isPlaying) { saveResume(); return }
                 val item = player?.currentMediaItem ?: return
                 if (!countedItem) {
                     com.example.MusicListeningStats(this@PlaybackService).record(item.mediaId)
@@ -87,6 +110,7 @@ class PlaybackService : MediaSessionService() {
                 if (sleepAtEnd && state == androidx.media3.common.Player.STATE_ENDED) stopPlayback.run()
             }
         })
+        timerHandler.post(resumeTicker)
         // Uygulamaya dönüş ve kilit ekranı aynı MediaSession'ı kullanır.
         val intent = android.content.Intent(this, com.example.MainActivity::class.java)
             .addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
@@ -98,6 +122,8 @@ class PlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
 
     override fun onDestroy() {
+        saveResume()
+        timerHandler.removeCallbacks(resumeTicker)
         timerHandler.removeCallbacks(stopPlayback)
         activeService = null
         mediaSession?.release()
