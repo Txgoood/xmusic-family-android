@@ -12,6 +12,7 @@ class MainActivity : ComponentActivity() {
     // Erişim anahtarı yalnızca bellekte tutulur; süre bitince yeniden yetki alınır.
     private var driveAccessToken: String? = null
     private var driveFolderId: String? = null
+    private var driveAccountId: String? = null
     private var driveBusy = false
     private val driveFolderWorker = java.util.concurrent.Executors.newSingleThreadExecutor()
     private val driveFilePicker = registerForActivityResult(
@@ -72,41 +73,33 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun uploadLocalFileToDrive(uri: android.net.Uri) {
-        val token = driveAccessToken ?: return
-        val folder = driveFolderId ?: return
-        if (driveBusy) return
-        driveBusy = true
-        android.widget.Toast.makeText(this, "Dosya Drive'a yükleniyor; tamamlanana kadar uygulamayı açık tut.", android.widget.Toast.LENGTH_LONG).show()
+        val account = driveAccountId ?: run { showDriveError("Önce Drive hesabını yeniden bağla."); return }
+        try {
+            contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            com.example.data.drive.DriveUploadWorker.enqueue(this, uri, account)
+            showDriveError("Dosya kalıcı yükleme kuyruğuna eklendi. Durumu 'Drive yükleme kuyruğu' düğmesinden izleyebilirsin.")
+        } catch (_: Exception) { showDriveError("Dosya için kalıcı okuma izni alınamadı; başka bir dosya sağlayıcısından seç.") }
+    }
+
+    fun showDriveUploadQueue() {
         driveFolderWorker.execute {
-            var temp: java.io.File? = null
             try {
-                var name = "Müzik dosyası"
-                contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
-                    if (it.moveToFirst()) name = it.getString(0).orEmpty().take(255).ifBlank { "Müzik dosyası" }
-                }
-                val mime = contentResolver.getType(uri) ?: "application/octet-stream"
-                val local = java.io.File.createTempFile("drive-upload-", ".audio", cacheDir)
-                temp = local
-                val input = contentResolver.openInputStream(uri) ?: throw java.io.IOException("Dosya açılamadı")
-                input.use { source -> local.outputStream().use { out ->
-                    val buffer = ByteArray(65536)
-                    var total = 0L
-                    while (true) {
-                        val n = source.read(buffer)
-                        if (n < 0) break
-                        total += n
-                        if (total > 250L * 1024 * 1024) throw java.io.IOException("Bu denemede dosya sınırı 250 MB")
-                        out.write(buffer, 0, n)
+                val jobs = androidx.work.WorkManager.getInstance(this).getWorkInfosByTag("xmusic-drive-upload")
+                    .get(10, java.util.concurrent.TimeUnit.SECONDS)
+                val text = jobs.take(30).joinToString("\n\n") { job ->
+                    val status = when (job.state) {
+                        androidx.work.WorkInfo.State.ENQUEUED -> "Bekliyor / yeniden denenecek"
+                        androidx.work.WorkInfo.State.RUNNING -> "Yükleniyor"
+                        androidx.work.WorkInfo.State.SUCCEEDED -> if (job.outputData.getBoolean("duplicate", false)) "Drive'da zaten var" else "Tamamlandı"
+                        androidx.work.WorkInfo.State.FAILED -> "Başarısız"
+                        androidx.work.WorkInfo.State.BLOCKED -> "Sıra bekliyor"
+                        else -> "İptal edildi"
                     }
-                } }
-                val uploaded = com.example.data.drive.DriveUploadClient().upload(token, folder, local, name, mime)
-                runOnUiThread { showDriveError("Yükleme tamamlandı: " + uploaded.name + "\nDrive → XMusic Family klasöründen kontrol edebilirsin.") }
-            } catch (e: Exception) {
-                runOnUiThread { showDriveError("Yükleme tamamlanamadı: " + (e.message ?: e.javaClass.simpleName)) }
-            } finally {
-                temp?.delete()
-                runOnUiThread { driveBusy = false }
-            }
+                    (job.outputData.getString("name") ?: job.id.toString().take(8)) + ": " + status +
+                        (job.outputData.getString("error")?.let { "\n" + it } ?: "")
+                }.ifBlank { "Yükleme kuyruğu boş." }
+                runOnUiThread { showDriveError(text) }
+            } catch (_: Exception) { runOnUiThread { showDriveError("Kuyruk durumu okunamadı.") } }
         }
     }
     private val driveAuthLauncher = registerForActivityResult(
@@ -147,12 +140,15 @@ class MainActivity : ComponentActivity() {
         if (token.isNullOrBlank()) { showDriveError("Drive erişimi alınamadı"); return }
         driveAccessToken = token
         driveFolderId = null
+        driveAccountId = null
         driveBusy = true
         driveFolderWorker.execute {
             try {
-                val folder = com.example.data.drive.DriveFolderClient().getOrCreate(token)
+                val folderClient = com.example.data.drive.DriveFolderClient()
+                val account = folderClient.accountId(token)
+                val folder = folderClient.getOrCreate(token)
                 runOnUiThread {
-                    if (driveAccessToken == token) driveFolderId = folder
+                    if (driveAccessToken == token) { driveFolderId = folder; driveAccountId = account }
                     showDriveError("Drive bağlantısı hazır. XMusic Family klasörü bulundu veya oluşturuldu. Şimdi 'Drive’a ses dosyası yükle' düğmesini kullanabilirsin.")
                 }
             } catch (e: Exception) {
@@ -612,7 +608,9 @@ class MainActivity : ComponentActivity() {
                           const library=document.createElement('button');
                           library.type='button';library.textContent='Drive müzik arşivini aç';library.style.cssText=btn.style.cssText;
                           library.dataset.xmOwned='true';library.__xmOwnedRun=function(){if(window.Android)window.Android.openDriveLibrary();};
-                          main.prepend(library);main.prepend(upload);main.prepend(btn);
+                          const queue=document.createElement('button');queue.type='button';queue.textContent='Drive yükleme kuyruğu';queue.style.cssText=btn.style.cssText;
+                          queue.dataset.xmOwned='true';queue.__xmOwnedRun=function(){if(window.Android)window.Android.showDriveUploadQueue();};
+                          main.prepend(queue);main.prepend(library);main.prepend(upload);main.prepend(btn);
                         }
                       }
                       // Ayarlar ekranındaki anahtarları Android SharedPreferences ile sakla.
