@@ -59,3 +59,6 @@ Durumları yalnız doğrulanan işin ardından güncelle.
 - Drive OAuth ve yükleme entegrasyonu henüz bulunmuyor; Drive aktarımı hazır değildir.
 
 - #60: Kullanıcı aynı parçanın ikinci açılışının hızlandığını doğruladı. İlk açılış ve Drive arşivi ayrıca bekliyor.
+
+- #62: Kullanıcı daha fazla sonuç özelliğinin çalıştığını bildirdi.
+- Drive: Dosya yükleme istemcisi eklendi; kullanıcı yetkilendirmesi, indirme kuyruğu, hesap ve klasör seçimi, yeniden deneme ve cihaz testi henüz tamamlanmadı.
