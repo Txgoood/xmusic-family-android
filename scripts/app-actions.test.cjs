@@ -208,7 +208,7 @@ x.dom.window.close();
 x=open('podcast_merkezi');
 assert.ok(x.d.getElementById('xm-podcast-following').textContent.includes('Tarih Sohbetleri'));
 assert.ok(x.d.querySelector('#podcast-chips'));checks+=2;
-assert.equal(x.d.querySelector('main').firstElementChild.children[2].style.display,'none');checks++;
+assert.equal([...x.d.querySelectorAll('main h2')].find(h=>h.textContent.includes('Aile & Çocuk Podcastleri')).closest('section').style.display,'none');checks++;
 x.dom.window.close();
 x=open('kitapl_m');
 const podcastsChip=[...x.d.querySelectorAll('.filter-chip')].find(b=>b.textContent.trim()==="Podcast'ler");
