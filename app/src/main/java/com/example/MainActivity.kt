@@ -21,6 +21,32 @@ class MainActivity : ComponentActivity() {
         if (uri != null) uploadLocalFileToDrive(uri)
     }
 
+    fun toggleAutomaticArchive() {
+        val prefs = getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE)
+        val enabled = !prefs.getBoolean("enabled", true)
+        prefs.edit().putBoolean("enabled", enabled).apply()
+        if (!enabled) androidx.work.WorkManager.getInstance(this).cancelAllWorkByTag("xmusic-auto-archive")
+        showDriveError(if (enabled) "Otomatik Drive arşivi açık. Drive hesabını bağladıktan sonra çalan YouTube kayıtları kuyruğa alınır." else "Otomatik Drive arşivi kapalı.")
+    }
+
+    fun playArchivedSource(sourceId: String, title: String, artist: String): Boolean {
+        val account = driveAccountId ?: return false
+        val token = driveAccessToken ?: return false
+        val fileId = getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE).getString(account + ":" + sourceId, null) ?: return false
+        if (!fileId.matches(Regex("[A-Za-z0-9_-]{1,200}"))) return false
+        val controller = mediaController ?: return false
+        val service = PlaybackService.activeService ?: return false
+        val url = "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media"
+        service.registerExperimentalStream(url, mapOf("Authorization" to "Bearer $token"))
+        val metadata = androidx.media3.common.MediaMetadata.Builder().setTitle(title).setArtist("Drive · " + artist)
+            .setArtworkUri(android.net.Uri.parse("https://i.ytimg.com/vi/$sourceId/mqdefault.jpg")).build()
+        controller.setMediaItem(androidx.media3.common.MediaItem.Builder().setMediaId("drive-source:" + sourceId)
+            .setUri(url).setMediaMetadata(metadata).build())
+        controller.prepare()
+        controller.play()
+        return true
+    }
+
     fun openDriveLibrary() {
         val token = driveAccessToken
         val folder = driveFolderId
@@ -148,7 +174,10 @@ class MainActivity : ComponentActivity() {
                 val account = folderClient.accountId(token)
                 val folder = folderClient.getOrCreate(token)
                 runOnUiThread {
-                    if (driveAccessToken == token) { driveFolderId = folder; driveAccountId = account }
+                    if (driveAccessToken == token) {
+                        driveFolderId = folder; driveAccountId = account
+                        getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE).edit().putString("account", account).apply()
+                    }
                     showDriveError("Drive bağlantısı hazır. XMusic Family klasörü bulundu veya oluşturuldu. Şimdi 'Drive’a ses dosyası yükle' düğmesini kullanabilirsin.")
                 }
             } catch (e: Exception) {
@@ -610,7 +639,9 @@ class MainActivity : ComponentActivity() {
                           library.dataset.xmOwned='true';library.__xmOwnedRun=function(){if(window.Android)window.Android.openDriveLibrary();};
                           const queue=document.createElement('button');queue.type='button';queue.textContent='Drive yükleme kuyruğu';queue.style.cssText=btn.style.cssText;
                           queue.dataset.xmOwned='true';queue.__xmOwnedRun=function(){if(window.Android)window.Android.showDriveUploadQueue();};
-                          main.prepend(queue);main.prepend(library);main.prepend(upload);main.prepend(btn);
+                          const automatic=document.createElement('button');automatic.type='button';automatic.textContent='Otomatik Drive arşivini aç / kapat';automatic.style.cssText=btn.style.cssText;
+                          automatic.dataset.xmOwned='true';automatic.__xmOwnedRun=function(){if(window.Android)window.Android.toggleAutomaticArchive();};
+                          main.prepend(automatic);main.prepend(queue);main.prepend(library);main.prepend(upload);main.prepend(btn);
                         }
                       }
                       // Ayarlar ekranındaki anahtarları Android SharedPreferences ile sakla.
