@@ -21,6 +21,7 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         if (changed && action == "select") webView.post { controller?.clearMediaItems(); com.example.playback.PlaybackService.activeService?.setSleepTimer(0) }
         if (changed && action == "delete") {
             activity.getSharedPreferences("xmusic_library_$id", Context.MODE_PRIVATE).edit().clear().commit()
+            MusicListeningStats(activity).removeProfile(id)
             val removedDownloads = activity.getSharedPreferences("xmusic_downloads_$id", Context.MODE_PRIVATE)
             val manager = activity.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
             removedDownloads.all.values.forEach { raw ->
@@ -177,6 +178,11 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         if (profiles.activeId() != libraryProfileId || value.length > 1_000_000) return false
         return try { JSONObject(value); prefs.edit().putString("data", value).commit() } catch (_: Exception) { false }
     }
+    @JavascriptInterface fun assignMusicGenre(videoId: String, genre: String) {
+        if (profiles.activeId() == libraryProfileId) MusicListeningStats(activity).assign(videoId, genre)
+    }
+    @JavascriptInterface fun familyGenreStats(): String = MusicListeningStats(activity).summary()
+
     @JavascriptInterface fun recordSearch(query: String) {
         if (profiles.activeId() != libraryProfileId) return
         try { SearchStatsStore(activity, libraryProfileId).record(query) } catch (_: Exception) { }
