@@ -83,3 +83,9 @@ Durumları yalnız doğrulanan işin ardından güncelle.
 
 - #80: Kullanıcı otomatik arşivleme düzeltmesinin çalıştığını doğruladı. Çalışan geri dönüş noktası: `93b4a3a0fe695e71880452022dc645241a33aa55`.
 - Kuyruk görünürlüğü: Otomatik indirme, ses hazırlama, Drive yükleme ve sunucu onayı aşamaları WorkManager ilerleme verisiyle gösterilir. Açık kuyruk penceresi değişiklikleri canlı izler; kapandığında gözlemci kaldırılır. Yükleme yüzdesi gönderilen baytlardan hesaplanır; başarı yalnız Drive dosya kimliği döndükten sonra bildirilir. Aynı aşamanın güncellemeleri saniyede birle sınırlıdır. Yeni görünüm cihazda henüz doğrulanmadı.
+
+
+## Keşfet ve son aramalar — 30 Ekim 2026
+- Kullanıcı #84 canlı Drive kuyruğunu ve #86 birleşik Keşfet aramasını başarılı bildirdi. Son onaylı arayüz noktası: `5ea3629a30d1a9a899d9280a24be52b95874617b`.
+- Son Aramalar artık demo etiketleri yerine profilin yerel geçmişini kullanır. En yeni 12 sorgu, Türkçe büyük/küçük harf ve boşluk normalleştirmesiyle tekilleştirilir. Yazım durakladığında, Enter/odak çıkışı veya sonuç seçimiyle kaydedilir; yeniden arama, tek kayıt silme ve tümünü temizleme bağlandı.
+- Geçmiş kitaplıktan ayrı anahtarda saklanır; profil silindiğinde birlikte silinir. Cihazlar arası senkronizasyon bu değişiklik kapsamında değildir. Android kalıcılık/profil ayrımı testleri ve Keşfet DOM testleri eklendi; yeni özelliğin cihaz kabulü bekliyor.
