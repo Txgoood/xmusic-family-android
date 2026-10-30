@@ -127,6 +127,10 @@ class ProfileStoreTest {
         assertTrue(store.requestReview(id, raw))
         assertEquals(1, JSONObject(store.childReview(id)).getJSONArray("pending").length())
         assertEquals(1, JSONObject(store.childReview(id)).getJSONArray("denied").length())
+        assertTrue(store.approve(id, raw, false, "1357"))
+        assertEquals(0, JSONObject(store.childReview(id)).getJSONArray("denied").length())
+        assertTrue(store.change("select", id, "", "", ""))
+        assertNull(store.playbackBlockReason("experimental:review12345"))
     }
 
 }
