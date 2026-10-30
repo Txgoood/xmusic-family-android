@@ -69,6 +69,53 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     }
 
     // Deneysel arama sonuçları her zaman kullanıcıya kaynak belirtilerek gösterilir.
+    /** Tür kartları için arama sonuçları yedi gün saklanır; akış URL'si saklanmaz. */
+    @JavascriptInterface
+    fun searchMusicShelf(query: String, requestId: Int) {
+        val term = query.trim()
+        if (term.length !in 2..100) return
+        Thread {
+            val prefs = context.getSharedPreferences("xmusic_music_shelves", Context.MODE_PRIVATE)
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(term.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+            val cached = try { org.json.JSONObject(prefs.getString(digest, null) ?: "{}") } catch (_: Exception) { org.json.JSONObject() }
+            val age = System.currentTimeMillis() - cached.optLong("time", 0)
+            val items = cached.optJSONArray("items")
+            val data = if (items != null && items.length() > 0 && age in 0 until 7L * 24 * 60 * 60 * 1000) {
+                org.json.JSONObject().put("items", items)
+            } else try {
+                val engine = com.yausername.youtubedl_android.YoutubeDL.getInstance()
+                engine.init(context.applicationContext)
+                val request = com.yausername.youtubedl_android.YoutubeDLRequest("ytsearch20:" + term)
+                request.addOption("--flat-playlist")
+                request.addOption("--dump-single-json")
+                request.addOption("--no-warnings")
+                request.addOption("--socket-timeout", "15")
+                val response = engine.execute(request, "xmusic-shelf-$requestId") { _, _, _ -> }
+                val entries = org.json.JSONObject(response.out).optJSONArray("entries") ?: org.json.JSONArray()
+                val tracks = org.json.JSONArray()
+                val seen = HashSet<String>()
+                for (i in 0 until entries.length()) {
+                    val row = entries.optJSONObject(i) ?: continue
+                    val id = row.optString("id")
+                    if (!id.matches(Regex("[A-Za-z0-9_-]{11}")) || !seen.add(id)) continue
+                    tracks.put(org.json.JSONObject().put("id", id)
+                        .put("title", row.optString("title").take(180))
+                        .put("artist", row.optString("channel", row.optString("uploader")).take(180)))
+                }
+                if (tracks.length() == 0) throw java.io.IOException("Sonuç yok")
+                prefs.edit().putString(digest, org.json.JSONObject().put("time", System.currentTimeMillis()).put("items", tracks).toString()).apply()
+                org.json.JSONObject().put("items", tracks)
+            } catch (_: Exception) {
+                if (items != null && items.length() > 0) org.json.JSONObject().put("items", items).put("stale", true)
+                else org.json.JSONObject().put("error", "Liste yüklenemedi. İnternet bağlantısını kontrol et.")
+            }
+            webView.post {
+                webView.evaluateJavascript("window.__xmusicMusicShelfResult && window.__xmusicMusicShelfResult(" + requestId + "," + data + ")", null)
+            }
+        }.start()
+    }
+
     @JavascriptInterface
     fun searchExperimentalSource(query: String, requestId: Int) {
         searchExperimentalSourceMore(query, requestId, 10)
