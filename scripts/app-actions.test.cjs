@@ -5,13 +5,20 @@ const assets=process.env.XMUSIC_TEST_PAGES||path.join(root,'app/src/main/assets/
 const script=fs.readFileSync(path.join(root,'app/src/main/assets/app-actions.js'),'utf8');
 const player=fs.readFileSync(path.join(root,'app/src/main/assets/playback.js'),'utf8');
 const main=fs.readFileSync(path.join(root,'app/src/main/java/com/example/MainActivity.kt'),'utf8').split('evaluateJavascript("""')[1].split('""".trimIndent()')[0];
-let db='{}',checks=0;const report=[];
+let db='{}',checks=0,recentState=[];const report=[];
 function open(folder,session={}){
  const f=path.join(assets,fs.existsSync(path.join(assets,folder+'.html'))?folder+'.html':folder+'/code.html');
  const dom=new JSDOM(fs.readFileSync(f,'utf8'),{url:'https://local.test/stitch/'+folder+'/code.html',runScripts:'outside-only'});
  const w=dom.window,calls=[];
  w.Android=new Proxy({}, {get:(_,key)=>(...args)=>{calls.push([key,...args]);return false;}});
- w.AndroidActions=new Proxy({}, {get:(_,key)=>(...args)=>{calls.push([key,...args]);if(key==='loadLibrary')return db;if(key==='saveLibrary'){db=args[0];return true;}}});
+ w.AndroidActions=new Proxy({}, {get:(_,key)=>(...args)=>{calls.push([key,...args]);if(key==='searchHistory'){
+ const [action,query]=args;const text=(query||'').replace(/\s+/g,' ').trim();
+ const same=value=>value.toLocaleLowerCase('tr')===text.toLocaleLowerCase('tr');
+ if(action==='add'&&text.length>=2&&text.length<=100)recentState=[text,...recentState.filter(v=>!same(v))].slice(0,12);
+ if(action==='remove')recentState=recentState.filter(v=>!same(v));
+ if(action==='clear')recentState=[];
+ return JSON.stringify(recentState);
+ }if(key==='loadLibrary')return db;if(key==='saveLibrary'){db=args[0];return true;}}});
  Object.entries(session).forEach(([k,v])=>w.sessionStorage.setItem(k,v));
  // Ekranın mevcut demo olayları gerçek uygulamadaki gibi önce yüklenir.
  for(const tag of w.document.querySelectorAll('script:not([src])'))if(!tag.id){try{w.eval(tag.textContent);}catch(e){throw new Error(folder+': '+e.message);}}
@@ -104,6 +111,46 @@ x.d.getElementById('search-clear-btn').click();
 assert.equal(searchInput.value,'');assert.equal(results.style.display,'none');assert.equal(results.nextElementSibling.style.display,'');checks+=3;
 assert.ok(!x.d.querySelector('main').textContent.includes('Apple Türkiye müzik kataloğu'));
 assert.ok(!x.d.querySelector('main').textContent.includes('YouTube · Deneme'));checks+=2;
+x.dom.window.close();
+
+// Son aramalar: demo yerine gerçek veri, gecikmeli kayıt, tekrar arama ve kalıcı silme.
+recentState=[];
+x=open('arama_ve_ke_fet');
+assert.ok(x.d.getElementById('history-items-wrapper').textContent.includes('Henüz arama yapmadın'));checks++;
+let recentTimers=[];
+x.w.setTimeout=(fn,ms)=>{if(ms===350||ms===1200)recentTimers.push({fn,ms});return recentTimers.length;};
+x.w.clearTimeout=()=>{};
+function flushRecent(ms){const ready=recentTimers.filter(t=>t.ms===ms);recentTimers=recentTimers.filter(t=>t.ms!==ms);ready.forEach(t=>t.fn());}
+let recentInput=x.d.getElementById('search-input');
+recentInput.value='Tarkan';recentInput.dispatchEvent(new x.w.Event('input',{bubbles:true}));flushRecent(350);
+assert.equal(recentState.length,0);checks++;
+flushRecent(1200);
+assert.deepEqual(recentState,['Tarkan']);checks++;
+x.d.getElementById('search-clear-btn').click();
+const recentArea=x.d.getElementById('history-items-wrapper');
+assert.ok(recentArea.textContent.includes('Tarkan'));checks++;
+recentArea.querySelector('[aria-label="Tarkan yeniden ara"]').click();flushRecent(350);
+assert.equal(recentInput.value,'Tarkan');
+assert.equal(x.calls.filter(c=>c[0]==='searchAppleCatalog').at(-1)[1],'Tarkan');checks+=2;
+x.d.getElementById('search-clear-btn').click();
+const beforeRemove=x.calls.filter(c=>c[0]==='searchAppleCatalog').length;
+recentArea.querySelector('[aria-label="Kaldır Tarkan"]').click();
+assert.equal(recentState.length,0);
+assert.equal(x.calls.filter(c=>c[0]==='searchAppleCatalog').length,beforeRemove);checks+=2;
+x.dom.window.close();
+x=open('arama_ve_ke_fet');
+assert.ok(x.d.getElementById('history-items-wrapper').textContent.includes('Henüz arama yapmadın'));checks++;
+x.dom.window.close();
+recentState=['Tarkan',"Don't <img src=x>"];
+x=open('arama_ve_ke_fet');
+assert.ok(x.d.getElementById('history-items-wrapper').textContent.includes("Don't <img src=x>"));
+assert.equal(x.d.getElementById('history-items-wrapper').querySelector('img'),null);checks+=2;
+x.d.getElementById('clear-all-history-btn').click();
+assert.deepEqual(recentState,[]);checks++;
+x.dom.window.close();
+x=open('arama_ve_ke_fet');
+assert.ok(x.d.getElementById('history-items-wrapper').textContent.includes('Henüz arama yapmadın'));
+assert.equal(x.d.getElementById('clear-all-history-btn').style.display,'none');checks+=2;
 x.dom.window.close();
 
 console.log('Application actions: '+checks+' assertions passed.');
