@@ -1104,7 +1104,13 @@
     let archiveTracks=[],archiveRequest=0;coverMosaic(archiveArt,[]);archiveCard.append(archiveArt,create('strong','Arşivden Seçkiler'),create('span','Aile zevkinden ilhamla','text-on-surface-variant'));mixGrid.append(archiveCard);
     window.__xmusicArchiveSelections=(id,data)=>{if(id!==archiveRequest)return;archiveTracks=rankArchive(Array.isArray(data?.items)?data.items:[]);coverMosaic(archiveArt,archiveTracks);};
     function refreshMixes(){mixCovers.forEach(([art,kind])=>coverMosaic(art,mixTracks(kind)));if(N.loadArchiveSelections)N.loadArchiveSelections(++archiveRequest);}
-    window.addEventListener('xmusic:family',refreshMixes);window.addEventListener('xmusic:archive',refreshMixes);refreshMixes();
+    window.addEventListener('xmusic:family',refreshMixes);window.addEventListener('xmusic:archive',refreshMixes);
+    let mixPlaybackSignature='';
+    window.addEventListener('xmusic:playback',e=>{
+      const v=e.detail||{},next=String(v.id||'')+'|'+String(v.artwork||'');
+      if(v.playing&&next!==mixPlaybackSignature){mixPlaybackSignature=next;refreshMixes();}
+    });
+    refreshMixes();
     const familyChip=document.querySelector('[data-filter="family"]');if(familyChip){familyChip.disabled=false;delete familyChip.dataset.xmBlocked;familyChip.textContent='Aile Karışımı';makeOwned(familyChip,()=>showFamilyMix('favorites'));}
     const mixSettings=mixes.querySelector('button');if(mixSettings&&!mixGrid.contains(mixSettings))makeOwned(mixSettings,()=>go('ayarlar_ve_profil_y_netimi'));
     const popHeading=pop.querySelector('h2');if(popHeading)popHeading.textContent='Stüdyo & Türkçe Pop';
