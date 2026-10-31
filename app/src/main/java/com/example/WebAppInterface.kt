@@ -204,7 +204,7 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         if (query.isBlank() || query.length > 120 || limit !in setOf(10, 30)) return
         Thread {
             val archived = if (liveOnly) null else try { (context as? MainActivity)?.searchDriveArchive(query) } catch (_: Exception) { null }
-            if (archived?.optJSONArray("items")?.length()?.let { it > 0 } == true) {
+            if (archived != null && archived.optJSONArray("items")?.length()?.let { it > 0 } == true) {
                 archived.put("archive", true).put("limit", limit)
                 webView.post { webView.evaluateJavascript("window.__xmusicExperimentalResult && window.__xmusicExperimentalResult($requestId,$archived)", null) }
                 return@Thread
