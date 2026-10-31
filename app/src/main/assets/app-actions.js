@@ -386,11 +386,12 @@
     const fav=mixTracks('favorites'),hist=mixTracks('history');
     const favIds=new Set(fav.map(t=>t.id)),favKeys=new Set(fav.map(selectionKey).filter(Boolean));
     const histIds=new Set(hist.map(t=>t.id)),histKeys=new Set(hist.map(selectionKey).filter(Boolean));
+    const byId=new Map(),byKey=new Map();[...fav,...hist].forEach(t=>{if(t.id&&!byId.has(t.id))byId.set(t.id,t);const key=selectionKey(t);if(key&&!byKey.has(key))byKey.set(key,t);});
     const week=Math.floor(Date.now()/604800000);
     const hash=id=>{let h=2166136261;for(const c of String(id)+':'+week)h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0;};
     return items.filter(t=>t&&String(t.id||'').startsWith('drive:')).map(t=>{
       const key=selectionKey(t),liked=favIds.has(t.id)||(key&&favKeys.has(key)),heard=histIds.has(t.id)||(key&&histKeys.has(key));
-      const shared=[...fav,...hist].find(x=>x.id===t.id||(key&&selectionKey(x)===key));
+      const shared=byId.get(t.id)||(key&&byKey.get(key));
       return {track:Object.assign({},t,{artwork:t.artwork||shared?.artwork||''}),score:liked?2:heard?1:0,order:hash(t.id)};
     }).sort((a,b)=>b.score-a.score||a.order-b.order).slice(0,30).map(x=>x.track);
   }
