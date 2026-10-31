@@ -399,9 +399,32 @@ x=open('ana_sayfa');[...x.d.querySelectorAll('button')].find(b=>b.textContent===
 assert.deepEqual(x.calls.find(c=>c[0]==='resumeDriveTrack'),['resumeDriveTrack','audiofile123','Drive çocuk kaydı','',0]);checks++;x.dom.window.close();
 profileMock={};familyMock={};approvedMock=[];
 
+// Arşiv araması, kaynak seçimi ve eski Drive yanıtlarının elenmesi.
+x=open('arama_ve_ke_fet');searchTimers=[];
+x.w.setTimeout=(fn,ms)=>{if(ms===350)searchTimers.push(fn);return searchTimers.length;};x.w.clearTimeout=()=>{};
+const archiveInput=x.d.getElementById('search-input');archiveInput.value='Dudu';archiveInput.dispatchEvent(new x.w.Event('input',{bubbles:true}));flushSearch();
+const driveRequest=x.calls.filter(c=>c[0]==='searchDriveArchive').at(-1);assert.equal(driveRequest[1],'Dudu');
+x.w.__xmusicDriveResult(driveRequest[2],{available:true,status:{stamp:123},items:[{id:'file123',title:'Arşiv Dudu',artist:'Tarkan',album:'Dudu',path:'Pop/Tarkan/Dudu'}]});
+const archiveResults=x.d.getElementById('xmusic-live-search');assert.ok(archiveResults.textContent.includes('Drive arşivim'));
+[...archiveResults.querySelectorAll('button')].find(b=>b.textContent.includes('Arşiv Dudu')).click();
+assert.deepEqual(x.calls.at(-1),['resumeDriveTrack','file123','Arşiv Dudu','Tarkan',0]);checks+=3;
+const songRequest=x.calls.filter(c=>c[0]==='searchAppleCatalog'&&c[3]==='songs').at(-1);
+x.w.__xmusicAppleResult(songRequest[4],{items:[{id:'catalogDudu',title:'Dudu',subtitle:'Tarkan'}]});
+[...archiveResults.querySelectorAll('button')].find(b=>b.textContent==='DuduTarkan').click();flushSearch();
+const versionsRequest=x.calls.filter(c=>c[0]==='searchExperimentalSource').at(-1);
+x.w.__xmusicExperimentalResult(versionsRequest[2],{archive:true,items:[{id:'file123',source:'drive',title:'Dudu',artist:'Tarkan',album:'Dudu'}]});
+[...archiveResults.querySelectorAll('button')].find(b=>b.textContent==='Diğer kaynaklarda ara').click();
+assert.equal(x.calls.at(-1)[0],'searchExperimentalSourceLive');checks++;
+archiveInput.value='Başka';archiveInput.dispatchEvent(new x.w.Event('input',{bubbles:true}));flushSearch();
+x.w.__xmusicDriveResult(driveRequest[2],{available:true,items:[{id:'stale',title:'Eski Drive sonucu'}]});
+assert.ok(!archiveResults.textContent.includes('Eski Drive sonucu'));checks++;x.dom.window.close();
+x=open('ayarlar_ve_profil_y_netimi');
+[...x.d.querySelectorAll('button')].find(b=>b.textContent==='Drive arşivini tara / yenile').click();assert.deepEqual(x.calls.at(-1),['refreshDriveArchive']);checks++;x.dom.window.close();
+
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
 if(process.env.XMUSIC_AUDIT_OUTPUT)fs.writeFileSync(process.env.XMUSIC_AUDIT_OUTPUT,JSON.stringify(report,null,2));
+
 
 
 
