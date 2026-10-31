@@ -28,7 +28,7 @@ open class DriveFolderClient {
         return request("https://www.googleapis.com/drive/v3/files?fields=id", token, metadata).getString("id")
     }
 
-    data class Track(val id: String, val name: String, val sourceId: String = "", val path: String = "", val modified: String = "") {
+    data class Track(val id: String, val name: String, val sourceId: String = "", val path: String = "", val modified: String = "", val artParents: String = "") {
         val displayName: String get() = if (path.isEmpty()) name else "$path / $name"
     }
 
@@ -37,6 +37,7 @@ open class DriveFolderClient {
         require(folderId.matches(Regex("[A-Za-z0-9_-]{1,200}")))
         val pending = java.util.ArrayDeque<Pair<String, String>>()
         pending.add(folderId to "")
+        val folderParents = mutableMapOf<String, String>()
         val visited = mutableSetOf(folderId); val seenFiles = mutableSetOf<String>()
         val tracks = mutableListOf<Track>(); var pages = 0
         while (pending.isNotEmpty()) {
@@ -65,13 +66,14 @@ open class DriveFolderClient {
                             require(visited.size <= 5000) { "Klasör sınırı aşıldı; önceki indeks korundu." }
                             val next = if (path.isEmpty()) name else "$path/$name"
                             require(next.count { it == '/' } < 64) { "Klasör derinliği sınırı aşıldı; önceki indeks korundu." }
+                            folderParents[id] = parent
                             pending.add(id to next)
                         }
                     } else if (mime != "application/vnd.google-apps.shortcut") {
                         val audio = mime.startsWith("audio/") || name.substringAfterLast('.', "").lowercase(java.util.Locale.ROOT) in setOf("mp3", "m4a", "aac", "flac", "ogg", "opus", "wav")
                         if (audio && seenFiles.add(id)) {
                             require(tracks.size < 50000) { "Dosya sınırı aşıldı; önceki indeks korundu." }
-                            tracks.add(Track(id, name, row.optJSONObject("appProperties")?.optString("youtubeId").orEmpty(), path, row.optString("modifiedTime")))
+                            tracks.add(Track(id, name, row.optJSONObject("appProperties")?.optString("youtubeId").orEmpty(), path, row.optString("modifiedTime"), parent))
                         }
                     }
                 }
@@ -79,7 +81,11 @@ open class DriveFolderClient {
                 if (page.isNotEmpty() && !seenPages.add(page)) throw IOException("Drive listeleme yanıtı tekrarlandı")
             } while (page.isNotEmpty())
         }
-        return tracks.sortedBy { it.displayName.lowercase(java.util.Locale.ROOT) }
+        return tracks.map { track ->
+            val chain = mutableListOf<String>(); var id = track.artParents
+            while (id.isNotEmpty() && id != folderId && id !in chain && chain.size < 3) { chain.add(id); id = folderParents[id].orEmpty() }
+            track.copy(artParents = chain.joinToString(","))
+        }.sortedBy { it.displayName.lowercase(java.util.Locale.ROOT) }
     }
 
     fun accountId(token: String): String =
@@ -121,6 +127,7 @@ open class DriveFolderClient {
         } finally { conn.disconnect() }
     }
 }
+
 
 
 
