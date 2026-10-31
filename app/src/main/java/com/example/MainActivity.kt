@@ -317,7 +317,11 @@ class MainActivity : ComponentActivity() {
         return true
     }
 
+    private val coverGeneration = java.util.concurrent.atomic.AtomicInteger()
+    private val coverWorker = java.util.concurrent.ThreadPoolExecutor(1, 1, 30L, java.util.concurrent.TimeUnit.SECONDS,
+        java.util.concurrent.ArrayBlockingQueue<Runnable>(4), java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy())
     fun resumeDriveTrack(fileId: String, title: String, artist: String, position: Long) {
+        if (isDestroyed) return
         val token = driveAccessToken
         val controller = mediaController
         val service = PlaybackService.activeService
@@ -330,12 +334,27 @@ class MainActivity : ComponentActivity() {
         service.registerExperimentalStream(url, mapOf("Authorization" to "Bearer $token"))
         val location = archiveLocation()
         val indexed = if (location == null) null else runCatching { com.example.data.drive.DriveArchiveIndex(this).use { it.get(com.example.data.drive.DriveArchiveIndex.scope(location.first, location.second), fileId) } }.getOrNull()
-        val metadata = androidx.media3.common.MediaMetadata.Builder().setTitle(indexed?.optString("title")?.ifBlank { title }?.take(180) ?: title.take(180))
-            .setArtist(indexed?.optString("artist")?.ifBlank { artist }?.take(180) ?: artist.take(180)).setAlbumTitle(indexed?.optString("album").orEmpty()).build()
+        val songTitle = indexed?.optString("title")?.ifBlank { title }?.take(180) ?: title.take(180)
+        val songArtist = indexed?.optString("artist")?.ifBlank { artist }?.take(180) ?: artist.take(180)
+        val album = indexed?.optString("album").orEmpty()
+        val scope = location?.let { com.example.data.drive.DriveArchiveIndex.scope(it.first, it.second) }.orEmpty()
+        val coverKey = CoverArtStore.key(scope, fileId, indexed?.optString("modified").orEmpty())
+        val metadataBuilder = androidx.media3.common.MediaMetadata.Builder().setTitle(songTitle).setArtist(songArtist).setAlbumTitle(album)
+            .setExtras(android.os.Bundle().apply { putString(CoverArtStore.EXTRA, coverKey) })
+        CoverArtStore(this).nativeUri(coverKey)?.let { metadataBuilder.setArtworkUri(it) }
+        val metadata = metadataBuilder.build()
         controller.setMediaItem(androidx.media3.common.MediaItem.Builder().setMediaId("drive:" + fileId).setUri(url).setMediaMetadata(metadata).build())
         controller.seekTo(position.coerceIn(0L, 86_400_000L))
         controller.prepare()
         controller.play()
+        val generation = coverGeneration.incrementAndGet()
+        val profile = ProfileStore(this).activeId()
+        coverWorker.execute {
+            val active = { !isDestroyed && generation == coverGeneration.get() && ProfileStore(this).activeId() == profile }
+            try {
+                com.example.data.drive.DriveCoverResolver(this).resolve(coverKey, scope, fileId, indexed?.optString("artParents").orEmpty(), songTitle, songArtist, album, token, active)
+            } catch (_: Exception) { }
+        }
     }
 
     fun openDriveLibrary() {
@@ -667,6 +686,16 @@ class MainActivity : ComponentActivity() {
         // Orijinal Stitch HTML dosyalarını değiştirmeden JavaScript köprüsünü kullan.
         // window.Android nesnesini JavaScript ile yeniden tanımlama: özyinelemeli çağrı oluşturur.
         webView.webViewClient = object : android.webkit.WebViewClient() {
+            override fun shouldInterceptRequest(view: WebView?, request: android.webkit.WebResourceRequest?): android.webkit.WebResourceResponse? {
+                val uri = request?.url ?: return null
+                if (uri.host != CoverArtStore.HOST) return super.shouldInterceptRequest(view, request)
+                val file = if (uri.scheme == "https" && (uri.port == -1 || uri.port == 443)) CoverArtStore(this@MainActivity).webFile(uri.path.orEmpty()) else null
+                return if (file != null) try {
+                    android.webkit.WebResourceResponse("image/jpeg", null, 200, "OK", mapOf("Cache-Control" to "private, max-age=86400"), file.inputStream())
+                } catch (_: Exception) { android.webkit.WebResourceResponse("image/jpeg", null, java.io.ByteArrayInputStream(ByteArray(0))) }
+                else android.webkit.WebResourceResponse("image/jpeg", null, 404, "Not Found", emptyMap(), java.io.ByteArrayInputStream(ByteArray(0)))
+            }
+
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
                 // Sayfa geçişinde ham HTML/ikon yazıları kısa süre görüntülenmesin.
@@ -871,7 +900,7 @@ class MainActivity : ComponentActivity() {
                             const row=document.createElement('button');
                             row.style.cssText='display:flex;gap:12px;align-items:center;text-align:left;width:100%;padding:12px 0;color:#e0e3e7;border-bottom:1px solid #313539;';
                             if(item.artwork && item.artwork.startsWith('https://')){
-                              const image=document.createElement('img');image.src=item.artwork;image.alt='';image.loading='lazy';
+                              const image=document.createElement('img');window.__xmusicSetArtwork(image,item.artwork);image.loading='lazy';
                               image.style.cssText='width:48px;height:48px;flex-shrink:0;object-fit:cover;border-radius:9px;';
                               row.appendChild(image);
                             }
@@ -1225,6 +1254,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        coverGeneration.incrementAndGet(); coverWorker.shutdownNow()
         driveSyncHandler.removeCallbacks(driveSyncTicker)
         playbackBridge.close()
         controllerFuture?.let { MediaController.releaseFuture(it) }
@@ -1235,6 +1265,7 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 }
+
 
 
 
