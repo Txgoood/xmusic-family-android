@@ -87,7 +87,7 @@
     window.dispatchEvent(new CustomEvent('xmusic:playback', { detail: value }));
     text(title, value.title || 'Henüz parça seçilmedi');
     text(artist, value.artist || 'Keşfet bölümünden bir parça seç');
-    const source = value.id?.startsWith('audius:') ? 'Audius' : value.id ? 'Akış' : '';
+    const source = value.id?.startsWith('audius:') ? 'Audius' : /^(drive:|drive-source:)/.test(value.id||'') ? 'Drive' : value.id ? 'Akış' : '';
     text(badge, source);
     if (full) text(document.querySelector('main h2'), source || 'Parça seçilmedi');
     if (artwork) {
@@ -118,4 +118,5 @@
   };
   window.__xmusicPlayback({ ready: false });
 })();
+
 
