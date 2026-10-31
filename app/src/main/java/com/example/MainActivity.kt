@@ -10,9 +10,9 @@ import com.example.playback.PlaybackService
 
 class MainActivity : ComponentActivity() {
     // Erişim anahtarı yalnızca bellekte tutulur; süre bitince yeniden yetki alınır.
-    private var driveAccessToken: String? = null
-    private var driveFolderId: String? = null
-    private var driveAccountId: String? = null
+    @Volatile private var driveAccessToken: String? = null
+    @Volatile private var driveFolderId: String? = null
+    @Volatile private var driveAccountId: String? = null
     private var driveBusy = false
     private var selectingDriveFolder = false
     private var requestContinuousRead = false
@@ -31,13 +31,86 @@ class MainActivity : ComponentActivity() {
             driveSyncHandler.postDelayed(this, 15000L)
         }
     }
+    private fun archiveLocation(): Pair<String, String>? {
+        val prefs = getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE)
+        val account = driveAccountId ?: prefs.getString("sync_account", null)
+            ?: getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE).getString("account", null) ?: return null
+        val folder = driveFolderId ?: prefs.getString(account, null) ?: return null
+        if (account.isBlank() || !folder.matches(Regex("[A-Za-z0-9_-]{1,200}"))) return null
+        return account to folder
+    }
+    fun searchDriveArchive(query: String): org.json.JSONObject {
+        val location = archiveLocation() ?: return org.json.JSONObject().put("available", false).put("items", org.json.JSONArray())
+        val scope = com.example.data.drive.DriveArchiveIndex.scope(location.first, location.second)
+        return com.example.data.drive.DriveArchiveIndex(this).use { index ->
+            val items = index.search(scope, query)
+            val visible = org.json.JSONArray(); val rules = ProfileStore(this)
+            for (i in 0 until items.length()) {
+                val item = items.getJSONObject(i)
+                if (!rules.isChild() || rules.playbackBlockReason("drive:" + item.getString("id")) == null) visible.put(item.put("source", "drive"))
+            }
+            org.json.JSONObject().put("available", true).put("items", visible).put("status", index.status(scope))
+        }
+    }
+    fun driveArchiveStatus(): String {
+        val location = archiveLocation() ?: return "Drive hesabı ve ortak klasör bağlantısı bekleniyor."
+        return com.example.data.drive.DriveArchiveIndex(this).use { index ->
+            val info = index.status(com.example.data.drive.DriveArchiveIndex.scope(location.first, location.second))
+            val count = info.optInt("count"); val stamp = info.optLong("stamp")
+            if (stamp == 0L) "Arşiv henüz taranmadı. Alt klasörler de taramaya dahildir."
+            else "$count ses dosyası · Alt klasörler dahil · " + java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT).format(java.util.Date(stamp)) +
+                if (info.optString("error").isEmpty()) "" else " · " + info.optString("error")
+        }
+    }
+    private fun scanDriveArchive(token: String, account: String, folder: String): List<com.example.data.drive.DriveFolderClient.Track> {
+        val scope = com.example.data.drive.DriveArchiveIndex.scope(account, folder)
+        return com.example.data.drive.DriveArchiveIndex(this).use { index ->
+            try {
+                val tracks = com.example.data.drive.DriveFolderClient().listAudio(token, folder)
+                index.replace(scope, tracks)
+                val network = getSystemService(CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+                if (!network.isActiveNetworkMetered) {
+                    val started = android.os.SystemClock.elapsedRealtime()
+                    for ((id, _, modified) in index.untaggedMp3(scope)) {
+                        if (android.os.SystemClock.elapsedRealtime() - started > 5000) break
+                        try { com.example.data.drive.DriveId3Reader.read(token, id)?.let { index.saveTags(scope, id, modified, it) } } catch (_: Exception) { }
+                    }
+                }
+                tracks
+            } catch (e: Exception) { index.markError(scope); throw e }
+        }
+    }
+    fun refreshDriveArchive() {
+        if (ProfileStore(this).isChild()) { showDriveError("Arşiv taraması için yetişkin profiline geç."); return }
+        val token = driveAccessToken; val location = archiveLocation()
+        if (token == null || location == null) { showDriveError("Önce Google hesabını bağla ve ortak klasörü seç."); return }
+        if (driveBusy || syncInFlight) { showDriveError("Arşiv işlemi sürüyor; bitmesini bekle."); return }
+        driveBusy = true
+        android.widget.Toast.makeText(this, "Alt klasörler taranıyor…", 0).show()
+        driveFolderWorker.execute {
+            try {
+                val tracks = scanDriveArchive(token, location.first, location.second)
+                runOnUiThread { if (!isDestroyed && archiveLocation() == location) { cacheSharedTracks(location.first, tracks); showDriveError(driveArchiveStatus()) } }
+            } catch (_: Exception) { runOnUiThread { if (!isDestroyed) showDriveError("Tarama tamamlanamadı. Önceki arşiv korunuyor; internet ve Drive okuma iznini kontrol et.") } }
+            finally { runOnUiThread { driveBusy = false } }
+        }
+    }
+    fun playMatchingDriveArchive(title: String, artist: String): Boolean {
+        // Farklı bir kayıt çocuk onayının yerine geçemez.
+        if (ProfileStore(this).isChild() || driveAccessToken == null) return false
+        val location = archiveLocation() ?: return false
+        val match = runCatching { com.example.data.drive.DriveArchiveIndex(this).use { it.exact(com.example.data.drive.DriveArchiveIndex.scope(location.first, location.second), title, artist) } }.getOrNull() ?: return false
+        resumeDriveTrack(match.getString("id"), match.optString("title"), match.optString("artist"), 0L)
+        return true
+    }
     private fun cacheSharedTracks(account: String, tracks: List<com.example.data.drive.DriveFolderClient.Track>) {
         val edit = getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE).edit()
         tracks.filter { it.sourceId.matches(Regex("[A-Za-z0-9_-]{11}")) }.forEach { edit.putString(account + ":" + it.sourceId, it.id) }
         edit.apply()
+        if (::appWebView.isInitialized && !isDestroyed) appWebView.evaluateJavascript("window.dispatchEvent(new Event('xmusic:archive'));", null)
         if (driveLibraryAdapter != null && account == driveAccountId) {
             visibleDriveTracks = tracks
-            driveLibraryAdapter?.apply { clear(); addAll(tracks.map { it.name }); notifyDataSetChanged() }
+            driveLibraryAdapter?.apply { clear(); addAll(tracks.map { it.displayName }); notifyDataSetChanged() }
         }
     }
     private fun reconnectSharedDriveSilently() {
@@ -61,7 +134,7 @@ class MainActivity : ComponentActivity() {
                         require(account == prefs.getString("sync_account", null))
                         val folder = prefs.getString(account, "").orEmpty()
                         require(folder.isNotBlank())
-                        val tracks = client.listAudio(token, folder)
+                        val tracks = scanDriveArchive(token, account, folder)
                         runOnUiThread {
                             if (!driveBusy) { driveAccessToken = token; driveAccountId = account; driveFolderId = folder; cacheSharedTracks(account, tracks) }
                             syncInFlight = false
@@ -250,7 +323,10 @@ class MainActivity : ComponentActivity() {
         if (!fileId.matches(Regex("[A-Za-z0-9_-]{1,200}"))) return
         val url = "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media"
         service.registerExperimentalStream(url, mapOf("Authorization" to "Bearer $token"))
-        val metadata = androidx.media3.common.MediaMetadata.Builder().setTitle(title.take(180)).setArtist(artist.take(180)).build()
+        val location = archiveLocation()
+        val indexed = if (location == null) null else runCatching { com.example.data.drive.DriveArchiveIndex(this).use { it.get(com.example.data.drive.DriveArchiveIndex.scope(location.first, location.second), fileId) } }.getOrNull()
+        val metadata = androidx.media3.common.MediaMetadata.Builder().setTitle(indexed?.optString("title")?.ifBlank { title }?.take(180) ?: title.take(180))
+            .setArtist(indexed?.optString("artist")?.ifBlank { artist }?.take(180) ?: artist.take(180)).setAlbumTitle(indexed?.optString("album").orEmpty()).build()
         controller.setMediaItem(androidx.media3.common.MediaItem.Builder().setMediaId("drive:" + fileId).setUri(url).setMediaMetadata(metadata).build())
         controller.seekTo(position.coerceIn(0L, 86_400_000L))
         controller.prepare()
@@ -263,12 +339,14 @@ class MainActivity : ComponentActivity() {
         val folder = driveFolderId
         if (driveBusy) { showDriveError("Drive işlemi sürüyor."); return }
         if (token == null || folder == null) { showDriveError("Önce Ayarlar'dan Google Drive hesabını bağla."); return }
+        val account = driveAccountId ?: return
         driveBusy = true
         driveFolderWorker.execute {
             try {
-                val tracks = com.example.data.drive.DriveFolderClient().listAudio(token, folder)
+                val tracks = scanDriveArchive(token, account, folder)
                 runOnUiThread {
-                    driveAccountId?.let { cacheSharedTracks(it, tracks) }
+                    if (isDestroyed || driveAccountId != account || driveFolderId != folder) return@runOnUiThread
+                    cacheSharedTracks(account, tracks)
                     if (tracks.isEmpty()) android.app.AlertDialog.Builder(this)
                         .setTitle("Drive müzik arşivi")
                         .setMessage("Bu klasörde uygulamanın erişebildiği ses dosyası yok. Drive'da dosyalar görünüyorsa mevcut müziklere ayrıca erişim ver. Klasör kimliği: " + folder)
@@ -277,7 +355,7 @@ class MainActivity : ComponentActivity() {
                         .setNegativeButton("Kapat", null).show()
                     else {
                         visibleDriveTracks = tracks
-                        val adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_list_item_1, tracks.map { it.name }.toMutableList())
+                        val adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_list_item_1, tracks.map { it.displayName }.toMutableList())
                         driveLibraryAdapter = adapter
                         val dialog = android.app.AlertDialog.Builder(this).setTitle("Drive müzik arşivi")
                         .setAdapter(adapter) { _, index ->
@@ -289,15 +367,7 @@ class MainActivity : ComponentActivity() {
                             } else if (driveAccessToken == null || driveFolderId != folder) {
                                 showDriveError("Drive hesabı değişti; arşivi yeniden aç.")
                             } else {
-                                val url = "https://www.googleapis.com/drive/v3/files/" + track.id + "?alt=media"
-                                service.registerExperimentalStream(url, mapOf("Authorization" to "Bearer ${driveAccessToken}"))
-                                val metadata = androidx.media3.common.MediaMetadata.Builder()
-                                    .setTitle(track.name).setArtist("Google Drive arşivi").build()
-                                val item = androidx.media3.common.MediaItem.Builder()
-                                    .setMediaId("drive:" + track.id).setUri(url).setMediaMetadata(metadata).build()
-                                controller.setMediaItem(item)
-                                controller.prepare()
-                                controller.play()
+                                resumeDriveTrack(track.id, track.name, "Google Drive arşivi", 0L)
                             }
                         }.setNegativeButton("Kapat", null).create()
                         dialog.setOnDismissListener { if (driveLibraryAdapter === adapter) driveLibraryAdapter = null }
@@ -433,7 +503,7 @@ class MainActivity : ComponentActivity() {
                 val prefsEdit = folderPrefs.edit().putString(account, folder)
                 if (continuous) prefsEdit.putBoolean("sync_enabled", true).putString("sync_account", account)
                 prefsEdit.commit()
-                val sharedTracks = if (continuous) folderClient.listAudio(token, folder) else emptyList()
+                val sharedTracks = if (continuous) scanDriveArchive(token, account, folder) else emptyList()
 
                 runOnUiThread {
                     if (driveAccessToken == token) {
@@ -846,6 +916,19 @@ class MainActivity : ComponentActivity() {
                             }
                             target.appendChild(rows);draw();
                           };
+                          function driveRow(item){
+                            const row=catalogRow({title:item.title,subtitle:'Drive · '+(item.artist||'')+(item.album?' · '+item.album:''),artwork:''},'songs');
+                            owned(row,function(){window.Android.resumeDriveTrack(item.id,item.title||'',item.artist||'',0);});return row;
+                          }
+                          window.__xmusicDriveResult=function(id,payload){
+                            const entry=pending.get(id);pending.delete(id);if(!entry||entry.epoch!==generation)return;
+                            const target=entry.container;target.replaceChildren();
+                            if(!payload.available){target.parentElement.style.display='none';return;}
+                            const items=payload.items||[];
+                            if(payload.error){target.textContent=payload.error;return;}
+                            if(!items.length){target.textContent=payload.status&&payload.status.stamp?'Drive arşivinde eşleşme yok.':'Arşiv henüz taranmadı. Drive ayarlarından arşivi tara.';return;}
+                            items.forEach(function(item){target.appendChild(driveRow(item));});
+                          };
                           window.__xmusicExperimentalResult=function(id,payload){
                             const entry=pending.get(id);pending.delete(id);
                             if(!entry || entry.epoch!==generation || state.view!=='versions')return;
@@ -853,14 +936,19 @@ class MainActivity : ComponentActivity() {
                             if(payload.error){target.textContent=payload.error;return;}
                             const items=payload.items||[];
                             if(!items.length){target.textContent='Dinlenebilir kayıt bulunamadı.';return;}
-                            const hint=document.createElement('p');hint.textContent='Dinlemek istediğin sürümü ve yükleyeni kontrol ederek seç.';
+                            const hint=document.createElement('p');hint.textContent=payload.archive?'Ortak Drive arşivindeki kayıtlar':'Dinlemek istediğin sürümü ve yükleyeni kontrol ederek seç.';
                             hint.style.cssText='font-size:12px;color:#b4c1c9;margin-bottom:8px;';target.appendChild(hint);
                             items.forEach(function(item){
+                              if(item.source==='drive'){target.appendChild(driveRow(item));return;}
                               const row=catalogRow({title:item.title,subtitle:item.artist,artwork:'https://i.ytimg.com/vi/'+item.id+'/mqdefault.jpg'},'songs');
                               owned(row,function(){window.Android.playExperimentalSource(item.id,item.title||'',item.artist||'');});
                               target.appendChild(row);
                             });
-                            if(payload.limit===10&&items.length===10)target.appendChild(button('Daha fazla sonuç',function(){
+                            if(payload.archive)target.appendChild(button('Diğer kaynaklarda ara',function(){
+                              target.textContent='Aranıyor…';const request=++requestId;pending.set(request,{container:target,epoch:generation});
+                              window.Android.searchExperimentalSourceLive(state.name,request);
+                            }));
+                            if(!payload.archive&&payload.limit===10&&items.length===10)target.appendChild(button('Daha fazla sonuç',function(){
                               target.textContent='Aranıyor…';
                               const request=++requestId;pending.set(request,{container:target,epoch:generation});
                               window.Android.searchExperimentalSourceMore(state.name,request,30);
@@ -887,6 +975,10 @@ class MainActivity : ComponentActivity() {
                                 const request=++requestId;pending.set(request,{container:body,epoch:epoch});
                                 window.Android.searchExperimentalSource(state.name,request);return;
                               }
+                              const driveGroup=document.createElement('section');
+                              const driveHeading=document.createElement('h3');driveHeading.textContent='Drive arşivim';driveHeading.style.cssText='font-weight:600;color:#4efd7d;margin:12px 0;';
+                              const driveResults=document.createElement('div');driveResults.textContent='Arşivde aranıyor…';driveGroup.append(driveHeading,driveResults);body.appendChild(driveGroup);
+                              const driveRequest=++requestId;pending.set(driveRequest,{container:driveResults,epoch:epoch});window.Android.searchDriveArchive(query,driveRequest);
                               const kinds=state.view==='search'?(state.filter==='all'?['artists','albums','songs']:[state.filter]):[state.view];
                               kinds.forEach(function(kind){
                                 const group=document.createElement('div');group.style.marginBottom='16px';
@@ -922,6 +1014,11 @@ class MainActivity : ComponentActivity() {
                           const library=document.createElement('button');
                           library.type='button';library.textContent='Drive müzik arşivini aç';library.style.cssText=btn.style.cssText;
                           library.dataset.xmOwned='true';library.__xmOwnedRun=function(){if(window.Android)window.Android.openDriveLibrary();};
+                          const scan=document.createElement('button');scan.type='button';scan.textContent='Drive arşivini tara / yenile';scan.style.cssText=btn.style.cssText;
+                          scan.dataset.xmOwned='true';scan.__xmOwnedRun=function(){window.Android.refreshDriveArchive();};
+                          const scanStatus=document.createElement('p');scanStatus.style.cssText='padding:0 16px 12px;color:#b4c1c9;font-size:12px;';
+                          function refreshScanStatus(){scanStatus.textContent=window.Android.driveArchiveStatus()||'';}refreshScanStatus();window.addEventListener('xmusic:archive',refreshScanStatus);
+
                           const queue=document.createElement('button');queue.type='button';queue.textContent='Drive yükleme kuyruğu';queue.style.cssText=btn.style.cssText;
                           queue.dataset.xmOwned='true';queue.__xmOwnedRun=function(){if(window.Android)window.Android.showDriveUploadQueue();};
                           const automatic=document.createElement('button');automatic.type='button';automatic.textContent='Otomatik Drive arşivini aç / kapat';automatic.style.cssText=btn.style.cssText;
@@ -952,7 +1049,7 @@ class MainActivity : ComponentActivity() {
                           details.appendChild(explain('2. Otomatik bağlantı iznini bir kez ver. Yeni müzikler uygulama açıkken yaklaşık dakikada bir alınır; tek tek şarkı seçmen gerekmez.'));
                           appendAction(details,sync);
                           details.appendChild(explain('Günlük kullanım: Ortak arşivdeki müzikleri aç ve dinle.'));
-                          appendAction(details,library);
+                          appendAction(details,library);appendAction(details,scan);details.appendChild(scanStatus);
                           const advanced=document.createElement('details');advanced.style.cssText='margin:16px;border-top:1px solid #3c4a3c;padding-top:12px;';
                           const advancedTitle=document.createElement('summary');advancedTitle.textContent='Gelişmiş işlemler';advancedTitle.style.cssText='padding:10px 0;font:inherit;color:#bbcbb8;cursor:pointer;';
                           advancedTitle.dataset.xmOwned='true';advancedTitle.__xmOwnedRun=function(){advanced.open=!advanced.open;};
@@ -1133,6 +1230,7 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 }
+
 
 
 
