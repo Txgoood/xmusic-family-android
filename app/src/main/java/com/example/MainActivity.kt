@@ -53,6 +53,25 @@ class MainActivity : ComponentActivity() {
             org.json.JSONObject().put("available", true).put("items", visible).put("status", index.status(scope))
         }
     }
+    fun archiveSelections(): org.json.JSONObject {
+        val location = archiveLocation() ?: return org.json.JSONObject().put("items", org.json.JSONArray()).put("available", false)
+        val scope = com.example.data.drive.DriveArchiveIndex.scope(location.first, location.second)
+        return com.example.data.drive.DriveArchiveIndex(this).use { index ->
+            val rows = index.selections(scope)
+            val visible = org.json.JSONArray()
+            val rules = ProfileStore(this)
+            val covers = CoverArtStore(this)
+            for (i in 0 until rows.length()) {
+                val item = rows.getJSONObject(i)
+                val id = item.optString("id")
+                if (rules.isChild() && rules.playbackBlockReason("drive:$id") != null) continue
+                item.put("id", "drive:$id")
+                item.put("artwork", covers.webUri(CoverArtStore.key(scope, id, item.optString("modified"))))
+                visible.put(item)
+            }
+            org.json.JSONObject().put("items", visible).put("available", true).put("status", index.status(scope))
+        }
+    }
     fun driveArchiveStatus(): String {
         val location = archiveLocation() ?: return "Drive hesabı ve ortak klasör bağlantısı bekleniyor."
         return com.example.data.drive.DriveArchiveIndex(this).use { index ->
@@ -1265,6 +1284,7 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 }
+
 
 
 
