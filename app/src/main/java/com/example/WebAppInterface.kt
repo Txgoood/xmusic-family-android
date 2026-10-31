@@ -29,6 +29,13 @@ class WebAppInterface(private val context: Context, private val webView: WebView
 
     @JavascriptInterface fun refreshDriveArchive() { webView.post { (context as? MainActivity)?.refreshDriveArchive() } }
     @JavascriptInterface fun driveArchiveStatus(): String = try { (context as? MainActivity)?.driveArchiveStatus().orEmpty() } catch (_: Exception) { "Arşiv indeksi açılamadı; yeniden taramayı dene." }
+    @JavascriptInterface fun loadArchiveSelections(requestId: Int) {
+        Thread {
+            val result = try { (context as? MainActivity)?.archiveSelections() ?: org.json.JSONObject().put("available", false) }
+                catch (_: Exception) { org.json.JSONObject().put("available", false) }
+            webView.post { webView.evaluateJavascript("window.__xmusicArchiveSelections && window.__xmusicArchiveSelections($requestId,$result)", null) }
+        }.start()
+    }
     @JavascriptInterface fun searchDriveArchive(query: String, requestId: Int) {
         if (query.isBlank() || query.length > 120) return
         Thread {
@@ -700,6 +707,7 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         this.mediaController = controller
     }
 }
+
 
 
 
