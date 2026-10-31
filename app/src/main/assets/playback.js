@@ -30,6 +30,11 @@
   const artist = full ? title?.parentElement?.nextElementSibling?.querySelector('p') : mini?.querySelectorAll('p')[1];
   const badge = title?.nextElementSibling;
   let artwork = full ? document.querySelector('main img') : null;
+  if (full && artwork) {
+    const visualStyle=document.createElement('style');
+    visualStyle.textContent='@keyframes xm-cover-motion{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}} .xm-cover-motion{animation:xm-cover-motion 12s ease-in-out infinite;will-change:transform} @media (prefers-reduced-motion:reduce){.xm-cover-motion{animation:none!important}}';
+    document.head.appendChild(visualStyle);
+  }
   if (mini) {
     const box = mini.querySelector('.w-12.h-12') || (settingsMini && mini.querySelector('.w-11.h-11')); 
     if (box) {
@@ -101,6 +106,7 @@
     text(badge, source);
     if (full) text(document.querySelector('main h2'), source || 'Parça seçilmedi');
     setArtwork(artwork,value.artwork,value.title);
+    if(full && artwork)artwork.classList.toggle('xm-cover-motion',!!value.id && !!value.playing && !document.hidden);
     text(status, value.error || (!value.ready ? 'Oynatıcı bağlanıyor…' : value.pending ? 'Ses yükleniyor…' : value.ended ? 'Bitti' : value.id ? (value.playing ? 'Çalıyor' : 'Duraklatıldı') : ''));
     controls.forEach(button => {
       const label = button.getAttribute('aria-label');
@@ -122,6 +128,7 @@
   };
   window.__xmusicPlayback({ ready: false });
 })();
+
 
 
 
