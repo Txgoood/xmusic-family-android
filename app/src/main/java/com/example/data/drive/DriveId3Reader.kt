@@ -16,8 +16,13 @@ object DriveId3Reader {
             // Aralık isteği yok sayılırsa büyük yanıt gövdesi okunmaz.
             if (conn.responseCode != 206 || !conn.getHeaderField("Content-Range").orEmpty().startsWith("bytes 0-")) return null
             val data = conn.inputStream.use { input ->
-                val out = java.io.ByteArrayOutputStream(); val buffer = ByteArray(8192)
-                while (out.size() < LIMIT) { val n = input.read(buffer, 0, minOf(buffer.size, LIMIT - out.size())); if (n < 0) break; out.write(buffer, 0, n) }
+                val header = ByteArray(10); var count = 0
+                while (count < header.size) { val n = input.read(header, count, header.size - count); if (n < 0) break; count += n }
+                if (count < 10 || String(header, 0, 3, Charsets.US_ASCII) != "ID3") return DriveArchiveIndex.Metadata("")
+                val tagSize = ((header[6].toInt() and 127) shl 21) or ((header[7].toInt() and 127) shl 14) or ((header[8].toInt() and 127) shl 7) or (header[9].toInt() and 127)
+                val target = minOf(LIMIT, 10 + tagSize)
+                val out = java.io.ByteArrayOutputStream(); out.write(header); val buffer = ByteArray(8192)
+                while (out.size() < target) { val n = input.read(buffer, 0, minOf(buffer.size, target - out.size())); if (n < 0) break; out.write(buffer, 0, n) }
                 out.toByteArray()
             }
             return parse(data)
