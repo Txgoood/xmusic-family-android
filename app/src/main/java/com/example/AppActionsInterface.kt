@@ -15,12 +15,84 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
     private val profiles = ProfileStore(activity)
     private var libraryProfileId = profiles.activeId()
     private val prefs get() = activity.getSharedPreferences("xmusic_library_" + profiles.activeId(), Context.MODE_PRIVATE)
+    private val avatarPrefs get() = activity.getSharedPreferences("xmusic_profile_avatars", Context.MODE_PRIVATE)
+    @JavascriptInterface fun activeAvatar(): String = FamilySyncStore(activity).syncedAvatar(profiles.activeId(), avatarPrefs.getString(profiles.activeId(), "") ?: "")
+    @JavascriptInterface fun setActiveAvatar(value: String): Boolean {
+        if (value !in setOf("🎵", "🎧", "🎸", "🌸", "🌟", "🐱", "🦊", "🐼")) return false
+        return avatarPrefs.edit().putString(profiles.activeId(), value).putLong("time_" + profiles.activeId(), System.currentTimeMillis()).commit()
+    }
+    @JavascriptInterface fun pickActiveAvatar() { webView.post { activity.pickProfilePhoto() } }
+    @JavascriptInterface fun openEqualizer() { webView.post {
+        val session = com.example.playback.PlaybackService.activeService?.audioSessionId() ?: 0
+        if (session == 0) { android.widget.Toast.makeText(activity, "Önce bir parça çal", 0).show(); return@post }
+        try {
+            val intent = Intent(android.media.audiofx.AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL)
+                .putExtra(android.media.audiofx.AudioEffect.EXTRA_AUDIO_SESSION, session)
+                .putExtra(android.media.audiofx.AudioEffect.EXTRA_PACKAGE_NAME, activity.packageName)
+                .putExtra(android.media.audiofx.AudioEffect.EXTRA_CONTENT_TYPE, android.media.audiofx.AudioEffect.CONTENT_TYPE_MUSIC)
+            activity.startActivity(intent)
+        } catch (_: android.content.ActivityNotFoundException) {
+            android.widget.Toast.makeText(activity, "Bu cihazda ekolayzır ekranı bulunamadı", 0).show()
+        } catch (_: SecurityException) {
+            android.widget.Toast.makeText(activity, "Ekolayzır açılamadı", 0).show()
+        }
+    } }
+
+    @JavascriptInterface fun setParentPin(oldPin: String, newPin: String): Boolean = profiles.setParentPin(oldPin, newPin)
+    @JavascriptInterface fun saveFamilyProfile(id: String, name: String, role: String, oldPin: String, newPin: String, parentPin: String, minutes: Int, mix: Boolean): Boolean =
+        profiles.saveProfile(id, name, role, oldPin, newPin, parentPin, minutes, mix)
+    @JavascriptInterface fun childTracks(id: String): String =
+        if (profiles.isAdmin() || id == profiles.activeId()) profiles.approved(id).toString() else "[]"
+    @JavascriptInterface fun approveChildTrack(id: String, track: String, remove: Boolean, parentPin: String): Boolean =
+        profiles.approve(id, track, remove, parentPin)
+    @JavascriptInterface fun childReview(id: String): String = profiles.childReview(id)
+    @JavascriptInterface fun requestChildReview(id: String, track: String): Boolean = profiles.requestReview(id, track)
+    @JavascriptInterface fun setChildAge(id: String, age: String, pin: String): Boolean = profiles.setChildAge(id, age, pin)
+    @JavascriptInterface fun resolveChildReview(id: String, key: String, deny: Boolean, pin: String): Boolean = profiles.resolveReview(id, key, deny, pin)
+    @JavascriptInterface fun familySyncState(): String = FamilySyncStore(activity).state()
+    @JavascriptInterface fun familySetup(action: String, code: String) { webView.post { activity.setupFamily(action, code) } }
+    @JavascriptInterface fun copyFamilyInvitation() { webView.post { activity.copyFamilyInvitation() } }
+    @JavascriptInterface fun setFamilySharing(enabled: Boolean): Boolean {
+        if (profiles.isChild()) return false
+        FamilySyncStore(activity).setSharing(profiles.activeId(), enabled)
+        webView.post { activity.syncFamilyIfReady(true) }; return true
+    }
+    @JavascriptInterface fun familySharing(): Boolean {
+        val data = JSONObject(profiles.publicState()).getJSONArray("profiles")
+        val row = (0 until data.length()).map { data.getJSONObject(it) }.firstOrNull { it.getString("id") == profiles.activeId() }
+        return !profiles.isChild() && FamilySyncStore(activity).isSharing(profiles.activeId(), row?.optBoolean("mixEnabled", false) ?: false)
+    }
+    @JavascriptInterface fun familyMix(kind: String): String {
+        if (profiles.isChild()) return profiles.approved().toString()
+        if (kind !in setOf("favorites", "history")) return "[]"
+        val result = org.json.JSONArray(); val ids = mutableSetOf<String>()
+        fun canonical(id: String): String = if (id.startsWith("drive-source:")) "experimental:" + id.substringAfter(':') else id
+        for (id in profiles.mixProfileIds()) {
+            val data = try { JSONObject(activity.getSharedPreferences("xmusic_library_$id", Context.MODE_PRIVATE).getString("data", "{}") ?: "{}") } catch (_: Exception) { continue }
+            val rows = data.optJSONArray(kind) ?: continue
+            for (i in 0 until minOf(rows.length(), 100)) {
+                val row = rows.optJSONObject(i) ?: continue
+                val trackId = row.optString("id")
+                if (trackId.isNotBlank() && ids.add(canonical(trackId))) result.put(row)
+            }
+        }
+        val remote = FamilySyncStore(activity).remoteMix(kind)
+        for (i in 0 until remote.length()) {
+            val row = remote.getJSONObject(i); if (ids.add(canonical(row.optString("id")))) result.put(row)
+        }
+        val sorted = org.json.JSONArray()
+        (0 until result.length()).map { result.getJSONObject(it) }.sortedBy { canonical(it.optString("id")) }.take(200).forEach { sorted.put(it) }
+        return sorted.toString()
+    }
+
     @JavascriptInterface fun profileState(): String = profiles.publicState()
     @JavascriptInterface fun changeProfile(action: String, id: String, name: String, oldPin: String, newPin: String): Boolean {
         val changed = profiles.change(action, id, name, oldPin, newPin)
         if (changed && action == "select") webView.post { controller?.clearMediaItems(); com.example.playback.PlaybackService.activeService?.setSleepTimer(0) }
         if (changed && action == "delete") {
             activity.getSharedPreferences("xmusic_library_$id", Context.MODE_PRIVATE).edit().clear().commit()
+            MusicListeningStats(activity).removeProfile(id)
+            PlaybackResumeStore(activity).clear(id)
             val removedDownloads = activity.getSharedPreferences("xmusic_downloads_$id", Context.MODE_PRIVATE)
             val manager = activity.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
             removedDownloads.all.values.forEach { raw ->
@@ -30,6 +102,29 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         }
         return changed
     }
+
+    private val podcastCatalog = PodcastCatalogClient()
+
+    @JavascriptInterface fun searchPodcasts(query: String, requestId: Int) {
+        if (query.trim().length !in 2..100) return
+        Thread {
+            val result = try { podcastCatalog.search(query) }
+            catch (_: Exception) { JSONObject().put("error", "Podcast araması yapılamadı. Bağlantını kontrol edip yeniden dene.") }
+            webView.post {
+                webView.evaluateJavascript("window.__xmusicPodcastSearchResult && window.__xmusicPodcastSearchResult(" +
+                    requestId + "," + result.toString() + ")", null)
+            }
+        }.start()
+    }
+
+    @JavascriptInterface fun openPodcastPage(address: String) { webView.post {
+        if (profiles.isChild()) return@post
+        try {
+            val uri = android.net.Uri.parse(address)
+            require(uri.scheme == "https" && uri.host == "podcasts.apple.com")
+            activity.startActivity(Intent(Intent.ACTION_VIEW, uri))
+        } catch (_: Exception) { android.widget.Toast.makeText(activity, "Program bağlantısı açılamadı.", 0).show() }
+    } }
 
     private val episodes = java.util.concurrent.ConcurrentHashMap<String, JSONObject>()
     private val downloadsPrefs get() = activity.getSharedPreferences("xmusic_downloads_" + profiles.activeId(), Context.MODE_PRIVATE)
@@ -79,12 +174,56 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         val data = episodes[id]
         if (data == null) { android.widget.Toast.makeText(activity, "Önce podcast RSS kaynağını aç", 0).show(); return@post }
         val item = MediaItem.Builder().setMediaId(id).setUri(data.getString("url"))
-            .setMediaMetadata(MediaMetadata.Builder().setTitle(data.optString("title")).setArtist(data.optString("artist")).build()).build()
+            .setMediaMetadata(MediaMetadata.Builder().setTitle(data.optString("title")).setArtist(data.optString("artist"))
+                .setExtras(android.os.Bundle().apply { putString("feed", data.optString("feed")) }).build()).build()
         val p = controller ?: return@post
         if (enqueue) p.addMediaItem(item) else { p.setMediaItem(item); p.prepare(); p.play() }
     } }
 
+    @JavascriptInterface fun resumePodcast(address: String, id: String, position: Long) {
+        if (!id.matches(Regex("podcast:[a-f0-9]{64}"))) return
+        Thread {
+            try {
+                var data = episodes[id]
+                var audioUri: android.net.Uri? = null
+                val manager = activity.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                val downloaded = downloadsPrefs.getString(id.removePrefix("podcast:"), null)
+                if (downloaded != null) {
+                    val saved = JSONObject(downloaded)
+                    audioUri = manager.getUriForDownloadedFile(saved.getLong("downloadId"))
+                    if (audioUri != null) data = saved
+                }
+                if (data == null) {
+                    val source = android.net.Uri.parse(address)
+                    require(source.scheme == "https" && !source.host.isNullOrBlank())
+                    val conn = java.net.URL(address).openConnection() as java.net.HttpURLConnection
+                    conn.connectTimeout = 10000; conn.readTimeout = 12000
+                    val xml = try {
+                        if (conn.responseCode !in 200..299) throw java.io.IOException("RSS bağlantısı açılamadı")
+                        conn.inputStream.use { String(it.readBytesLimited(2_000_000), Charsets.UTF_8) }
+                    } finally { conn.disconnect() }
+                    val items = PodcastRssParser.parse(xml, address).getJSONArray("items")
+                    for (i in 0 until items.length()) {
+                        val row = items.getJSONObject(i)
+                        if (row.optString("id") == id) { data = row; episodes[id] = row; break }
+                    }
+                }
+                val track = data ?: throw java.io.IOException("Bölüm bulunamadı")
+                val uri = audioUri ?: android.net.Uri.parse(track.getString("url"))
+                val item = MediaItem.Builder().setMediaId(id).setUri(uri).setMediaMetadata(MediaMetadata.Builder()
+                    .setTitle(track.optString("title")).setArtist(track.optString("artist"))
+                    .setExtras(android.os.Bundle().apply { putString("feed", track.optString("feed")) }).build()).build()
+                webView.post {
+                    controller?.let { p ->
+                        p.setMediaItem(item);p.seekTo(position.coerceIn(0L, 86_400_000L));p.prepare();p.play()
+                    }
+                }
+            } catch (_: Exception) { webView.post { android.widget.Toast.makeText(activity, "Podcast bölümüne erişilemedi.", 0).show() } }
+        }.start()
+    }
+
     @JavascriptInterface fun downloadPodcast(id: String) { webView.post {
+        if (profiles.isChild()) return@post
         val data = episodes[id] ?: return@post
         try {
             val manager = activity.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
@@ -97,6 +236,8 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
                 .setDescription("XMusic Family podcast")
                 .setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 .setDestinationInExternalFilesDir(activity, android.os.Environment.DIRECTORY_MUSIC, "$key.audio")
+            if (activity.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE).getBoolean("download_unmetered_only", false))
+                request.setAllowedNetworkTypes(android.app.DownloadManager.Request.NETWORK_WIFI)
             val downloadId = manager.enqueue(request)
             downloadsPrefs.edit().putString(key, JSONObject(data.toString()).put("downloadId", downloadId).toString()).apply()
             android.widget.Toast.makeText(activity, "Podcast indirme kuyruğuna eklendi", 0).show()
@@ -155,6 +296,34 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         if (profiles.activeId() != libraryProfileId || value.length > 1_000_000) return false
         return try { JSONObject(value); prefs.edit().putString("data", value).commit() } catch (_: Exception) { false }
     }
+    @JavascriptInterface fun loadPlaybackResume(): String =
+        if (profiles.activeId() == libraryProfileId) PlaybackResumeStore(activity).load(libraryProfileId) else "{}"
+    @JavascriptInterface fun clearPlaybackResume() {
+        if (profiles.isChild()) return
+        if (profiles.activeId() == libraryProfileId) PlaybackResumeStore(activity).clear(libraryProfileId)
+    }
+
+    @JavascriptInterface fun assignMusicGenre(videoId: String, genre: String) {
+        if (profiles.activeId() == libraryProfileId) MusicListeningStats(activity).assign(videoId, genre)
+    }
+    @JavascriptInterface fun familyGenreStats(): String = MusicListeningStats(activity).summary()
+
+    @JavascriptInterface fun recordSearch(query: String) {
+        if (profiles.activeId() != libraryProfileId) return
+        try { SearchStatsStore(activity, libraryProfileId).record(query) } catch (_: Exception) { }
+    }
+    @JavascriptInterface fun topSearches(): String {
+        if (profiles.activeId() != libraryProfileId) return "[]"
+        return try { SearchStatsStore(activity, libraryProfileId).read().toString() } catch (_: Exception) { "[]" }
+    }
+
+    @JavascriptInterface fun searchHistory(action: String, query: String): String {
+        // Önceki profilin açık sayfasından yeni profile geçmiş yazılmasını engelle.
+        if (profiles.activeId() != libraryProfileId) return "[]"
+        return try { SearchHistoryStore(activity, libraryProfileId).update(action, query) }
+        catch (_: Exception) { "null" }
+    }
+
     @JavascriptInterface fun voiceSearch() { webView.post { activity.openVoiceSearch() } }
     @JavascriptInterface fun openLocalAudio() { webView.post { activity.openLocalAudio() } }
     @JavascriptInterface fun clearWebCache() { webView.post {
@@ -162,10 +331,12 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         android.widget.Toast.makeText(activity, "Web önbelleği temizlendi; kitaplık korundu", android.widget.Toast.LENGTH_SHORT).show()
     } }
     @JavascriptInterface fun openSoundSettings() { webView.post {
+        if (profiles.isChild()) return@post
         try { activity.startActivity(Intent(android.provider.Settings.ACTION_SOUND_SETTINGS)) }
         catch (_: Exception) { android.widget.Toast.makeText(activity, "Ses ayarları açılamadı", 0).show() }
     } }
     @JavascriptInterface fun shareText(value: String) { webView.post {
+        if (profiles.isChild()) return@post
         val intent = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, value.take(4000))
         activity.startActivity(Intent.createChooser(intent, "Paylaş"))
     } }
@@ -183,13 +354,18 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
             "speed" -> p.setPlaybackSpeed(target.coerceIn(50, 200) / 100f)
         }
     } }
+    @JavascriptInterface fun setSleepFade(enabled: Boolean) { webView.post {
+        com.example.playback.PlaybackService.activeService?.setSleepFade(enabled)
+    } }
     @JavascriptInterface fun setSleepTimer(minutes: Int) { webView.post {
         val service = com.example.playback.PlaybackService.activeService
         if (service == null || (minutes != 0 && controller?.currentMediaItem == null)) {
             android.widget.Toast.makeText(activity, "Önce bir parça başlat", 0).show()
         } else { service.setSleepTimer(minutes); android.widget.Toast.makeText(activity, if (minutes == 0) "Zamanlayıcı iptal edildi" else "Zamanlayıcı ayarlandı", 0).show() }
     } }
-    @JavascriptInterface fun playSavedTrack(value: String, enqueue: Boolean) { webView.post {
+    @JavascriptInterface fun playSavedTrack(value: String, enqueue: Boolean) = startSavedTrack(value, enqueue, 0L)
+    @JavascriptInterface fun resumeLocalTrack(value: String, position: Long) = startSavedTrack(value, false, position.coerceIn(0L, 86_400_000L))
+    private fun startSavedTrack(value: String, enqueue: Boolean, position: Long) { webView.post {
         try {
             val data = JSONObject(value)
             val id = data.optString("id")
@@ -201,7 +377,10 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
             val item = MediaItem.Builder().setMediaId(id).setUri(uri).setMediaMetadata(MediaMetadata.Builder()
                 .setTitle(data.optString("title").take(180)).setArtist(data.optString("artist").take(180)).build()).build()
             val p = controller ?: return@post
-            if (enqueue) p.addMediaItem(item) else { p.setMediaItem(item); p.prepare(); p.play() }
+            if (enqueue) p.addMediaItem(item) else { p.setMediaItem(item); if (position > 0) p.seekTo(position); p.prepare(); p.play() }
         } catch (_: Exception) { android.widget.Toast.makeText(activity, "Dosya açılamadı. Dosyayı yeniden seç.", 0).show() }
     } }
 }
+
+
+

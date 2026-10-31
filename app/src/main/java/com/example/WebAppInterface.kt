@@ -17,12 +17,63 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     private var lastMusicBrainzRequest = 0L
 
     @JavascriptInterface
+    fun showDriveUploadQueue() { webView.post { (context as? MainActivity)?.showDriveUploadQueue() } }
+
+    @JavascriptInterface
+    fun toggleAutomaticArchive() { webView.post { (context as? MainActivity)?.toggleAutomaticArchive() } }
+
+    @JavascriptInterface
+    fun resumeDriveTrack(id: String, title: String, artist: String, position: Long) {
+        webView.post { (context as? MainActivity)?.resumeDriveTrack(id, title, artist, position) }
+    }
+
+    @JavascriptInterface fun refreshDriveArchive() { webView.post { (context as? MainActivity)?.refreshDriveArchive() } }
+    @JavascriptInterface fun driveArchiveStatus(): String = try { (context as? MainActivity)?.driveArchiveStatus().orEmpty() } catch (_: Exception) { "Arşiv indeksi açılamadı; yeniden taramayı dene." }
+    @JavascriptInterface fun loadArchiveSelections(requestId: Int) {
+        Thread {
+            val result = try { (context as? MainActivity)?.archiveSelections() ?: org.json.JSONObject().put("available", false) }
+                catch (_: Exception) { org.json.JSONObject().put("available", false) }
+            webView.post { webView.evaluateJavascript("window.__xmusicArchiveSelections && window.__xmusicArchiveSelections($requestId,$result)", null) }
+        }.start()
+    }
+    @JavascriptInterface fun searchDriveArchive(query: String, requestId: Int) {
+        if (query.isBlank() || query.length > 120) return
+        Thread {
+            val result = try { (context as? MainActivity)?.searchDriveArchive(query) ?: org.json.JSONObject().put("available", false) }
+                catch (_: Exception) { org.json.JSONObject().put("available", true).put("error", "Drive arşivi aranamadı. Yeniden taramayı dene.") }
+            webView.post { webView.evaluateJavascript("window.__xmusicDriveResult && window.__xmusicDriveResult($requestId,$result)", null) }
+        }.start()
+    }
+
+    @JavascriptInterface
+    fun openDriveLibrary() { webView.post { (context as? MainActivity)?.openDriveLibrary() } }
+
+    @JavascriptInterface
+    fun chooseDriveUpload() { webView.post { (context as? MainActivity)?.chooseDriveUpload() } }
+
+    @JavascriptInterface
+    fun enableContinuousDrive() { webView.post { (context as? MainActivity)?.enableContinuousDrive() } }
+
+    @JavascriptInterface
+    fun authorizeExistingDriveAudio() { webView.post { (context as? MainActivity)?.authorizeExistingDriveAudio() } }
+
+    @JavascriptInterface
+    fun chooseSharedDriveFolder() { webView.post { (context as? MainActivity)?.chooseSharedDriveFolder() } }
+
+    @JavascriptInterface
+    fun connectDrive() { webView.post { (context as? MainActivity)?.authorizeDrive() } }
+
+    @JavascriptInterface
     fun showToast(message: String) {
         webView.post { Toast.makeText(context, message, Toast.LENGTH_SHORT).show() }
     }
 
     @JavascriptInterface
     fun navigateTo(pageFolder: String) {
+        if (ProfileStore(context).isChild() && pageFolder !in setOf("ana_sayfa", "kitapl_m", "aile_profili_se_imi", "imdi_al_yor", "uyku_zamanlay_c_s", "oynatma_s_ras_queue", "ocuk_modu_kids_safe")) {
+            webView.post { webView.loadUrl("file:///android_asset/stitch/ana_sayfa/code.html") }; return
+        }
+
         // Yalnızca önceden tanımlanmış Stitch ekranlarına geçişe izin ver.
         val allowedPages = setOf(
             "ana_sayfa", "podcast_merkezi", "imdi_al_yor", "i_ndirme_y_neticisi",
@@ -38,6 +89,51 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         webView.post { webView.loadUrl(url) }
     }
 
+    // StatFs genel alan bilgisini verir; kişisel dosyalara erişim izni gerektirmez.
+    @JavascriptInterface
+    fun deviceStorageInfo(): String {
+        val stats = android.os.StatFs(context.filesDir.absolutePath)
+        return org.json.JSONObject().put("free", stats.availableBytes).put("total", stats.totalBytes).toString()
+    }
+
+    /** Şehir adıyla hava durumunu alır; konum izni istemez. */
+    @JavascriptInterface
+    fun fetchWeather(city: String, requestId: Int) {
+        if (city.trim().length !in 2..80) return
+        Thread {
+            fun readJson(address: String): org.json.JSONObject {
+                val conn = java.net.URL(address).openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout = 8000; conn.readTimeout = 8000
+                return try {
+                    if (conn.responseCode !in 200..299) throw java.io.IOException("weather HTTP")
+                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    require(body.length < 1_000_000)
+                    org.json.JSONObject(body)
+                } finally { conn.disconnect() }
+            }
+            val result = try {
+                val name = java.net.URLEncoder.encode(city.trim(), "UTF-8")
+                val geo = readJson("https://geocoding-api.open-meteo.com/v1/search?count=1&language=tr&format=json&name=$name")
+                    .getJSONArray("results").getJSONObject(0)
+                val lat = geo.getDouble("latitude"); val lon = geo.getDouble("longitude")
+                val current = readJson("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code&timezone=auto")
+                    .getJSONObject("current")
+                org.json.JSONObject().put("city", geo.getString("name")).put("country", geo.optString("country"))
+                    .put("temperature", current.getDouble("temperature_2m")).put("code", current.getInt("weather_code"))
+            } catch (_: Exception) { org.json.JSONObject().put("error", "Hava durumu alınamadı") }
+            webView.post { webView.evaluateJavascript("window.__xmusicWeatherResult && window.__xmusicWeatherResult($requestId,$result)", null) }
+        }.start()
+    }
+
+    // Yeni indirme ve arşiv işleri için ağ tercihi. Mevcut işler kendi koşullarını korur.
+    @JavascriptInterface fun getDownloadWifiOnly(): Boolean =
+        context.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE).getBoolean("download_unmetered_only", false)
+    @JavascriptInterface fun setDownloadWifiOnly(enabled: Boolean) {
+        if (ProfileStore(context).isChild()) return
+        context.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE)
+            .edit().putBoolean("download_unmetered_only", enabled).apply()
+    }
+
     // Ayarlar yalnızca cihazda saklanır; bulut senkronizasyonuna karışmaz.
     @JavascriptInterface
     fun saveSetting(key: String, enabled: Boolean) {
@@ -51,6 +147,143 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         if (!key.matches(Regex("setting_[0-9]{1,2}"))) return defaultValue
         return context.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE)
             .getBoolean(key, defaultValue)
+    }
+
+    // Deneysel arama sonuçları her zaman kullanıcıya kaynak belirtilerek gösterilir.
+    /** Tür kartları için arama sonuçları yedi gün saklanır; akış URL'si saklanmaz. */
+    @JavascriptInterface
+    fun searchMusicShelf(query: String, requestId: Int) {
+        val term = query.trim()
+        if (term.length !in 2..100) return
+        Thread {
+            val prefs = context.getSharedPreferences("xmusic_music_shelves", Context.MODE_PRIVATE)
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(term.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+            val cached = try { org.json.JSONObject(prefs.getString(digest, null) ?: "{}") } catch (_: Exception) { org.json.JSONObject() }
+            val age = System.currentTimeMillis() - cached.optLong("time", 0)
+            val items = cached.optJSONArray("items")
+            val data = if (items != null && items.length() > 0 && age in 0 until 7L * 24 * 60 * 60 * 1000) {
+                org.json.JSONObject().put("items", items)
+            } else try {
+                val engine = com.yausername.youtubedl_android.YoutubeDL.getInstance()
+                engine.init(context.applicationContext)
+                val request = com.yausername.youtubedl_android.YoutubeDLRequest("ytsearch20:" + term)
+                request.addOption("--flat-playlist")
+                request.addOption("--dump-single-json")
+                request.addOption("--no-warnings")
+                request.addOption("--socket-timeout", "15")
+                val response = engine.execute(request, "xmusic-shelf-$requestId") { _, _, _ -> }
+                val entries = org.json.JSONObject(response.out).optJSONArray("entries") ?: org.json.JSONArray()
+                val tracks = org.json.JSONArray()
+                val seen = HashSet<String>()
+                for (i in 0 until entries.length()) {
+                    val row = entries.optJSONObject(i) ?: continue
+                    val id = row.optString("id")
+                    if (!id.matches(Regex("[A-Za-z0-9_-]{11}")) || !seen.add(id)) continue
+                    tracks.put(org.json.JSONObject().put("id", id)
+                        .put("title", row.optString("title").take(180))
+                        .put("artist", row.optString("channel", row.optString("uploader")).take(180)))
+                }
+                if (tracks.length() == 0) throw java.io.IOException("Sonuç yok")
+                prefs.edit().putString(digest, org.json.JSONObject().put("time", System.currentTimeMillis()).put("items", tracks).toString()).apply()
+                org.json.JSONObject().put("items", tracks)
+            } catch (_: Exception) {
+                if (items != null && items.length() > 0) org.json.JSONObject().put("items", items).put("stale", true)
+                else org.json.JSONObject().put("error", "Liste yüklenemedi. İnternet bağlantısını kontrol et.")
+            }
+            webView.post {
+                webView.evaluateJavascript("window.__xmusicMusicShelfResult && window.__xmusicMusicShelfResult(" + requestId + "," + data + ")", null)
+            }
+        }.start()
+    }
+
+    @JavascriptInterface
+    fun searchExperimentalSource(query: String, requestId: Int) {
+        searchExperimentalSourceMore(query, requestId, 10)
+    }
+
+    @JavascriptInterface
+    fun searchExperimentalSourceMore(query: String, requestId: Int, limit: Int) = searchExperimentalInternal(query, requestId, limit, false)
+
+    @JavascriptInterface fun searchExperimentalSourceLive(query: String, requestId: Int) = searchExperimentalInternal(query, requestId, 10, true)
+
+    private fun searchExperimentalInternal(query: String, requestId: Int, limit: Int, liveOnly: Boolean) {
+        if (query.isBlank() || query.length > 120 || limit !in setOf(10, 30)) return
+        Thread {
+            val archived = if (liveOnly) null else try { (context as? MainActivity)?.searchDriveArchive(query) } catch (_: Exception) { null }
+            if (archived != null && archived.optJSONArray("items")?.length()?.let { it > 0 } == true) {
+                archived.put("archive", true).put("limit", limit)
+                webView.post { webView.evaluateJavascript("window.__xmusicExperimentalResult && window.__xmusicExperimentalResult($requestId,$archived)", null) }
+                return@Thread
+            }
+            val result = try {
+                val engine = com.yausername.youtubedl_android.YoutubeDL.getInstance()
+                engine.init(context.applicationContext)
+                val request = com.yausername.youtubedl_android.YoutubeDLRequest("ytsearch$limit:" + query.trim())
+                request.addOption("--flat-playlist")
+                request.addOption("--dump-single-json")
+                request.addOption("--no-warnings")
+                val response = engine.execute(request, "xmusic-search-$requestId") { _, _, _ -> }
+                val entries = org.json.JSONObject(response.out).optJSONArray("entries") ?: org.json.JSONArray()
+                val items = org.json.JSONArray()
+                for (i in 0 until minOf(entries.length(), limit)) {
+                    val entry = entries.optJSONObject(i) ?: continue
+                    val id = entry.optString("id")
+                    if (!id.matches(Regex("[A-Za-z0-9_-]{11}"))) continue
+                    items.put(org.json.JSONObject().put("id", id).put("title", entry.optString("title")).put("artist", entry.optString("channel", entry.optString("uploader"))))
+                }
+                org.json.JSONObject().put("items", items).put("limit", limit)
+            } catch (e: Exception) {
+                org.json.JSONObject().put("error", "Kaynak araması başarısız oldu. İnternet bağlantısını kontrol edip tekrar dene.")
+            }
+            webView.post { webView.evaluateJavascript("window.__xmusicExperimentalResult && window.__xmusicExperimentalResult($requestId,${result})", null) }
+        }.start()
+    }
+
+    @JavascriptInterface
+    fun playExperimentalSource(id: String, title: String, artist: String) = startExperimentalSource(id, title, artist, 0L)
+
+    @JavascriptInterface
+    fun resumeExperimentalSource(id: String, title: String, artist: String, position: Long) =
+        startExperimentalSource(id, title, artist, position.coerceIn(0L, 86_400_000L))
+
+    private fun startExperimentalSource(id: String, title: String, artist: String, position: Long) {
+        if (!id.matches(Regex("[A-Za-z0-9_-]{11}"))) return
+        webView.post {
+        if ((context as? MainActivity)?.playArchivedSource(id, title, artist) == true ||
+            (context as? MainActivity)?.playMatchingDriveArchive(title, artist) == true) {
+            if (position > 0) mediaController?.seekTo(position)
+            return@post
+        }
+        Thread {
+            try {
+                val stream = com.example.data.source.ExperimentalAudioResolver(context).resolve("https://www.youtube.com/watch?v=$id")
+                webView.post {
+                    val controller = mediaController
+                    if (controller == null) {
+                        Toast.makeText(context, "Oynatıcı hazır değil", Toast.LENGTH_SHORT).show()
+                    } else {
+                        val metadata = androidx.media3.common.MediaMetadata.Builder().setTitle(title.take(180)).setArtist(artist.take(180))
+                            .setArtworkUri(android.net.Uri.parse("https://i.ytimg.com/vi/$id/mqdefault.jpg")).build()
+                        val item = MediaItem.Builder().setMediaId("experimental:$id").setUri(stream.url).setMediaMetadata(metadata).build()
+                        com.example.playback.PlaybackService.activeService?.registerExperimentalStream(stream.url, stream.headers)
+                        controller.setMediaItem(item)
+                        if (position > 0) controller.seekTo(position)
+                        controller.prepare()
+                        controller.play()
+                    }
+                }
+            } catch (e: Exception) {
+                webView.post {
+                    android.app.AlertDialog.Builder(context)
+                        .setTitle("Ses kaynağı açılamadı")
+                        .setMessage(e.message ?: "Bilinmeyen kaynak hatası")
+                        .setPositiveButton("Tamam", null)
+                        .show()
+                }
+            }
+        }.start()
+        }
     }
 
     @JavascriptInterface
@@ -224,7 +457,11 @@ class WebAppInterface(private val context: Context, private val webView: WebView
                 } else {
                     "https://itunes.apple.com/search?term=" +
                         java.net.URLEncoder.encode(query.trim(), "UTF-8") +
-                        "&country=TR&media=music&entity=musicArtist&limit=30"
+                        "&country=TR&media=music&entity=" + when (kind) {
+                            "albums" -> "album"
+                            "songs" -> "song"
+                            else -> "musicArtist"
+                        } + "&limit=50"
                 }
                 val conn = (java.net.URL(url).openConnection() as java.net.HttpURLConnection).apply {
                     connectTimeout = 9000
@@ -241,7 +478,11 @@ class WebAppInterface(private val context: Context, private val webView: WebView
                     for (i in 0 until data.length()) {
                         val entry = data.optJSONObject(i) ?: continue
                         val type = entry.optString("wrapperType")
-                        if (itemId.isEmpty() && type != "artist") continue
+                        if (itemId.isEmpty() && type != when (kind) {
+                                "albums" -> "collection"
+                                "songs" -> "track"
+                                else -> "artist"
+                            }) continue
                         if (itemId.isNotEmpty() && (type == "artist" || (kind == "albums" && type != "collection") ||
                                 (kind == "songs" && type != "track"))) continue
                         if (kind == "albums" && entry.optString("collectionType") != "Album") continue
@@ -336,7 +577,10 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     }
 
     @JavascriptInterface
-    fun resolveAudiusTrack(trackId: String, enqueue: Boolean) {
+    fun resolveAudiusTrack(trackId: String, enqueue: Boolean) = resolveAudius(trackId, enqueue, 0L)
+    @JavascriptInterface
+    fun resumeAudiusTrack(trackId: String, position: Long) = resolveAudius(trackId, false, position.coerceIn(0L, 86_400_000L))
+    private fun resolveAudius(trackId: String, enqueue: Boolean, position: Long) {
         if (!trackId.matches(Regex("[a-zA-Z0-9]{1,64}"))) return
         Thread {
             try {
@@ -361,7 +605,7 @@ class WebAppInterface(private val context: Context, private val webView: WebView
                     .setMediaMetadata(metadata.build()).build()
                 webView.post {
                     val p = mediaController ?: return@post
-                    if (enqueue) p.addMediaItem(item) else { p.setMediaItem(item); p.prepare(); p.play() }
+                    if (enqueue) p.addMediaItem(item) else { p.setMediaItem(item); if (position > 0) p.seekTo(position); p.prepare(); p.play() }
                 }
             } catch (_: Exception) { showToast("Kayıt açılamadı. İnternet veya kaynak erişimi uygun değil.") }
         }.start()
@@ -463,4 +707,12 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         this.mediaController = controller
     }
 }
+
+
+
+
+
+
+
+
 

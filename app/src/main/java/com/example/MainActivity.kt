@@ -9,6 +9,648 @@ import androidx.media3.session.SessionToken
 import com.example.playback.PlaybackService
 
 class MainActivity : ComponentActivity() {
+    // Erişim anahtarı yalnızca bellekte tutulur; süre bitince yeniden yetki alınır.
+    @Volatile private var driveAccessToken: String? = null
+    @Volatile private var driveFolderId: String? = null
+    @Volatile private var driveAccountId: String? = null
+    private var driveBusy = false
+    private var selectingDriveFolder = false
+    private var requestContinuousRead = false
+    private var syncInFlight = false
+    private var driveLibraryAdapter: android.widget.ArrayAdapter<String>? = null
+    private var visibleDriveTracks = emptyList<com.example.data.drive.DriveFolderClient.Track>()
+    private var lastDriveSync = 0L
+    @Volatile private var archiveScanning = false
+    private val driveSyncHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val driveSyncTicker = object : Runnable {
+        override fun run() {
+            syncFamilyIfReady()
+            if (getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE).getBoolean("sync_enabled", false) &&
+                !driveBusy && !syncInFlight && android.os.SystemClock.elapsedRealtime() - lastDriveSync > 55000L) {
+                reconnectSharedDriveSilently()
+            }
+            driveSyncHandler.postDelayed(this, 15000L)
+        }
+    }
+    private fun archiveLocation(): Pair<String, String>? {
+        val prefs = getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE)
+        val account = driveAccountId ?: prefs.getString("sync_account", null)
+            ?: getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE).getString("account", null) ?: return null
+        val folder = driveFolderId ?: prefs.getString(account, null) ?: return null
+        if (account.isBlank() || !folder.matches(Regex("[A-Za-z0-9_-]{1,200}"))) return null
+        return account to folder
+    }
+    fun searchDriveArchive(query: String): org.json.JSONObject {
+        val location = archiveLocation() ?: return org.json.JSONObject().put("available", false).put("items", org.json.JSONArray())
+        val scope = com.example.data.drive.DriveArchiveIndex.scope(location.first, location.second)
+        return com.example.data.drive.DriveArchiveIndex(this).use { index ->
+            val items = index.search(scope, query)
+            val visible = org.json.JSONArray(); val rules = ProfileStore(this)
+            for (i in 0 until items.length()) {
+                val item = items.getJSONObject(i)
+                if (!rules.isChild() || rules.playbackBlockReason("drive:" + item.getString("id")) == null) visible.put(item.put("source", "drive"))
+            }
+            org.json.JSONObject().put("available", true).put("items", visible).put("status", index.status(scope))
+        }
+    }
+    fun archiveSelections(): org.json.JSONObject {
+        val location = archiveLocation() ?: return org.json.JSONObject().put("items", org.json.JSONArray()).put("available", false)
+        val scope = com.example.data.drive.DriveArchiveIndex.scope(location.first, location.second)
+        return com.example.data.drive.DriveArchiveIndex(this).use { index ->
+            val rows = index.selections(scope)
+            val visible = org.json.JSONArray()
+            val rules = ProfileStore(this)
+            val covers = CoverArtStore(this)
+            for (i in 0 until rows.length()) {
+                val item = rows.getJSONObject(i)
+                val id = item.optString("id")
+                if (rules.isChild() && rules.playbackBlockReason("drive:$id") != null) continue
+                item.put("id", "drive:$id")
+                item.put("artwork", covers.webUri(CoverArtStore.key(scope, id, item.optString("modified"))))
+                visible.put(item)
+            }
+            org.json.JSONObject().put("items", visible).put("available", true).put("status", index.status(scope))
+        }
+    }
+    fun driveArchiveStatus(): String {
+        val location = archiveLocation() ?: return "Drive hesabı ve ortak klasör bağlantısı bekleniyor."
+        return com.example.data.drive.DriveArchiveIndex(this).use { index ->
+            val info = index.status(com.example.data.drive.DriveArchiveIndex.scope(location.first, location.second))
+            val count = info.optInt("count"); val stamp = info.optLong("stamp")
+            if (archiveScanning) "Alt klasörler taranıyor… Önceki indekste $count dosya var."
+            else if (stamp == 0L) "Arşiv henüz taranmadı. Alt klasörler de taramaya dahildir. " + info.optString("error")
+            else "$count ses dosyası · Alt klasörler dahil · " + java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT).format(java.util.Date(stamp)) +
+                if (info.optString("error").isEmpty()) "" else " · " + info.optString("error")
+        }
+    }
+    private fun scanDriveArchive(token: String, account: String, folder: String): List<com.example.data.drive.DriveFolderClient.Track> {
+        val scope = com.example.data.drive.DriveArchiveIndex.scope(account, folder)
+        archiveScanning = true
+        fun notifyStatus() { runOnUiThread { if (::appWebView.isInitialized && !isDestroyed) appWebView.evaluateJavascript("window.dispatchEvent(new Event('xmusic:archive'));", null) } }
+        notifyStatus()
+        return try { com.example.data.drive.DriveArchiveIndex(this).use { index ->
+            try {
+                val tracks = com.example.data.drive.DriveFolderClient().listAudio(token, folder)
+                index.replace(scope, tracks)
+                val network = getSystemService(CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+                if (!network.isActiveNetworkMetered) {
+                    val started = android.os.SystemClock.elapsedRealtime()
+                    for ((id, _, modified) in index.untaggedMp3(scope)) {
+                        if (android.os.SystemClock.elapsedRealtime() - started > 5000) break
+                        try { com.example.data.drive.DriveId3Reader.read(token, id)?.let { index.saveTags(scope, id, modified, it) } } catch (_: Exception) { }
+                    }
+                }
+                tracks
+            } catch (e: Exception) { index.markError(scope); throw e }
+        } } finally { archiveScanning = false; notifyStatus() }
+    }
+    fun refreshDriveArchive() {
+        if (ProfileStore(this).isChild()) { showDriveError("Arşiv taraması için yetişkin profiline geç."); return }
+        val token = driveAccessToken; val location = archiveLocation()
+        if (token == null || location == null) { showDriveError("Önce Google hesabını bağla ve ortak klasörü seç."); return }
+        if (driveBusy || syncInFlight) { showDriveError("Arşiv işlemi sürüyor; bitmesini bekle."); return }
+        driveBusy = true
+        android.widget.Toast.makeText(this, "Alt klasörler taranıyor…", 0).show()
+        driveFolderWorker.execute {
+            try {
+                val tracks = scanDriveArchive(token, location.first, location.second)
+                runOnUiThread { if (!isDestroyed && archiveLocation() == location) { cacheSharedTracks(location.first, tracks); showDriveError(driveArchiveStatus()) } }
+            } catch (_: Exception) { runOnUiThread { if (!isDestroyed) showDriveError("Tarama tamamlanamadı. Önceki arşiv korunuyor; internet ve Drive okuma iznini kontrol et.") } }
+            finally { runOnUiThread { driveBusy = false } }
+        }
+    }
+    fun playMatchingDriveArchive(title: String, artist: String): Boolean {
+        // Farklı bir kayıt çocuk onayının yerine geçemez.
+        if (ProfileStore(this).isChild() || driveAccessToken == null) return false
+        val location = archiveLocation() ?: return false
+        val match = runCatching { com.example.data.drive.DriveArchiveIndex(this).use { it.exact(com.example.data.drive.DriveArchiveIndex.scope(location.first, location.second), title, artist) } }.getOrNull() ?: return false
+        resumeDriveTrack(match.getString("id"), match.optString("title"), match.optString("artist"), 0L)
+        return true
+    }
+    private fun cacheSharedTracks(account: String, tracks: List<com.example.data.drive.DriveFolderClient.Track>) {
+        val edit = getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE).edit()
+        tracks.filter { it.sourceId.matches(Regex("[A-Za-z0-9_-]{11}")) }.forEach { edit.putString(account + ":" + it.sourceId, it.id) }
+        edit.apply()
+        if (::appWebView.isInitialized && !isDestroyed) appWebView.evaluateJavascript("window.dispatchEvent(new Event('xmusic:archive'));", null)
+        if (driveLibraryAdapter != null && account == driveAccountId) {
+            visibleDriveTracks = tracks
+            driveLibraryAdapter?.apply { clear(); addAll(tracks.map { it.displayName }); notifyDataSetChanged() }
+        }
+    }
+    private fun reconnectSharedDriveSilently() {
+        if (ProfileStore(this).isChild() && !FamilySyncStore(this).enabled()) return
+        syncInFlight = true
+        lastDriveSync = android.os.SystemClock.elapsedRealtime()
+        val request = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(
+                com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file"),
+                com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.readonly")))
+            .build()
+        com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this).authorize(request)
+            .addOnSuccessListener { auth ->
+                val token = auth.accessToken
+                if (auth.hasResolution() || token.isNullOrBlank()) { syncInFlight = false; return@addOnSuccessListener }
+                driveFolderWorker.execute {
+                    try {
+                        val client = com.example.data.drive.DriveFolderClient()
+                        val account = client.accountId(token)
+                        val prefs = getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE)
+                        require(account == prefs.getString("sync_account", null))
+                        val folder = prefs.getString(account, "").orEmpty()
+                        require(folder.isNotBlank())
+                        val tracks = scanDriveArchive(token, account, folder)
+                        runOnUiThread {
+                            if (!driveBusy) { driveAccessToken = token; driveAccountId = account; driveFolderId = folder; cacheSharedTracks(account, tracks) }
+                            syncInFlight = false
+                        }
+                    } catch (_: Exception) { runOnUiThread { syncInFlight = false } }
+                }
+            }.addOnFailureListener { syncInFlight = false }
+    }
+    fun enableContinuousDrive() {
+        if (ProfileStore(this).isChild()) { showDriveError("Bu işlem için yetişkin profiline geç."); return }
+        if (driveBusy || syncInFlight) { showDriveError("Drive işlemi sürüyor; biraz sonra tekrar dene."); return }
+        if (driveFolderId == null) { showDriveError("Önce ortak müzik klasörünü seç."); return }
+        android.app.AlertDialog.Builder(this).setTitle("Ortak arşivi otomatik yenile")
+            .setMessage("Google bir kez daha geniş Drive okuma izni isteyecek. Bu izin hesabının erişebildiği Drive dosyalarını okumayı kapsar; XMusic yalnızca seçtiğin müzik klasörünü tarar. Yeni şarkılar uygulama açıkken yaklaşık bir dakika içinde alınır.")
+            .setPositiveButton("Google ile yetkilendir") { _, _ -> requestContinuousRead = true; authorizeDrive() }
+            .setNegativeButton("Vazgeç", null).show()
+    }
+
+    private var familyBusy = false
+    private var lastFamilyAttempt = 0L
+    private fun familyRefresh(reload: Boolean = false) {
+        if (isDestroyed) return
+        if (reload) {
+            appActions.controller?.clearMediaItems()
+            appWebView.loadUrl("file:///android_asset/stitch/ana_sayfa/code.html")
+        } else appWebView.evaluateJavascript("window.dispatchEvent(new Event('xmusic:family'));", null)
+    }
+    fun syncFamilyIfReady(force: Boolean = false) {
+        val family = FamilySyncStore(this)
+        if (!family.enabled() || familyBusy || driveBusy) return
+        if (!force && android.os.SystemClock.elapsedRealtime() - lastFamilyAttempt < 55000L) return
+        val token = driveAccessToken ?: return
+        if (driveAccountId != family.account() || driveFolderId != family.folder()) {
+            family.status("Aile bağlantısındaki Google hesabını ve ortak klasörü bağla."); return
+        }
+        lastFamilyAttempt = android.os.SystemClock.elapsedRealtime(); familyBusy = true
+        val previousProfile = ProfileStore(this).activeId(); val previousRole = ProfileStore(this).role()
+        driveFolderWorker.execute {
+            try {
+                FamilyDriveClient(this).sync(token)
+                runOnUiThread {
+                    val now = ProfileStore(this)
+                    familyRefresh(now.activeId() == previousProfile && now.role() != previousRole)
+                }
+            } catch (_: Exception) {
+                family.status("Aile eşitlemesi tamamlanamadı. İnternet, ortak klasör ve otomatik arşiv iznini kontrol et; yerel kayıtların korunuyor.")
+                runOnUiThread { familyRefresh() }
+            } finally { runOnUiThread { familyBusy = false } }
+        }
+    }
+    fun setupFamily(action: String, code: String) {
+        if (ProfileStore(this).isChild()) { showDriveError("Aile kurulumu için ebeveyn profiline geç."); return }
+        val family = FamilySyncStore(this)
+        if (action == "sync") { syncFamilyIfReady(true); return }
+        if (family.enabled()) { showDriveError("Bu telefon zaten bir aileye bağlı. Aile profilleri ekranındaki bağlantı durumunu kontrol et."); return }
+        val token = driveAccessToken; val folder = driveFolderId; val account = driveAccountId
+        val continuous = getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE).getBoolean("sync_enabled", false)
+        if (token == null || folder == null || account == null || !continuous) {
+            showDriveError("Önce Ayarlar → Google hesap ve Drive ayarları: ortak klasörü seç, ardından Otomatik ortak arşiv bağlantısını aç. Sonra Aile Profilleri’ne dön."); return
+        }
+        if (familyBusy || driveBusy) { showDriveError("Devam eden işlemin bitmesini bekle."); return }
+        if (action == "create") {
+            if (!ProfileStore(this).isAdmin() || !ProfileStore(this).hasParentPin()) { showDriveError("Önce yönetici profilinde Ebeveyn PIN’i belirle. Fatma ve çocuk profillerini de bu telefonda ekle."); return }
+            familyBusy = true
+            driveFolderWorker.execute {
+                try { FamilyDriveClient(this).createFamily(token, folder, account); runOnUiThread { familyRefresh(true); showDriveError("Aile oluşturuldu. Aile Profilleri → Aile bağlantısı → Bağlantı kodunu kopyala. Diğer telefonda Aileye katıl seç.") } }
+                catch (_: Exception) { runOnUiThread { showDriveError("Aile oluşturulamadı. Ortak klasörde düzenleme ve otomatik arşiv izinlerini kontrol et."); familyRefresh(true) } }
+                finally { runOnUiThread { familyBusy = false } }
+            }; return
+        }
+        if (action != "join") return
+        val invitation = try { family.parseInvitation(code.trim()) } catch (_: Exception) { showDriveError("Aile bağlantı kodu geçersiz. Kurucu telefondaki kodun tamamını kopyala."); return }
+        if (invitation.getString("folder") != folder) { showDriveError("İki telefonda aynı ortak müzik klasörü seçilmeli. Önce Drive ayarlarında ortak klasörü değiştir."); return }
+        familyBusy = true
+        driveFolderWorker.execute {
+            try {
+                val policy = FamilyDriveClient(this).preview(token, invitation)
+                val rows = policy.getJSONArray("profiles")
+                val labels = (0 until rows.length()).map { val row = rows.getJSONObject(it); row.getString("name") + " · " + when(row.getString("role")) { "child" -> "Çocuk"; "admin" -> "Aile kurucusu"; else -> "Yetişkin" } }.toTypedArray()
+                runOnUiThread {
+                    familyBusy = false
+                    if (isDestroyed) return@runOnUiThread
+                    android.app.AlertDialog.Builder(this).setTitle("Bu telefonu kim kullanacak?")
+                        .setItems(labels) { _, index ->
+                            val selected = rows.getJSONObject(index)
+                            android.app.AlertDialog.Builder(this).setTitle(selected.getString("name") + " ile aileye katıl")
+                                .setMessage("Bu telefondaki aktif profilin kitaplığı korunarak seçtiğin aile profiline bağlanacak. Yetişkin beğeni/geçmiş paylaşımını Aile bağlantısı ekranından açıp kapatabilirsin. Çocuk kuralları kurucu telefondan yönetilir; istekler ve günlük süre kullanımı eşitlenir. Kod gizlidir; yalnızca ailenle paylaş.")
+                                .setPositiveButton("Katıl") { _, _ ->
+                                    if (familyBusy) return@setPositiveButton
+                                    familyBusy = true
+                                    driveFolderWorker.execute {
+                                        try {
+                                            // Önizleme ile onay arasında değişmiş olabilecek kurallar yeniden doğrulanır.
+                                            val fresh = FamilyDriveClient(this).preview(token, invitation)
+                                            FamilyDriveClient(this).join(token, account, invitation, selected.getString("id"), fresh)
+                                            runOnUiThread { familyRefresh(true); showDriveError("Aile bağlantısı hazır. Uygulama açıkken yaklaşık bir dakikada eşitlenir. İnternet yokken son alınan kurallar geçerlidir.") }
+                                        } catch (_: Exception) { runOnUiThread { showDriveError("Katılım tamamlanamadı. Aile bağlantısını ve Drive izinlerini kontrol et; mevcut kitaplığın korunur."); familyRefresh(true) } }
+                                        finally { runOnUiThread { familyBusy = false } }
+                                    }
+                                }.setNegativeButton("Vazgeç", null).show()
+                        }.setNegativeButton("Vazgeç", null).show()
+                }
+            } catch (_: Exception) { runOnUiThread { familyBusy = false; showDriveError("Aile bilgileri okunamadı. Aynı klasörü, bağlantı kodunu ve otomatik arşiv iznini kontrol et.") } }
+        }
+    }
+    fun copyFamilyInvitation() {
+        if (!ProfileStore(this).isAdmin() || !FamilySyncStore(this).owner()) { showDriveError("Kodu yalnızca aile kurucusu paylaşabilir."); return }
+        val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("XMusic aile bağlantısı", FamilySyncStore(this).invitation()))
+        showDriveError("Aile bağlantı kodu kopyalandı. Yalnızca ailenle paylaş; bu kod aile verilerine erişim sağlar.")
+    }
+
+    private val driveFolderWorker = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val driveFilePicker = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) uploadLocalFileToDrive(uri)
+    }
+
+    private var avatarTargetProfile: String? = null
+    private val avatarPicker = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri ->
+        val target = avatarTargetProfile
+        avatarTargetProfile = null
+        if (uri != null && target != null && target == ProfileStore(this).activeId()) {
+            try {
+                val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+                require(bounds.outWidth > 0 && bounds.outHeight > 0)
+                var sample = 1
+                while (bounds.outWidth / sample > 512 || bounds.outHeight / sample > 512) sample *= 2
+                val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+                val bitmap = contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, options) }
+                    ?: throw IllegalArgumentException("invalid image")
+                val bytes = java.io.ByteArrayOutputStream()
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 82, bytes)
+                bitmap.recycle()
+                val value = "data:image/jpeg;base64," + android.util.Base64.encodeToString(bytes.toByteArray(), android.util.Base64.NO_WRAP)
+                getSharedPreferences("xmusic_profile_avatars", MODE_PRIVATE).edit().putString(target, value).putLong("time_$target", System.currentTimeMillis()).apply()
+                if (::appWebView.isInitialized) appWebView.evaluateJavascript("window.__xmusicRefreshAvatar && window.__xmusicRefreshAvatar()", null)
+                android.widget.Toast.makeText(this, "Profil fotoğrafı kaydedildi", 0).show()
+            } catch (_: Exception) { android.widget.Toast.makeText(this, "Fotoğraf açılamadı", 0).show() }
+        }
+    }
+    fun pickProfilePhoto() {
+        avatarTargetProfile = ProfileStore(this).activeId()
+        avatarPicker.launch("image/*")
+    }
+
+    fun toggleAutomaticArchive() {
+        if (ProfileStore(this).isChild()) { showDriveError("Bu işlem için yetişkin profiline geç."); return }
+        val prefs = getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE)
+        val enabled = !prefs.getBoolean("enabled", true)
+        prefs.edit().putBoolean("enabled", enabled).apply()
+        if (!enabled) androidx.work.WorkManager.getInstance(this).cancelAllWorkByTag("xmusic-auto-archive")
+        showDriveError(if (enabled) "Otomatik Drive arşivi açık. Drive hesabını bağladıktan sonra çalan YouTube kayıtları kuyruğa alınır." else "Otomatik Drive arşivi kapalı.")
+    }
+
+    fun playArchivedSource(sourceId: String, title: String, artist: String): Boolean {
+        val account = driveAccountId ?: return false
+        val token = driveAccessToken ?: return false
+        val fileId = getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE).getString(account + ":" + sourceId, null) ?: return false
+        if (!fileId.matches(Regex("[A-Za-z0-9_-]{1,200}"))) return false
+        val controller = mediaController ?: return false
+        val service = PlaybackService.activeService ?: return false
+        val url = "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media"
+        service.registerExperimentalStream(url, mapOf("Authorization" to "Bearer $token"))
+        val metadata = androidx.media3.common.MediaMetadata.Builder().setTitle(title).setArtist("Drive · " + artist)
+            .setArtworkUri(android.net.Uri.parse("https://i.ytimg.com/vi/$sourceId/mqdefault.jpg")).build()
+        controller.setMediaItem(androidx.media3.common.MediaItem.Builder().setMediaId("drive-source:" + sourceId)
+            .setUri(url).setMediaMetadata(metadata).build())
+        controller.prepare()
+        controller.play()
+        return true
+    }
+
+    private val coverGeneration = java.util.concurrent.atomic.AtomicInteger()
+    private val coverWorker = java.util.concurrent.ThreadPoolExecutor(1, 1, 30L, java.util.concurrent.TimeUnit.SECONDS,
+        java.util.concurrent.ArrayBlockingQueue<Runnable>(4), java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy())
+    fun resumeDriveTrack(fileId: String, title: String, artist: String, position: Long) {
+        if (isDestroyed) return
+        val token = driveAccessToken
+        val controller = mediaController
+        val service = PlaybackService.activeService
+        if (token == null || controller == null || service == null) {
+            showDriveError("Drive dosyası için önce Ayarlar'dan hesabını bağla.")
+            return
+        }
+        if (!fileId.matches(Regex("[A-Za-z0-9_-]{1,200}"))) return
+        val url = "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media"
+        service.registerExperimentalStream(url, mapOf("Authorization" to "Bearer $token"))
+        val location = archiveLocation()
+        val indexed = if (location == null) null else runCatching { com.example.data.drive.DriveArchiveIndex(this).use { it.get(com.example.data.drive.DriveArchiveIndex.scope(location.first, location.second), fileId) } }.getOrNull()
+        val songTitle = indexed?.optString("title")?.ifBlank { title }?.take(180) ?: title.take(180)
+        val songArtist = indexed?.optString("artist")?.ifBlank { artist }?.take(180) ?: artist.take(180)
+        val album = indexed?.optString("album").orEmpty()
+        val scope = location?.let { com.example.data.drive.DriveArchiveIndex.scope(it.first, it.second) }.orEmpty()
+        val coverKey = CoverArtStore.key(scope, fileId, indexed?.optString("modified").orEmpty())
+        val metadataBuilder = androidx.media3.common.MediaMetadata.Builder().setTitle(songTitle).setArtist(songArtist).setAlbumTitle(album)
+            .setExtras(android.os.Bundle().apply { putString(CoverArtStore.EXTRA, coverKey) })
+        CoverArtStore(this).nativeUri(coverKey)?.let { metadataBuilder.setArtworkUri(it) }
+        val metadata = metadataBuilder.build()
+        controller.setMediaItem(androidx.media3.common.MediaItem.Builder().setMediaId("drive:" + fileId).setUri(url).setMediaMetadata(metadata).build())
+        controller.seekTo(position.coerceIn(0L, 86_400_000L))
+        controller.prepare()
+        controller.play()
+        val generation = coverGeneration.incrementAndGet()
+        val profile = ProfileStore(this).activeId()
+        coverWorker.execute {
+            val active = { !isDestroyed && generation == coverGeneration.get() && ProfileStore(this).activeId() == profile }
+            try {
+                com.example.data.drive.DriveCoverResolver(this).resolve(coverKey, scope, fileId, indexed?.optString("artParents").orEmpty(), songTitle, songArtist, album, token, active)
+            } catch (_: Exception) { }
+        }
+    }
+
+    fun openDriveLibrary() {
+        if (ProfileStore(this).isChild()) { showDriveError("Bu işlem için yetişkin profiline geç."); return }
+        val token = driveAccessToken
+        val folder = driveFolderId
+        if (driveBusy) { showDriveError("Drive işlemi sürüyor."); return }
+        if (token == null || folder == null) { showDriveError("Önce Ayarlar'dan Google Drive hesabını bağla."); return }
+        val account = driveAccountId ?: return
+        driveBusy = true
+        driveFolderWorker.execute {
+            try {
+                val tracks = scanDriveArchive(token, account, folder)
+                runOnUiThread {
+                    if (isDestroyed || driveAccountId != account || driveFolderId != folder) return@runOnUiThread
+                    cacheSharedTracks(account, tracks)
+                    if (tracks.isEmpty()) android.app.AlertDialog.Builder(this)
+                        .setTitle("Drive müzik arşivi")
+                        .setMessage("Bu klasörde uygulamanın erişebildiği ses dosyası yok. Drive'da dosyalar görünüyorsa mevcut müziklere ayrıca erişim ver. Klasör kimliği: " + folder)
+                        .setPositiveButton("Müziklere erişim ver") { _, _ -> authorizeExistingDriveAudio() }
+                        .setNeutralButton("Klasörü değiştir") { _, _ -> chooseSharedDriveFolder() }
+                        .setNegativeButton("Kapat", null).show()
+                    else {
+                        visibleDriveTracks = tracks
+                        val adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_list_item_1, tracks.map { it.displayName }.toMutableList())
+                        driveLibraryAdapter = adapter
+                        val dialog = android.app.AlertDialog.Builder(this).setTitle("Drive müzik arşivi")
+                        .setAdapter(adapter) { _, index ->
+                            val track = visibleDriveTracks.getOrNull(index) ?: return@setAdapter
+                            val controller = mediaController
+                            val service = PlaybackService.activeService
+                            if (controller == null || service == null) {
+                                showDriveError("Oynatıcı henüz hazır değil.")
+                            } else if (driveAccessToken == null || driveFolderId != folder) {
+                                showDriveError("Drive hesabı değişti; arşivi yeniden aç.")
+                            } else {
+                                resumeDriveTrack(track.id, track.name, "Google Drive arşivi", 0L)
+                            }
+                        }.setNegativeButton("Kapat", null).create()
+                        dialog.setOnDismissListener { if (driveLibraryAdapter === adapter) driveLibraryAdapter = null }
+                        dialog.show()
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread { showDriveError(e.message ?: "Drive arşivi açılamadı") }
+            } finally { runOnUiThread { driveBusy = false } }
+        }
+    }
+
+    fun chooseDriveUpload() {
+        if (ProfileStore(this).isChild()) { showDriveError("Bu işlem için yetişkin profiline geç."); return }
+        if (driveBusy) {
+            showDriveError("Drive işlemi sürüyor; tamamlanmasını bekle.")
+            return
+        }
+        if (driveAccessToken == null || driveFolderId == null) {
+            showDriveError("Önce Google Drive hesabını bağla ve klasörün hazır olmasını bekle.")
+            return
+        }
+        driveFilePicker.launch(arrayOf("audio/*"))
+    }
+
+    private fun uploadLocalFileToDrive(uri: android.net.Uri) {
+        val account = driveAccountId ?: run { showDriveError("Önce Drive hesabını yeniden bağla."); return }
+        try {
+            contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            com.example.data.drive.DriveUploadWorker.enqueue(this, uri, account)
+            showDriveError("Dosya kalıcı yükleme kuyruğuna eklendi. Durumu 'Drive yükleme kuyruğu' düğmesinden izleyebilirsin.")
+        } catch (_: Exception) { showDriveError("Dosya için kalıcı okuma izni alınamadı; başka bir dosya sağlayıcısından seç.") }
+    }
+
+    fun showDriveUploadQueue() {
+        if (ProfileStore(this).isChild()) { showDriveError("Bu işlem için yetişkin profiline geç."); return }
+        runOnUiThread {
+            if (isFinishing || isDestroyed) return@runOnUiThread
+            val status = androidx.work.WorkManager.getInstance(this)
+                .getWorkInfosByTagLiveData("xmusic-drive-upload")
+            val dialog = android.app.AlertDialog.Builder(this)
+                .setTitle("Drive yükleme kuyruğu")
+                .setMessage("Kuyruk okunuyor…")
+                .setPositiveButton("Tamam", null).create()
+            val observer = androidx.lifecycle.Observer<List<androidx.work.WorkInfo>> { jobs ->
+                val text = jobs.sortedBy { it.state.isFinished }.take(30).joinToString("\n\n") { job ->
+                    val state = when (job.state) {
+                        androidx.work.WorkInfo.State.ENQUEUED -> "Bekliyor / yeniden denenecek"
+                        androidx.work.WorkInfo.State.RUNNING -> {
+                            val stage = job.progress.getString("stage") ?: "Yükleniyor"
+                            val percent = job.progress.getInt("percent", -1)
+                            stage + if (percent in 0..100) " · %" + percent else ""
+                        }
+                        androidx.work.WorkInfo.State.SUCCEEDED -> if (job.outputData.getBoolean("duplicate", false)) "Drive'da zaten var" else "Tamamlandı"
+                        androidx.work.WorkInfo.State.FAILED -> "Başarısız"
+                        androidx.work.WorkInfo.State.BLOCKED -> "Sıra bekliyor"
+                        else -> "İptal edildi"
+                    }
+                    val name = job.outputData.getString("name") ?: job.progress.getString("name")
+                        ?: job.id.toString().take(8)
+                    name + ": " + state + (job.outputData.getString("error")?.let { "\n" + it } ?: "")
+                }.ifBlank { "Yükleme kuyruğu boş." }
+                dialog.setMessage(text)
+            }
+            // Ekran açıkken canlı izle; kapatıldığında gözlemciyi kaldır.
+            dialog.setOnDismissListener { status.removeObserver(observer) }
+            dialog.show()
+            status.observe(this, observer)
+        }
+    }
+    private val driveAuthLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        try {
+            val data = result.data
+            if (data == null) {
+                val detail = if (result.resultCode == android.app.Activity.RESULT_CANCELED)
+                    "Google hesap ekranı iptal edildi veya sonuç döndürmedi." else
+                    "Google hesap ekranı sonuç döndürmedi. Sonuç kodu: " + result.resultCode
+                showDriveError(detail)
+            } else {
+                val auth = com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this)
+                    .getAuthorizationResultFromIntent(data)
+                receiveDriveAuthorization(auth)
+            }
+        } catch (e: Exception) {
+            showDriveException("Yetkilendirme sonucu", e)
+        }
+    }
+
+    private fun showDriveError(detail: String) {
+        android.app.AlertDialog.Builder(this).setTitle("Google Drive bağlantısı")
+            .setMessage(detail).setPositiveButton("Tamam", null).show()
+    }
+
+    private fun showDriveException(stage: String, error: Exception) {
+        val api = error as? com.google.android.gms.common.api.ApiException
+        val detail = if (api != null) "Google hata kodu: " + api.statusCode +
+            "\nDurum: " + (api.status.statusMessage ?: "Açıklama yok") else
+            "Hata türü: " + error.javaClass.simpleName
+        showDriveError(stage + "\n" + detail)
+    }
+
+    private fun receiveDriveAuthorization(result: com.google.android.gms.auth.api.identity.AuthorizationResult) {
+        val token = result.accessToken
+        if (token.isNullOrBlank()) { showDriveError("Drive erişimi alınamadı"); return }
+        val continuous = result.grantedScopes.contains("https://www.googleapis.com/auth/drive.readonly")
+        val picked = result.tokenResponseParams?.getString("picked_file_ids").orEmpty().split(',').filter { it.isNotBlank() }
+        val choosing = selectingDriveFolder || picked.isNotEmpty()
+        selectingDriveFolder = false
+        if (choosing && (picked.size != 1 || !picked[0].matches(Regex("[A-Za-z0-9_-]{1,200}")))) {
+            showDriveError("Bir müzik klasörü seçilmedi. Mevcut bağlantı korunuyor."); return
+        }
+        driveAccessToken = token
+        driveFolderId = null
+        driveAccountId = null
+        driveBusy = true
+        driveFolderWorker.execute {
+            try {
+                val folderClient = com.example.data.drive.DriveFolderClient()
+                val account = folderClient.accountId(token)
+                val folderPrefs = getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE)
+                val previous = folderPrefs.getString(account, "").orEmpty()
+                val wanted = if (choosing) picked.single() else previous
+                val folder = folderClient.getOrCreate(token, wanted)
+                if (choosing && previous != folder) {
+                    androidx.work.WorkManager.getInstance(this).cancelAllWorkByTag("xmusic-drive-upload")
+                    val archive = getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE)
+                    val edit = archive.edit()
+                    archive.all.keys.filter { it.startsWith(account + ":") }.forEach { edit.remove(it) }
+                    edit.commit()
+                }
+                val prefsEdit = folderPrefs.edit().putString(account, folder)
+                if (continuous) prefsEdit.putBoolean("sync_enabled", true).putString("sync_account", account)
+                prefsEdit.commit()
+                val sharedTracks = if (continuous) scanDriveArchive(token, account, folder) else emptyList()
+
+                runOnUiThread {
+                    if (driveAccessToken == token) {
+                        driveFolderId = folder; driveAccountId = account
+                        cacheSharedTracks(account, sharedTracks)
+                        getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE).edit().putString("account", account).apply()
+                    }
+                    showDriveError(if (continuous) "Ortak arşiv otomatik yenileme açık. Yeni şarkılar uygulama açıkken yaklaşık bir dakika içinde görünür. Tek tek dosya seçmen gerekmez." else "Drive bağlantısı hazır. Ortak arşivin yeni dosyalarını otomatik görmek için Otomatik ortak arşiv bağlantısını aç.")
+                    requestContinuousRead = false
+                }
+            } catch (e: Exception) {
+                runOnUiThread { showDriveError(e.message ?: "Drive klasörü hazırlanamadı") }
+            } finally { runOnUiThread { driveBusy = false } }
+        }
+    }
+
+    private val driveAudioAuthLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        val data = result.data
+        if (result.resultCode != android.app.Activity.RESULT_OK || data == null) {
+            showDriveError("Müzik dosyası seçimi iptal edildi. Mevcut klasör korunuyor.")
+        } else try {
+            val auth = com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this).getAuthorizationResultFromIntent(data)
+            receiveDriveAudioAuthorization(auth)
+        } catch (e: Exception) { showDriveException("Müzik dosyası izni", e) }
+    }
+
+    private fun receiveDriveAudioAuthorization(auth: com.google.android.gms.auth.api.identity.AuthorizationResult) {
+        val token = auth.accessToken
+        val picked = auth.tokenResponseParams?.getString("picked_file_ids").orEmpty()
+        if (token.isNullOrBlank() || picked.isBlank()) { showDriveError("Müzik seçilmedi. Ortak klasörü açıp içindeki şarkıları seç."); return }
+        driveBusy = true
+        driveFolderWorker.execute {
+            try {
+                val client = com.example.data.drive.DriveFolderClient()
+                val account = client.accountId(token)
+                val folder = getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE).getString(account, "").orEmpty()
+                require(folder.isNotBlank()) { "Bu hesap için önce ortak müzik klasörünü seç." }
+                client.getOrCreate(token, folder)
+                runOnUiThread {
+                    driveAccessToken = token; driveAccountId = account; driveFolderId = folder
+                    getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE).edit().putString("account", account).apply()
+                    driveBusy = false
+                    openDriveLibrary()
+                }
+            } catch (e: Exception) { runOnUiThread { driveBusy = false; showDriveError(e.message ?: "Müzik izni alınamadı") } }
+        }
+    }
+
+    fun authorizeExistingDriveAudio() {
+        if (ProfileStore(this).isChild()) { showDriveError("Bu işlem için yetişkin profiline geç."); return }
+        if (driveBusy) { showDriveError("Drive işlemi sürüyor; tamamlanmasını bekle."); return }
+        if (driveFolderId == null) { showDriveError("Önce ortak müzik klasörünü seç ve hesabını bağla."); return }
+        val request = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file")))
+            .setOptOutIncludingGrantedScopes(true)
+            .setPrompt(com.google.android.gms.auth.api.identity.AuthorizationRequest.Prompt.CONSENT)
+            .addResourceParameter(com.google.android.gms.auth.api.identity.AuthorizationRequest.ResourceParameter.PICKER_OAUTH_TRIGGER, "true")
+            .addResourceParameter(com.google.android.gms.auth.api.identity.AuthorizationRequest.ResourceParameter.PICKER_ALLOW_MULTIPLE, "true")
+            .addResourceParameter(com.google.android.gms.auth.api.identity.AuthorizationRequest.ResourceParameter.PICKER_ALLOW_FOLDER_SELECTION, "false")
+            .build()
+        com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this).authorize(request)
+            .addOnSuccessListener { auth ->
+                if (auth.hasResolution()) {
+                    val pending = auth.pendingIntent
+                    if (pending != null) driveAudioAuthLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(pending.intentSender).build())
+                    else showDriveError("Google dosya seçicisi açılamadı")
+                } else receiveDriveAudioAuthorization(auth)
+            }.addOnFailureListener { showDriveException("Müzik dosyası izni", it) }
+    }
+
+    fun chooseSharedDriveFolder() { authorizeDrive(true) }
+
+    fun authorizeDrive(pickFolder: Boolean = false) {
+        if (ProfileStore(this).isChild()) { showDriveError("Bu işlem için yetişkin profiline geç."); return }
+        if (driveBusy) { showDriveError("Drive işlemi sürüyor; tamamlanmasını bekle."); return }
+        selectingDriveFolder = pickFolder
+        val scopes = mutableListOf(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file"))
+        if (!pickFolder && (requestContinuousRead || getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE).getBoolean("sync_enabled", false)))
+            scopes.add(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.readonly"))
+        val builder = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder().setRequestedScopes(scopes)
+        if (pickFolder) {
+            builder.setOptOutIncludingGrantedScopes(true)
+                .setPrompt(com.google.android.gms.auth.api.identity.AuthorizationRequest.Prompt.CONSENT or com.google.android.gms.auth.api.identity.AuthorizationRequest.Prompt.SELECT_ACCOUNT)
+                .addResourceParameter(com.google.android.gms.auth.api.identity.AuthorizationRequest.ResourceParameter.PICKER_OAUTH_TRIGGER, "true")
+                .addResourceParameter(com.google.android.gms.auth.api.identity.AuthorizationRequest.ResourceParameter.PICKER_ALLOW_FOLDER_SELECTION, "true")
+                .addResourceParameter(com.google.android.gms.auth.api.identity.AuthorizationRequest.ResourceParameter.PICKER_MIMETYPES, "application/vnd.google-apps.folder")
+                .addResourceParameter(com.google.android.gms.auth.api.identity.AuthorizationRequest.ResourceParameter.PICKER_ALLOW_MULTIPLE, "false")
+        }
+        val request = builder.build()
+        val client = com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this)
+        client.authorize(request).addOnSuccessListener { result ->
+            if (result.hasResolution()) {
+                val pending = result.pendingIntent
+                if (pending != null) {
+                    driveAuthLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(pending.intentSender).build())
+                } else android.widget.Toast.makeText(this, "Google hesap seçimi açılamadı", android.widget.Toast.LENGTH_LONG).show()
+            } else receiveDriveAuthorization(result)
+        }.addOnFailureListener { error ->
+            showDriveException("Google izin isteği", error)
+        }
+    }
+
     private var mediaController: MediaController? = null
     private var controllerFuture: com.google.common.util.concurrent.ListenableFuture<MediaController>? = null
     private lateinit var playbackBridge: PlaybackWebBridge
@@ -28,7 +670,7 @@ class MainActivity : ComponentActivity() {
             } catch (_: Exception) { android.widget.Toast.makeText(this, "Dosyaya erişilemedi", 0).show() }
         }
     }
-    fun openLocalAudio() { audioPicker.launch(arrayOf("audio/*")) }
+    fun openLocalAudio() { if (!ProfileStore(this).isChild()) audioPicker.launch(arrayOf("audio/*")) }
     private val speechPicker = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             val phrase = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
@@ -37,6 +679,7 @@ class MainActivity : ComponentActivity() {
         }
     }
     fun openVoiceSearch() {
+        if (ProfileStore(this).isChild()) return
         try {
             speechPicker.launch(android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                 .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -62,6 +705,16 @@ class MainActivity : ComponentActivity() {
         // Orijinal Stitch HTML dosyalarını değiştirmeden JavaScript köprüsünü kullan.
         // window.Android nesnesini JavaScript ile yeniden tanımlama: özyinelemeli çağrı oluşturur.
         webView.webViewClient = object : android.webkit.WebViewClient() {
+            override fun shouldInterceptRequest(view: WebView?, request: android.webkit.WebResourceRequest?): android.webkit.WebResourceResponse? {
+                val uri = request?.url ?: return null
+                if (uri.host != CoverArtStore.HOST) return super.shouldInterceptRequest(view, request)
+                val file = if (uri.scheme == "https" && (uri.port == -1 || uri.port == 443)) CoverArtStore(this@MainActivity).webFile(uri.path.orEmpty()) else null
+                return if (file != null) try {
+                    android.webkit.WebResourceResponse("image/jpeg", null, 200, "OK", mapOf("Cache-Control" to "private, max-age=86400"), file.inputStream())
+                } catch (_: Exception) { android.webkit.WebResourceResponse("image/jpeg", null, java.io.ByteArrayInputStream(ByteArray(0))) }
+                else android.webkit.WebResourceResponse("image/jpeg", null, 404, "Not Found", emptyMap(), java.io.ByteArrayInputStream(ByteArray(0)))
+            }
+
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
                 // Sayfa geçişinde ham HTML/ikon yazıları kısa süre görüntülenmesin.
@@ -97,8 +750,15 @@ class MainActivity : ComponentActivity() {
                         button.innerHTML = '<span class="material-symbols-outlined" style="font-size:26px">settings</span>';
                         button.addEventListener('click',function(e){e.stopPropagation();go('ayarlar_ve_profil_y_netimi');});
                         // Sağ grup içindeki çan + profilin sonuna ekle; üçüncü flex sütunu oluşturma.
-                        const rightGroup = header.querySelector('button[aria-label="Profil ve Aile Alanı"]')?.parentElement;
+                        const rightGroup = header.querySelector('button[aria-label="Profil ve Aile Alanı"]')?.parentElement || (header.children.length > 1 ? header.lastElementChild : null);
                         if (rightGroup) {
+                          const avatar = rightGroup.querySelector('img[alt="Profile"]');
+                          if (avatar && avatar.parentElement === rightGroup) {
+                            const profileButton = document.createElement('button');
+                            profileButton.type = 'button'; profileButton.setAttribute('aria-label','Profil ve Aile Alanı');
+                            profileButton.dataset.xmOwned='true'; profileButton.__xmOwnedRun=function(){go('aile_profili_se_imi');};
+                            rightGroup.replaceChild(profileButton, avatar); profileButton.appendChild(avatar);
+                          }
                           rightGroup.appendChild(button);
                           rightGroup.style.setProperty('margin-left','auto','important');
                           rightGroup.style.setProperty('flex-shrink','0','important');
@@ -119,263 +779,370 @@ class MainActivity : ComponentActivity() {
                           icon.style.fontSize = '0';
                         }
                       });
-                      // Stitch arama ekranına gerçek Audius sonuçları ekle; HTML şablonunu koru.
+                      // Keşfet: Stitch arama çubuğu ve filtrelerini gerçek aramaya bağla.
                       if ((location.pathname || '').includes('/arama_ve_ke_fet/')) {
                         const input = document.getElementById('search-input');
-                        if (input && window.Android) {
+                        const shell = input && input.closest('section');
+                        if (shell && window.Android) {
                           const panel = document.createElement('section');
-                          panel.id = 'xmusic-live-search';
-                          panel.style.cssText = 'display:none;margin:8px 16px 18px;padding:12px;background:#181c1f;border-radius:16px;color:#e0e3e7;';
-                          const heading = document.createElement('h2');
-                          heading.textContent = 'Audius topluluk araması';
-                          heading.style.cssText = 'font-weight:700;font-size:16px;margin-bottom:6px;';
-                          const list = document.createElement('div');
-                          const disclaimer=document.createElement('p');
-                          disclaimer.textContent='Bu sonuçlar Audius kullanıcı yüklemeleridir; resmî sanatçı diskografisi veya doğrulanmış albümler değildir.';
-                          disclaimer.style.cssText='color:#b4c1c9;font-size:11px;line-height:1.4;margin-bottom:8px;';;
-                          panel.append(heading,disclaimer,list);
-                          const main = document.querySelector('main');
-                          if (main) main.insertBefore(panel,main.firstChild);
-                          let currentId = 0;
-                          let debounce;
-                          window.__xmusicSearchResult = function(id,payload) {
-                            if(id!==currentId)return;
-                            list.replaceChildren();
-                            if(payload.error){list.textContent=payload.error;return;}
-                            const entries=payload.items||[];
-                            if(!entries.length){list.textContent='Sonuç bulunamadı';return;}
-                            entries.forEach(function(item) {
-                              const line=document.createElement('div');
-                              line.style.cssText='display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid #313539;';
-                              if(item.artwork && item.artwork.startsWith('https://')){
-                                const img=document.createElement('img');img.src=item.artwork;
-                                img.style.cssText='width:48px;height:48px;object-fit:cover;border-radius:8px;';
-                                line.appendChild(img);
-                              }
-                              const caption=document.createElement('div');
-                              const name=document.createElement('strong');name.textContent=item.title||'İsimsiz parça';
-                              const artist=document.createElement('div');artist.textContent=item.artist||'Bilinmeyen sanatçı';artist.style.color='#bbcbb8';
-                              const access=document.createElement('small');access.textContent=item.playable?'Audius · Akış denenebilir':'Bu kayıt için oynatma erişimi yok';caption.append(name,artist,access);line.appendChild(caption);
-                              if(item.playable && item.id && /^[a-zA-Z0-9]{1,64}$/.test(item.id)){
-                                const play=document.createElement('button');play.type='button';
-                                play.textContent='▶ Dinle';play.setAttribute('aria-label',item.title+' oynat');
-                                play.style.cssText='margin-left:auto;flex-shrink:0;color:#9af0ba;border:1px solid #36584d;padding:8px;border-radius:12px;font-size:12px;';
-                                play.addEventListener('click',function(e){
-                                  e.stopPropagation();
-                                  window.Android.playAudiusTrack(item.id,item.title||'',item.artist||'');
-                                });
-                                line.appendChild(play);
-                                const queue=document.createElement('button');queue.type='button';queue.textContent='+ Sıraya';
-                                queue.style.cssText=play.style.cssText;
-                                queue.addEventListener('click',function(){window.Android.enqueueAudiusTrack(item.id);});
-                                line.appendChild(queue);
-                              }
-                              list.appendChild(line);
-                            });
-                          };
-                          // Sanatçı ve albüm/koleksiyon aramalarını mevcut arama paneline ekle.
-                          const categories = document.createElement('div');
-                          categories.style.cssText='display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;';
-                          const modes=[['tracks','Şarkılar'],['users','Sanatçılar'],['playlists','Kullanıcı listeleri']];
-                          let mode='tracks';
-                          const buttons=[];
-                          modes.forEach(function(pair){
-                            const btn=document.createElement('button');btn.textContent=pair[1];
-                            btn.type='button';btn.style.cssText='border:1px solid #5b6369;border-radius:18px;padding:7px 12px;color:white;';
-                            btn.addEventListener('click',function(){
-                              mode=pair[0];buttons.forEach(function(b){b.style.background=b===btn?'#36584d':'transparent';});
-                              runSearch();
-                            });
-                            categories.appendChild(btn);buttons.push(btn);
+                          panel.id='xmusic-live-search';
+                          panel.setAttribute('aria-label','Arama sonuçları');
+                          panel.style.cssText='display:none;margin:8px 16px 18px;padding:12px;background:#181c1f;border-radius:16px;color:#e0e3e7;';
+                          shell.insertAdjacentElement('afterend',panel);
+                          const browse=panel.nextElementSibling;
+                          shell.style.top=Math.ceil(document.querySelector('header')?.getBoundingClientRect().height||64)+'px';
+                          const nav=document.querySelector('nav');
+                          if(nav)nav.querySelectorAll('a[data-path]').forEach(function(a){
+                            const active=a.dataset.path==='kesfet-ara';
+                            a.classList.toggle('text-primary',active);
+                            a.classList.toggle('font-bold',active);
+                            a.classList.toggle('text-on-surface-variant',!active);
+                            if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');
                           });
-                          buttons[0].style.background='#36584d';
-                          panel.insertBefore(categories,list);
-                          const official=document.createElement('button');
-                          official.type='button';official.textContent='Doğrulanabilir sanatçı / albüm kataloğu';
-                          official.style.cssText='flex:1;padding:8px;border:1px solid #62796f;border-radius:10px;color:#e0e3e7;text-align:center;font-size:12px;';
-                          panel.insertBefore(official,list);
-                          const appleButton=document.createElement('button');
-                          appleButton.type='button';appleButton.textContent='Apple Türkiye müzik kataloğu';
-                          appleButton.style.cssText='flex:1;padding:8px;border:1px solid #62796f;border-radius:10px;color:#e0e3e7;text-align:center;font-size:12px;';
-                          panel.insertBefore(appleButton,official);
-                          // Kaynak anahtarları iki büyük satır yerine kompakt yatay sekmeler.
-                          const sourceRow=document.createElement('div');
-                          sourceRow.style.cssText='display:flex;gap:8px;margin:4px 0 8px;';
-                          const sourceAnchor=appleButton.parentNode;
-                          sourceAnchor.insertBefore(sourceRow,appleButton);
-                          sourceRow.append(appleButton,official);
-                          let appleMode=false, appleId='', appleStage='artists', appleName='';
-                          let releaseFilter='Albüm';
-                          function showApple(id,payload){
-                            if(id!==currentId || !appleMode)return;
-                            list.replaceChildren();
-                            if(payload.error){list.textContent=payload.error;return;}
-                            const items=payload.items||[];
-                            if(!items.length){list.textContent='Apple Türkiye kataloğunda sonuç bulunamadı';return;}
-                            if(appleStage!=='artists'){
-                              const back=document.createElement('button');
-                              back.type='button';back.textContent='← Geri';
-                              back.style.cssText='display:block;padding:9px;color:#9af0ba;';
-                              back.addEventListener('click',function(){
-                                if(appleStage==='songs'){appleStage='albums';appleId=window.__appleArtistId||'';}
-                                else {appleStage='artists';appleId='';}
-                                runSearch();
-                              });list.appendChild(back);
+                          const labels={all:'Tümü',songs:'Şarkılar',artists:'Sanatçılar',albums:'Albümler'};
+                          let state={filter:'all',view:'search',id:'',name:''};
+                          let history=[],generation=0,requestId=0,debounce;
+                          const pending=new Map();
+                          function owned(button,run){
+                            button.type='button';button.dataset.xmOwned='true';button.__xmOwnedRun=run;
+                            delete button.dataset.xmBlocked;
+                          }
+                          function button(text,run){
+                            const b=document.createElement('button');b.textContent=text;
+                            b.style.cssText='padding:9px 12px;border:1px solid #3c4a3c;border-radius:18px;color:#4efd7d;font-size:13px;';
+                            owned(b,run);return b;
+                          }
+                          const recentItems=document.getElementById('history-items-wrapper');
+                          const clearRecent=document.getElementById('clear-all-history-btn');
+                          let recentSearches=[],recentTimer,lastCountedQuery='';
+                          function editRecent(action,query){
+                            try {
+                              const result=JSON.parse(window.AndroidActions.searchHistory(action,query||''));
+                              if(!Array.isArray(result))throw new Error('Geçmiş kaydedilemedi');
+                              recentSearches=result;drawRecent();
+                            }catch(_){
+                              if(action!=='read')window.Android.showToast('Arama geçmişi kaydedilemedi.');
                             }
-                            if(appleStage==='albums'){
-                              const counts={};
-                              items.forEach(function(item){const c=item.category||'Albüm';counts[c]=(counts[c]||0)+1;});
-                              const summary=document.createElement('div');
-                              summary.textContent=Object.keys(counts).map(function(k){return k+': '+counts[k];}).join('  ·  ');
-                              summary.style.cssText='color:#9af0ba;font-size:12px;padding:6px 0 10px;';
-                              list.appendChild(summary);
+                          }
+                          function rememberQuery(){
+                            if(state.view!=='search')return;
+                            const query=input.value.replace(/\s+/g,' ').trim();
+                            if(query.length>=2&&query.length<=100){
+                              editRecent('add',query);
+                              const key=query.toLocaleLowerCase('tr');
+                              if(key!==lastCountedQuery){
+                                window.AndroidActions.recordSearch(query);lastCountedQuery=key;
+                                if(window.__xmusicRefreshTopSearches)window.__xmusicRefreshTopSearches();
+                              }
+                            }
+                          }
+                          function drawRecent(){
+                            if(!recentItems)return;
+                            recentItems.replaceChildren();
+                            if(clearRecent)clearRecent.style.display=recentSearches.length?'':'none';
+                            if(!recentSearches.length){
+                              const empty=document.createElement('span');
+                              empty.textContent='Henüz arama yapmadın.';
+                              empty.className='font-body-sm text-body-sm text-on-surface-variant py-2';
+                              recentItems.appendChild(empty);return;
+                            }
+                            recentSearches.forEach(function(query){
+                              const chip=document.createElement('div');
+                              chip.className='history-chip flex items-center gap-1.5 pl-3.5 pr-1.5 py-1.5 rounded-full bg-surface-container-low text-on-surface shadow-sm';
+                              chip.style.maxWidth='100%';
+                              const search=button(query,function(){
+                                state={filter:'all',view:'search',id:'',name:''};history=[];
+                                updateChips();input.value=query;
+                                input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();
+                              });
+                              search.setAttribute('aria-label',query+' yeniden ara');search.title=query;
+                              search.style.cssText='padding:2px 0;color:inherit;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+                              const remove=button('×',function(){editRecent('remove',query);});
+                              remove.setAttribute('aria-label','Kaldır '+query);
+                              remove.style.cssText='flex-shrink:0;width:28px;height:28px;color:#bbcbb8;border-radius:50%;font-size:22px;';
+                              chip.append(search,remove);recentItems.appendChild(chip);
+                            });
+                          }
+                          if(clearRecent)owned(clearRecent,function(){editRecent('clear','');});
+                          editRecent('read','');
+                          input.addEventListener('keydown',function(event){
+                            if(event.key==='Enter'){event.preventDefault();rememberQuery();input.blur();}
+                          });
+                          input.addEventListener('blur',rememberQuery);
+                          function updateChips(){
+                            document.querySelectorAll('.search-filter-chip').forEach(function(chip){
+                              const selected=chip.dataset.filter===state.filter;
+                              chip.setAttribute('aria-pressed',String(selected));
+                              chip.classList.toggle('bg-primary',selected);chip.classList.toggle('text-on-primary',selected);
+                              chip.classList.toggle('shadow-sm',selected);
+                              chip.classList.toggle('bg-surface-container-high',!selected);
+                              chip.classList.toggle('text-on-surface-variant',!selected);
+                            });
+                          }
+                          function selectFilter(filter){
+                            state={filter:filter,view:'search',id:'',name:''};history=[];
+                            updateChips();runSearch();
+                          }
+                          document.querySelectorAll('.search-filter-chip').forEach(function(chip){
+                            const filter=chip.dataset.filter;
+                            if(labels[filter])owned(chip,function(){selectFilter(filter);});
+                            else if(filter==='playlists'||filter==='podcasts')owned(chip,function(){
+                              window.Android.navigateTo(filter==='playlists'?'kitapl_m':'podcast_merkezi');
+                            });
+                          });
+                          function enter(view,id,name){
+                            rememberQuery();
+                            history.push(Object.assign({},state));
+                            state=Object.assign({},state,{view:view,id:id||'',name:name||''});
+                            runSearch();
+                          }
+                          function renderFrame(){
+                            panel.replaceChildren();
+                            if(history.length)panel.appendChild(button('← Geri',function(){
+                              state=history.pop();updateChips();runSearch();
+                            }));
+                            const heading=document.createElement('h2');
+                            heading.textContent=state.view==='search'?'Arama sonuçları':state.view==='versions'?'Dinlenecek kaydı seç':state.name;
+                            heading.style.cssText='font-weight:700;font-size:17px;margin:8px 0 12px;';
+                            panel.appendChild(heading);
+                          }
+                          function requestCatalog(kind,id,container,epoch){
+                            const request=++requestId;
+                            pending.set(request,{kind:kind,container:container,epoch:epoch});
+                            window.Android.searchAppleCatalog(input.value.trim(),id,kind,request);
+                            setTimeout(function(){
+                              const entry=pending.get(request);
+                              if(entry && entry.epoch===generation){container.textContent='Arama yanıt vermedi. Yeniden dene.';pending.delete(request);}
+                            },16000);
+                          }
+                          function catalogRow(item,kind){
+                            const row=document.createElement('button');
+                            row.style.cssText='display:flex;gap:12px;align-items:center;text-align:left;width:100%;padding:12px 0;color:#e0e3e7;border-bottom:1px solid #313539;';
+                            if(item.artwork && item.artwork.startsWith('https://')){
+                              const image=document.createElement('img');window.__xmusicSetArtwork(image,item.artwork);image.loading='lazy';
+                              image.style.cssText='width:48px;height:48px;flex-shrink:0;object-fit:cover;border-radius:9px;';
+                              row.appendChild(image);
+                            }
+                            const text=document.createElement('div');text.style.minWidth='0';
+                            const title=document.createElement('strong');title.textContent=item.title||'İsimsiz';
+                            const sub=document.createElement('div');
+                            sub.textContent=(kind==='albums'?(item.category||'Albüm')+' · ':'')+(item.subtitle||'');
+                            sub.style.cssText='font-size:13px;color:#b4c1c9;margin-top:4px;';
+                            text.append(title,sub);row.appendChild(text);
+                            owned(row,function(){
+                              if(kind==='artists')enter('albums',item.id,item.title);
+                              else if(kind==='albums')enter('songs',item.id,item.title);
+                              else enter('versions','',((item.subtitle||'')+' '+(item.title||'')).trim());
+                            });
+                            return row;
+                          }
+                          window.__xmusicAppleResult=function(id,payload){
+                            const entry=pending.get(id);pending.delete(id);
+                            if(!entry || entry.epoch!==generation)return;
+                            const target=entry.container;target.replaceChildren();
+                            if(payload.error){target.textContent='Aramaya ulaşılamadı. İnternet bağlantısını kontrol edip yeniden dene.';return;}
+                            const items=payload.items||[];
+                            if(!items.length){target.textContent='Sonuç bulunamadı.';return;}
+                            let release='Tümü';
+                            const rows=document.createElement('div');
+                            function draw(){
+                              rows.replaceChildren();
+                              const visible=items.filter(function(item){return release==='Tümü'||item.category===release;});
+                              const preview=state.view==='search'&&state.filter==='all';
+                              visible.slice(0,preview?6:visible.length).forEach(function(item){rows.appendChild(catalogRow(item,entry.kind));});
+                              if(!visible.length)rows.textContent='Bu türde kayıt bulunamadı.';
+                              if(preview && visible.length>6)rows.appendChild(button('Tümünü gör',function(){selectFilter(entry.kind);}));
+                            }
+                            if(entry.kind==='albums'&&state.view==='albums'){
                               const filters=document.createElement('div');
-                              filters.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;';
-                              ['Albüm','EP','Single','Tümü'].forEach(function(category){
-                                const chip=document.createElement('button');
-                                chip.type='button';chip.textContent=category+' ('+(category==='Tümü'?items.length:(counts[category]||0))+')';
-                                chip.style.cssText='border-radius:16px;padding:7px 11px;font-size:12px;border:1px solid #62796f;color:#e0e3e7;background:'+(releaseFilter===category?'#36584d':'transparent');
-                                chip.addEventListener('click',function(){releaseFilter=category;showApple(id,payload);});
-                                filters.appendChild(chip);
-                              });
-                              list.appendChild(filters);
-                              items.sort(function(a,b){
-                                const order={'Albüm':0,'EP':1,'Single':2};
-                                return (order[a.category]??3)-(order[b.category]??3);
-                              });
+                              filters.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;';
+                              ['Tümü','Albüm','EP','Single'].forEach(function(category){
+                                const count=items.filter(function(item){return category==='Tümü'||item.category===category;}).length;
+                                const chip=button(category+' ('+count+')',function(){
+                                  release=category;
+                                  Array.from(filters.children).forEach(function(b){b.setAttribute('aria-pressed',String(b===chip));b.style.background=b===chip?'#36584d':'transparent';});
+                                  draw();
+                                });
+                                chip.setAttribute('aria-pressed',String(category===release));
+                                chip.style.background=category===release?'#36584d':'transparent';filters.appendChild(chip);
+                              });target.appendChild(filters);
                             }
-                            items.forEach(function(item){
-                              if(appleStage==='albums' && releaseFilter!=='Tümü' && item.category!==releaseFilter)return;
-                              const row=document.createElement('button');
-                              row.type='button';row.style.cssText='display:flex;gap:12px;align-items:center;text-align:left;width:100%;padding:10px 0;color:#e0e3e7;border-bottom:1px solid #313539;';
-                              if(item.artwork && item.artwork.startsWith('https://')){
-                                const img=document.createElement('img');img.src=item.artwork;
-                                img.style.cssText='width:48px;height:48px;object-fit:cover;border-radius:8px;';
-                                row.appendChild(img);
-                              }
-                              const cell=document.createElement('div');
-                              const title=document.createElement('strong');title.textContent=item.title||'İsimsiz';
-                              const sub=document.createElement('div');sub.textContent=(appleStage==='albums'?((item.category||'Albüm')+' · '):appleStage==='songs'?'Yalnızca katalog · ':'')+(item.subtitle||'');sub.style.cssText='color:#b4c1c9;font-size:13px;';
-                              cell.append(title,sub);row.appendChild(cell);
-                              row.addEventListener('click',function(){
-                                if(appleStage==='artists'){
-                                  appleId=item.id;window.__appleArtistId=item.id;appleName=item.title;
-                                  appleStage='albums';runSearch();
-                                }else if(appleStage==='albums'){
-                                  appleId=item.id;appleStage='songs';runSearch();
-                                }else{
-                                  // Apple katalog kayıtları ses akışı değildir: yanlışlıkla Apple Music'e yönlendirme.
-                                  if(window.Android)window.Android.showToast('Bu şarkı katalog bilgisidir. Bu kayıt için yetkili ses kaynağı henüz bağlı değil.');
-                                }
-                              });
-                              list.appendChild(row);
-                            });
-                          }
-                          window.__xmusicAppleResult=showApple;
-                          appleButton.addEventListener('click',function(){
-                            appleMode=!appleMode;appleStage='artists';appleId='';
-                            if(appleMode){verifiedMode=false;official.style.background='transparent';}
-                            appleButton.style.background=appleMode?'#36584d':'transparent';
-                            categories.style.display=appleMode?'none':'flex';
-                            heading.textContent=appleMode?'Apple Türkiye sanatçı ve albüm kataloğu':'Audius topluluk araması';
-                            disclaimer.textContent=appleMode?
-                              'Sanatçı → albüm → şarkı listesi. Apple kayıt bilgileri gösterilir; tam şarkı oynatma bu katalogdan yapılmaz.':
-                              'Bu sonuçlar Audius kullanıcı yüklemeleridir; resmî sanatçı diskografisi veya doğrulanmış albümler değildir.';
-                            runSearch();
-                          });
-                          let verifiedMode=false;
-                          let selectedArtist='';
-                          function showVerified(payload,id) {
-                            if(id!==currentId || !verifiedMode)return;
-                            list.replaceChildren();
-                            if(payload.error){list.textContent=payload.error;return;}
-                            const items=payload.items||[];
-                            if(!items.length){list.textContent='Katalogda sonuç bulunamadı';return;}
-                            if(selectedArtist){
-                              const back=document.createElement('button');
-                              back.textContent='← Sanatçılara dön';
-                              back.style.cssText='padding:8px;color:#9af0ba;';
-                              back.addEventListener('click',function(){selectedArtist='';runSearch();});
-                              list.appendChild(back);
-                            }
-                            items.forEach(function(item){
-                              const row=document.createElement('button');
-                              row.type='button';row.style.cssText='display:block;width:100%;text-align:left;padding:12px 4px;border-bottom:1px solid #313539;color:#e0e3e7;';
-                              const title=document.createElement('strong');title.textContent=item.title;
-                              const desc=document.createElement('div');desc.textContent=item.subtitle||'';
-                              desc.style.cssText='color:#b4c1c9;font-size:13px;margin-top:4px;';
-                              row.append(title,desc);
-                              if(!selectedArtist){
-                                row.addEventListener('click',function(){selectedArtist=item.id;runSearch();});
-                              }else{row.disabled=true;}
-                              list.appendChild(row);
-                            });
-                          }
-                          window.__xmusicVerifiedCatalog=showVerified;
-                          official.addEventListener('click',function(){
-                            verifiedMode=!verifiedMode;selectedArtist='';appleMode=false;appleButton.style.background='transparent';
-                            official.style.background=verifiedMode?'#36584d':'transparent';
-                            categories.style.display=verifiedMode?'none':'flex';
-                            heading.textContent=verifiedMode?'MusicBrainz sanatçı ve albümleri':'Audius topluluk araması';
-                            disclaimer.textContent=verifiedMode?
-                              'Sanatçı seçip kayıtlı albümlerini görebilirsin. Bu yalnızca katalog bilgisidir; ses dosyası veya oynatma hakkı içermez.':
-                              'Bu sonuçlar Audius kullanıcı yüklemeleridir; resmî sanatçı diskografisi veya doğrulanmış albümler değildir.';
-                            runSearch();
-                          });
-
-                          const renderCatalog=function(id,type,payload){
-                            if(id!==currentId || type!==mode)return;
-                            list.replaceChildren();
-                            if(payload.error){list.textContent=payload.error;return;}
-                            const entries=payload.items||[];
-                            if(!entries.length){list.textContent='Sonuç bulunamadı';return;}
-                            entries.forEach(function(item){
-                              const line=document.createElement('div');
-                              line.style.cssText='display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #313539;';
-                              if(item.artwork && item.artwork.startsWith('https://')){
-                                const img=document.createElement('img');img.src=item.artwork;
-                                img.style.cssText='width:48px;height:48px;object-fit:cover;border-radius:8px;';
-                                line.appendChild(img);
-                              }
-                              const info=document.createElement('div');
-                              const title=document.createElement('strong');title.textContent=item.title||'İsimsiz';
-                              const sub=document.createElement('div');sub.textContent=item.artist||'';sub.style.color='#b4c1c9';
-                              info.append(title,sub);line.appendChild(info);list.appendChild(line);
-                            });
+                            target.appendChild(rows);draw();
                           };
-                          window.__xmusicCatalogResult=renderCatalog;
+                          function driveRow(item){
+                            const row=catalogRow({title:item.title,subtitle:'Drive · '+(item.artist||'')+(item.album?' · '+item.album:''),artwork:''},'songs');
+                            owned(row,function(){window.Android.resumeDriveTrack(item.id,item.title||'',item.artist||'',0);});return row;
+                          }
+                          window.__xmusicDriveResult=function(id,payload){
+                            const entry=pending.get(id);pending.delete(id);if(!entry||entry.epoch!==generation)return;
+                            const target=entry.container;target.replaceChildren();
+                            if(!payload.available){target.parentElement.style.display='none';return;}
+                            const items=payload.items||[];
+                            if(payload.error){target.textContent=payload.error;return;}
+                            if(!items.length){target.textContent=payload.status&&payload.status.stamp?'Drive arşivinde eşleşme yok.':'Arşiv henüz taranmadı. Drive ayarlarından arşivi tara.';return;}
+                            items.forEach(function(item){target.appendChild(driveRow(item));});
+                          };
+                          window.__xmusicExperimentalResult=function(id,payload){
+                            const entry=pending.get(id);pending.delete(id);
+                            if(!entry || entry.epoch!==generation || state.view!=='versions')return;
+                            const target=entry.container;target.replaceChildren();
+                            if(payload.error){target.textContent=payload.error;return;}
+                            const items=payload.items||[];
+                            if(!items.length){target.textContent='Dinlenebilir kayıt bulunamadı.';return;}
+                            const hint=document.createElement('p');hint.textContent=payload.archive?'Ortak Drive arşivindeki kayıtlar':'Dinlemek istediğin sürümü ve yükleyeni kontrol ederek seç.';
+                            hint.style.cssText='font-size:12px;color:#b4c1c9;margin-bottom:8px;';target.appendChild(hint);
+                            items.forEach(function(item){
+                              if(item.source==='drive'){target.appendChild(driveRow(item));return;}
+                              const row=catalogRow({title:item.title,subtitle:item.artist,artwork:'https://i.ytimg.com/vi/'+item.id+'/mqdefault.jpg'},'songs');
+                              owned(row,function(){window.Android.playExperimentalSource(item.id,item.title||'',item.artist||'');});
+                              target.appendChild(row);
+                            });
+                            if(payload.archive)target.appendChild(button('Diğer kaynaklarda ara',function(){
+                              target.textContent='Aranıyor…';const request=++requestId;pending.set(request,{container:target,epoch:generation});
+                              window.Android.searchExperimentalSourceLive(state.name,request);
+                            }));
+                            if(!payload.archive&&payload.limit===10&&items.length===10)target.appendChild(button('Daha fazla sonuç',function(){
+                              target.textContent='Aranıyor…';
+                              const request=++requestId;pending.set(request,{container:target,epoch:generation});
+                              window.Android.searchExperimentalSourceMore(state.name,request,30);
+                            }));
+                          };
                           function runSearch(){
-                            clearTimeout(debounce);currentId+=1;
-                            const id=currentId;const q=input.value.trim();
-                            if(!q){panel.style.display='none';return;}
-                            panel.style.display='block';list.textContent='Aranıyor...';
+                            clearTimeout(debounce);clearTimeout(recentTimer);generation++;pending.clear();
+                            const query=input.value.trim();
+                            panel.style.display=query?'block':'none';
+                            if(browse)browse.style.display=query?'none':'';
+                            if(!query){panel.replaceChildren();return;}
+                            renderFrame();
+                            const epoch=generation;
+                            const body=document.createElement('div');body.textContent='Aranıyor…';panel.appendChild(body);
                             debounce=setTimeout(function(){
-                              if(verifiedMode){
-                                setTimeout(function(){if(verifiedMode && id===currentId && list.textContent==='Aranıyor...'){list.textContent='Katalog yanıt vermedi. Aramayı yeniden dene.';}},16000);
+                              if(epoch!==generation)return;
+                              body.replaceChildren();
+                              // Yazım durakladığında son sorguyu kaydet; hızlı ara harfleri kaydetme.
+                              if(state.view==='search')recentTimer=setTimeout(function(){
+                                if(epoch===generation)rememberQuery();
+                              },1200);
+                              if(state.view==='versions'){
+                                body.textContent='Kayıtlar aranıyor…';
+                                const request=++requestId;pending.set(request,{container:body,epoch:epoch});
+                                window.Android.searchExperimentalSource(state.name,request);return;
                               }
-                              if(appleMode)window.Android.searchAppleCatalog(q,appleId,appleStage,id);
-                              else if(verifiedMode)window.Android.searchVerifiedCatalog(q,selectedArtist,id);
-                              else if(mode==='tracks')window.Android.searchMusic(q,id);
-                              else window.Android.searchAudiusCatalog(q,mode,id);
+                              const driveGroup=document.createElement('section');
+                              const driveHeading=document.createElement('h3');driveHeading.textContent='Drive arşivim';driveHeading.style.cssText='font-weight:600;color:#4efd7d;margin:12px 0;';
+                              const driveResults=document.createElement('div');driveResults.textContent='Arşivde aranıyor…';driveGroup.append(driveHeading,driveResults);body.appendChild(driveGroup);
+                              const driveRequest=++requestId;pending.set(driveRequest,{container:driveResults,epoch:epoch});window.Android.searchDriveArchive(query,driveRequest);
+                              const kinds=state.view==='search'?(state.filter==='all'?['artists','albums','songs']:[state.filter]):[state.view];
+                              kinds.forEach(function(kind){
+                                const group=document.createElement('div');group.style.marginBottom='16px';
+                                if(kinds.length>1){
+                                  const h=document.createElement('h3');h.textContent=labels[kind];h.style.cssText='font-weight:600;color:#4efd7d;margin-bottom:6px;';group.appendChild(h);
+                                }
+                                const results=document.createElement('div');results.textContent='Aranıyor…';group.appendChild(results);body.appendChild(group);
+                                requestCatalog(kind,state.view==='search'?'':state.id,results,epoch);
+                              });
                             },350);
                           }
-                          input.addEventListener('input',function() {
-                            runSearch();
+                          input.addEventListener('input',function(){
+                            if(!input.value.trim())lastCountedQuery='';
+                            state=Object.assign({},state,{view:'search',id:'',name:''});history=[];runSearch();
                           });
+                          const clear=document.getElementById('search-clear-btn');
+                          if(clear)owned(clear,function(){
+                            input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();
+                          });
+                          updateChips();
                         }
                       }
-                      // Ayarlar ekranındaki anahtarları Android SharedPreferences ile sakla.
-                      // Gerçek işlevi olmayan anahtarın görüntüsü değişse de özellik tamamlandı sayılmaz.
+                      if ((location.pathname || '').includes('/ayarlar_ve_profil_y_netimi/')) {
+                        const main=document.querySelector('main');
+                        if(main && !document.getElementById('xmusic-drive-connect')){
+                          const btn=document.createElement('button');
+                          btn.id='xmusic-drive-connect';btn.type='button';btn.textContent='Google Drive hesabını bağla';
+                          btn.style.cssText='display:block;padding:12px;margin:12px;border:1px solid #62796f;border-radius:12px;color:#e0e3e7;';
+                          btn.dataset.xmOwned='true';btn.__xmOwnedRun=function(){if(window.Android)window.Android.connectDrive();};
+                          const upload=document.createElement('button');
+                          upload.type='button';upload.textContent='Drive’a ses dosyası yükle';upload.style.cssText=btn.style.cssText;
+                          upload.dataset.xmOwned='true';upload.__xmOwnedRun=function(){if(window.Android)window.Android.chooseDriveUpload();};
+                          const library=document.createElement('button');
+                          library.type='button';library.textContent='Drive müzik arşivini aç';library.style.cssText=btn.style.cssText;
+                          library.dataset.xmOwned='true';library.__xmOwnedRun=function(){if(window.Android)window.Android.openDriveLibrary();};
+                          const scan=document.createElement('button');scan.type='button';scan.textContent='Drive arşivini tara / yenile';scan.style.cssText=btn.style.cssText;
+                          scan.dataset.xmOwned='true';scan.__xmOwnedRun=function(){window.Android.refreshDriveArchive();};
+                          const scanStatus=document.createElement('p');scanStatus.style.cssText='padding:0 16px 12px;color:#b4c1c9;font-size:12px;';
+                          function refreshScanStatus(){scanStatus.textContent=window.Android.driveArchiveStatus()||'';}refreshScanStatus();window.addEventListener('xmusic:archive',refreshScanStatus);
+
+                          const queue=document.createElement('button');queue.type='button';queue.textContent='Drive yükleme kuyruğu';queue.style.cssText=btn.style.cssText;
+                          queue.dataset.xmOwned='true';queue.__xmOwnedRun=function(){if(window.Android)window.Android.showDriveUploadQueue();};
+                          const automatic=document.createElement('button');automatic.type='button';automatic.textContent='Otomatik Drive arşivini aç / kapat';automatic.style.cssText=btn.style.cssText;
+                          automatic.dataset.xmOwned='true';automatic.__xmOwnedRun=function(){if(window.Android)window.Android.toggleAutomaticArchive();};
+                          const section=document.createElement('section');
+                          section.className='px-4 mb-6';
+                          const details=document.createElement('details');
+                          details.className='bg-surface-container-low rounded-xl overflow-hidden shadow-sm';
+                          const summary=document.createElement('summary');
+                          summary.className='p-4 font-label-lg text-label-lg text-on-surface cursor-pointer';
+                          summary.textContent='Google hesap ve Drive ayarları';
+                          summary.dataset.xmOwned='true';summary.__xmOwnedRun=function(){details.open=!details.open;};
+                          details.appendChild(summary);
+                          const shared=document.createElement('button');shared.type='button';shared.textContent='Ortak müzik klasörünü seç / değiştir';
+                          shared.dataset.xmOwned='true';shared.__xmOwnedRun=function(){window.Android.chooseSharedDriveFolder();};
+                          const access=document.createElement('button');access.type='button';access.textContent='Mevcut müziklere erişim ver';
+                          access.dataset.xmOwned='true';access.__xmOwnedRun=function(){window.Android.authorizeExistingDriveAudio();};
+                          const sync=document.createElement('button');sync.type='button';sync.textContent='Otomatik ortak arşiv bağlantısını aç';
+                          sync.dataset.xmOwned='true';sync.__xmOwnedRun=function(){window.Android.enableContinuousDrive();};
+                          const explain=function(text){const p=document.createElement('p');p.textContent=text;p.style.cssText='margin:12px 16px 6px;font-size:13px;line-height:1.5;color:#bbcbb8;';return p;};
+                          const appendAction=function(parent,item){
+                            item.style.cssText='display:block;width:calc(100% - 32px);padding:14px;margin:8px 16px;text-align:left;border:1px solid #62796f;border-radius:12px;color:#e0e3e7;font:inherit;';
+                            parent.appendChild(item);
+                          };
+                          details.appendChild(explain('Bir kez kurulum: Her telefonda kendi Google hesabını ve aynı ortak müzik klasörünü kullan.'));
+                          details.appendChild(explain('1. Ortak klasörü seç. Daha önce seçtiysen bu adımı tekrarlama.'));
+                          appendAction(details,shared);
+                          details.appendChild(explain('2. Otomatik bağlantı iznini bir kez ver. Yeni müzikler uygulama açıkken yaklaşık dakikada bir alınır; tek tek şarkı seçmen gerekmez.'));
+                          appendAction(details,sync);
+                          details.appendChild(explain('Günlük kullanım: Ortak arşivdeki müzikleri aç ve dinle.'));
+                          appendAction(details,library);appendAction(details,scan);details.appendChild(scanStatus);
+                          const advanced=document.createElement('details');advanced.style.cssText='margin:16px;border-top:1px solid #3c4a3c;padding-top:12px;';
+                          const advancedTitle=document.createElement('summary');advancedTitle.textContent='Gelişmiş işlemler';advancedTitle.style.cssText='padding:10px 0;font:inherit;color:#bbcbb8;cursor:pointer;';
+                          advancedTitle.dataset.xmOwned='true';advancedTitle.__xmOwnedRun=function(){advanced.open=!advanced.open;};
+                          advanced.appendChild(advancedTitle);
+                          advanced.appendChild(explain('Normal kullanım için aşağıdaki işlemleri tekrarlaman gerekmez. Dosya yükleme, kuyruk ve eski dosya bazlı erişim seçenekleri.'));
+                          [btn,upload,queue,automatic,access].forEach(function(item){appendAction(advanced,item);});
+                          details.appendChild(advanced);
+                          section.appendChild(details);
+                          const anchor=Array.from(main.querySelectorAll('section')).find(function(s){return (s.textContent||'').includes('İndirme & Depolama');});
+                          if(anchor) anchor.before(section); else main.appendChild(section);
+                        }
+                      }
+                      // Yalnız gerçek arka plan işlerine bağlı ağ tercihi etkin.
                       if ((location.pathname || '').includes('/ayarlar_ve_profil_y_netimi/')) {
                         document.querySelectorAll('input[type="checkbox"]').forEach(function(box, index) {
-                          const key = 'setting_' + index;
-                          if (window.Android) {
-                            box.checked = window.Android.loadSetting(key, box.checked);
-                            box.addEventListener('change', function() {
-                              window.Android.saveSetting(key, box.checked);
-                            });
+                          if(index===2 && window.Android){
+                            box.checked=window.Android.getDownloadWifiOnly();
+                            box.addEventListener('change',function(){window.Android.setDownloadWifiOnly(box.checked);});
+                          } else {
+                            box.checked=false;box.disabled=true;box.title='Bu özellik henüz hazır değil';
                           }
                         });
+                      }
+                      if ((location.pathname || '').includes('/ayarlar_ve_profil_y_netimi/')) {
+                        ['Biyometrik Hızlı Geçiş','Bağlı Cihazlar & Yayın','İndirme Kalitesi','Akış Kalitesi (Wi-Fi)','Mobil Veri Akış Kalitesi'].forEach(function(label){
+                          const title=Array.from(document.querySelectorAll('main h4,main p')).find(function(n){return n.textContent.trim()===label;});
+                          const row=title?.closest('.p-4, .pt-3'); if(row)row.remove();
+                        });
+                        const place=Array.from(document.querySelectorAll('main span')).find(function(n){return (n.textContent||'').includes('Depolama Konumu:');});
+                        const storage=place?.closest('.p-4');
+                        if(storage && window.Android){
+                          try {
+                            const info=JSON.parse(window.Android.deviceStorageInfo());
+                            const gb=function(n){return (n/1073741824).toLocaleString('tr-TR',{maximumFractionDigits:1})+' GB';};
+                            storage.replaceChildren();
+                            const title=document.createElement('p');title.className='font-label-md text-label-md text-on-surface';title.textContent='Cihaz depolama alanı';
+                            const detail=document.createElement('p');detail.className='font-body-sm text-body-sm text-on-surface-variant';detail.textContent=gb(info.free)+' boş · '+gb(info.total)+' toplam';
+                            storage.append(title,detail);
+                          } catch (_) { storage.textContent='Depolama bilgisi alınamadı.'; }
+                        }
                       }
                       // Ekran genişliğini aşan sabit öğelerin yatay taşmasını önle.
                       const sheet = document.createElement('style');
@@ -495,14 +1262,19 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         playbackBridge.start()
+        driveSyncHandler.removeCallbacks(driveSyncTicker)
+        driveSyncHandler.post(driveSyncTicker)
     }
 
     override fun onStop() {
         playbackBridge.stop()
+        driveSyncHandler.removeCallbacks(driveSyncTicker)
         super.onStop()
     }
 
     override fun onDestroy() {
+        coverGeneration.incrementAndGet(); coverWorker.shutdownNow()
+        driveSyncHandler.removeCallbacks(driveSyncTicker)
         playbackBridge.close()
         controllerFuture?.let { MediaController.releaseFuture(it) }
         appActions.controller = null
@@ -512,3 +1284,14 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 }
+
+
+
+
+
+
+
+
+
+
+

@@ -10,12 +10,22 @@ object PodcastRssParser {
                 val rows = org.json.JSONArray()
                 var item: JSONObject? = null
                 var feedTitle = "Podcast"
+                var feedDescription = ""
+                var feedAuthor = ""
                 var event = parser.eventType
                 while (event != org.xmlpull.v1.XmlPullParser.END_DOCUMENT && rows.length() < 100) {
                     if (event == org.xmlpull.v1.XmlPullParser.START_TAG) {
-                        when (parser.name.lowercase()) {
+                        when (parser.name.lowercase().substringAfter(':')) {
                             "item" -> item = JSONObject()
-                            "title" -> { val title = parser.nextText().take(300); if (item != null) item.put("title", title) else feedTitle = title }
+                            "title" -> if (item != null) item.put("title", parser.nextText().take(300)) else if (parser.depth == 3) feedTitle = parser.nextText().take(300)
+                            "pubdate" -> if (item != null) item.put("published", parser.nextText().take(120))
+                            "author" -> if (item == null && parser.depth == 3) feedAuthor = parser.nextText().take(300)
+                            "duration" -> if (item != null) item.put("duration", parser.nextText().take(40))
+                            "description" -> if (item != null || parser.depth == 3) {
+                                val raw = parser.nextText().take(10000)
+                                val description = android.text.Html.fromHtml(raw, android.text.Html.FROM_HTML_MODE_LEGACY).toString().trim().take(1000)
+                                if (item != null) item.put("description", description) else feedDescription = description
+                            }
                             "enclosure" -> if (item != null) {
                                 val url = parser.getAttributeValue(null, "url").orEmpty()
                                 val type = parser.getAttributeValue(null, "type").orEmpty()
@@ -35,6 +45,6 @@ object PodcastRssParser {
                     }
                     event = parser.next()
                 }
-                return JSONObject().put("title", feedTitle).put("items", rows)
+                return JSONObject().put("title", feedTitle).put("description", feedDescription).put("author", feedAuthor).put("items", rows)
     }
 }

@@ -13,9 +13,29 @@ class PlaybackService : MediaSessionService() {
         private set
     var sleepAtEnd = false
         private set
-    private val stopPlayback = Runnable { player?.pause(); sleepDeadline = 0L; sleepAtEnd = false }
+    private var fadeEnabled = false
+    private var originalVolume: Float? = null
+    private fun restoreVolume() { originalVolume?.let { player?.volume = it }; originalVolume = null }
+    private val stopPlayback = Runnable { player?.pause(); sleepDeadline = 0L; sleepAtEnd = false; restoreVolume() }
+    private val fadeTicker = object : Runnable {
+        override fun run() {
+            val p = player
+            if (fadeEnabled && p != null && (sleepDeadline > 0L || sleepAtEnd)) {
+                val remaining = if (sleepAtEnd) {
+                    if (p.isPlaying && p.duration > 0) (p.duration - p.currentPosition).coerceAtLeast(0L) else Long.MAX_VALUE
+                } else (sleepDeadline - android.os.SystemClock.elapsedRealtime()).coerceAtLeast(0L)
+                if (remaining <= 30000L) {
+                    if (originalVolume == null) originalVolume = p.volume
+                    p.volume = (originalVolume!! * remaining / 30000f).coerceIn(0f, 1f)
+                } else restoreVolume()
+            }
+            timerHandler.postDelayed(this, 250L)
+        }
+    }
+    fun setSleepFade(enabled: Boolean) { fadeEnabled = enabled; if (!enabled) restoreVolume() }
     fun setSleepTimer(minutes: Int) {
         timerHandler.removeCallbacks(stopPlayback)
+        restoreVolume()
         sleepDeadline = 0L
         sleepAtEnd = minutes == -1
         if (minutes in 1..120) {
@@ -23,20 +43,137 @@ class PlaybackService : MediaSessionService() {
             timerHandler.postDelayed(stopPlayback, minutes * 60000L)
         }
     }
+    private val experimentalHeaders = java.util.concurrent.ConcurrentHashMap<String, Map<String, String>>()
+
+    fun registerExperimentalStream(url: String, headers: Map<String, String>) {
+        // Başlıklar yalnızca çözülen akış adresi için geçerlidir.
+        experimentalHeaders.clear()
+        experimentalHeaders[url] = headers
+    }
+
+    fun audioSessionId(): Int = player?.audioSessionId ?: 0
+
     private var player: ExoPlayer? = null
     private var mediaSession: MediaSession? = null
+    private var resumeProfileId: String? = null
+    var familyBlockMessage: String = ""
+        private set
+    private var checkingFamily = false
+    private var familyTickAt = 0L
+    private var listeningProfile: String? = null
+    private var wasPlaying = false
+    private fun checkFamilyPlayback(): Boolean {
+        val p = player ?: return false
+        if (checkingFamily || p.currentMediaItem == null) return true
+        val family = com.example.ProfileStore(this)
+        val item = p.currentMediaItem!!
+        val message = family.playbackBlockReason(item.mediaId)
+        if (message != null && family.isChild()) family.requestReview(family.activeId(), org.json.JSONObject()
+            .put("id", item.mediaId).put("title", item.mediaMetadata.title?.toString().orEmpty())
+            .put("artist", item.mediaMetadata.artist?.toString().orEmpty()).toString())
+        if (message != null) {
+            familyBlockMessage = message
+            checkingFamily = true
+            try { p.pause(); p.clearMediaItems() } finally { checkingFamily = false }
+            return false
+        }
+        familyBlockMessage = ""
+        return true
+    }
+    private fun accountListening() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        val store = com.example.ProfileStore(this)
+        val id = store.activeId()
+        if (wasPlaying && listeningProfile == id && familyTickAt > 0) store.recordListening(id, now - familyTickAt)
+        familyTickAt = now; listeningProfile = id; wasPlaying = player?.isPlaying == true
+    }
+    private val familyTicker = object : Runnable {
+        override fun run() {
+            accountListening()
+            checkFamilyPlayback()
+            timerHandler.postDelayed(this, 1000L)
+        }
+    }
+
+
+    private fun saveResume() {
+        val p = player ?: return
+        val item = p.currentMediaItem ?: return
+        if (item.mediaId.isBlank()) return
+        val position = if (p.playbackState == androidx.media3.common.Player.STATE_ENDED) 0L else p.currentPosition.coerceAtLeast(0L)
+        val saved = org.json.JSONObject().put("id", item.mediaId)
+            .put("title", item.mediaMetadata.title?.toString().orEmpty())
+            .put("artist", item.mediaMetadata.artist?.toString().orEmpty())
+            .put("artwork", com.example.CoverArtStore(this).webArtwork(item.mediaMetadata))
+            .put("feed", item.mediaMetadata.extras?.getString("feed").orEmpty())
+            .put("position", position).put("duration", p.duration.coerceAtLeast(0L))
+            .put("updatedAt", System.currentTimeMillis())
+        com.example.PlaybackResumeStore(this).save(resumeProfileId ?: com.example.ProfileStore(this).activeId(), saved)
+    }
+
+    private val resumeTicker = object : Runnable {
+        override fun run() {
+            if (player?.isPlaying == true) saveResume()
+            timerHandler.postDelayed(this, 5000L)
+        }
+    }
+
 
     override fun onCreate() {
         super.onCreate()
         activeService = this
+        val resolver = androidx.media3.datasource.ResolvingDataSource.Resolver { spec ->
+            val headers = experimentalHeaders[spec.uri.toString()]
+            if (headers == null) spec else spec.withAdditionalHeaders(headers)
+        }
+        val dataSource = androidx.media3.datasource.DefaultDataSource.Factory(
+            this,
+            androidx.media3.datasource.ResolvingDataSource.Factory(
+                androidx.media3.datasource.DefaultHttpDataSource.Factory(), resolver
+            )
+        )
         player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(androidx.media3.exoplayer.source.DefaultMediaSourceFactory(dataSource))
             .setAudioAttributes(AudioAttributes.Builder()
                 .setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true)
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
         player!!.addListener(object : androidx.media3.common.Player.Listener {
+            private var countedItem = false
+            override fun onMediaMetadataChanged(metadata: androidx.media3.common.MediaMetadata) {
+                val key = player?.currentMediaItem?.mediaMetadata?.extras?.getString(com.example.CoverArtStore.EXTRA) ?: return
+                com.example.CoverArtStore.embedded(this@PlaybackService, key, metadata.artworkData)
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                accountListening()
+                if (isPlaying && !checkFamilyPlayback()) return
+                if (!isPlaying) { saveResume(); return }
+                val item = player?.currentMediaItem ?: return
+                if (!countedItem) {
+                    com.example.MusicListeningStats(this@PlaybackService).record(item.mediaId)
+                    countedItem = true
+                }
+                if (item.mediaId.startsWith("experimental:") && !com.example.ProfileStore(this@PlaybackService).isChild()) {
+                    com.example.data.drive.AutomaticDriveArchive.enqueue(
+                        this@PlaybackService, item.mediaId.removePrefix("experimental:"),
+                        item.mediaMetadata.title?.toString().orEmpty()
+                    )
+                }
+            }
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                val id = player?.currentMediaItem?.mediaId.orEmpty()
+                if (id.startsWith("experimental:")) {
+                    com.example.data.source.ExperimentalAudioResolver.invalidate(
+                        "https://www.youtube.com/watch?v=" + id.removePrefix("experimental:")
+                    )
+                }
+            }
             override fun onMediaItemTransition(item: androidx.media3.common.MediaItem?, reason: Int) {
+                if (item != null) resumeProfileId = com.example.ProfileStore(this@PlaybackService).activeId()
+                countedItem = false
+                if (!checkFamilyPlayback()) return
                 if (sleepAtEnd && (reason == androidx.media3.common.Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
                     reason == androidx.media3.common.Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT)) stopPlayback.run()
             }
@@ -44,6 +181,9 @@ class PlaybackService : MediaSessionService() {
                 if (sleepAtEnd && state == androidx.media3.common.Player.STATE_ENDED) stopPlayback.run()
             }
         })
+        timerHandler.post(resumeTicker)
+        timerHandler.post(fadeTicker)
+        timerHandler.post(familyTicker)
         // Uygulamaya dönüş ve kilit ekranı aynı MediaSession'ı kullanır.
         val intent = android.content.Intent(this, com.example.MainActivity::class.java)
             .addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
@@ -55,6 +195,12 @@ class PlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
 
     override fun onDestroy() {
+        accountListening()
+        saveResume()
+        timerHandler.removeCallbacks(familyTicker)
+        timerHandler.removeCallbacks(resumeTicker)
+        timerHandler.removeCallbacks(fadeTicker)
+        restoreVolume()
         timerHandler.removeCallbacks(stopPlayback)
         activeService = null
         mediaSession?.release()
@@ -64,3 +210,7 @@ class PlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 }
+
+
+
+

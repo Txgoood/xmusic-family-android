@@ -2,8 +2,27 @@
   'use strict';
   if (window.__xmusicPlaybackInstalled) return;
   window.__xmusicPlaybackInstalled = true;
+  const setArtwork = window.__xmusicSetArtwork ||= function(img, address, label='') {
+    if(!img)return;
+    const fallback=window.__xmusicArtworkFallback ||= 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="384" height="384" viewBox="0 0 384 384"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#17412d"/><stop offset="1" stop-color="#101719"/></linearGradient></defs><rect width="384" height="384" fill="url(#g)"/><path fill="#4efd7d" opacity=".75" d="M231 90v147a42 42 0 1 1-20-36V119l-71 16v118a42 42 0 1 1-20-36V119z"/></svg>');
+    const wanted=typeof address==='string'&&address.startsWith('https://')?address:'';
+    img.alt=label||'';img.style.visibility='visible';img.style.objectFit='cover';
+    if(img.dataset.xmArtwork===wanted)return;
+    img.dataset.xmArtwork=wanted;
+    img.onerror=()=>{img.onerror=null;if(img.getAttribute('src')!==fallback)img.src=fallback;};
+    const next=wanted||fallback;if(img.getAttribute('src')!==next)img.src=next;
+  };
   const full = location.pathname.includes('/imdi_al_yor/');
-  const mini = document.querySelector('aside');
+  const settingsMini = location.pathname.includes('/ayarlar_ve_profil_y_netimi/')
+    ? document.querySelector('main .fixed.bottom-2.inset-x-2') : null;
+  const mini = document.querySelector('aside') || settingsMini;
+  if (settingsMini) {
+    settingsMini.querySelector('[aria-label="Google Cast"]')?.remove();
+    settingsMini.querySelector('.absolute.-bottom-1.-right-1')?.remove();
+    const play = settingsMini.querySelector('#miniPlayBtn');
+    if (play) { play.removeAttribute('onclick'); play.setAttribute('aria-label','Oynat veya Duraklat'); }
+  }
+  if (mini) mini.style.display = 'none';
   let state = {};
   const text = (node, value) => { if (node) node.textContent = value; };
   const time = ms => { const n = Math.floor(Math.max(0, ms || 0) / 1000); return Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0'); };
@@ -11,8 +30,13 @@
   const artist = full ? title?.parentElement?.nextElementSibling?.querySelector('p') : mini?.querySelectorAll('p')[1];
   const badge = title?.nextElementSibling;
   let artwork = full ? document.querySelector('main img') : null;
+  if (full && artwork) {
+    const visualStyle=document.createElement('style');
+    visualStyle.textContent='@keyframes xm-cover-motion{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}} .xm-cover-motion{animation:xm-cover-motion 12s ease-in-out infinite;will-change:transform} @media (prefers-reduced-motion:reduce){.xm-cover-motion{animation:none!important}}';
+    document.head.appendChild(visualStyle);
+  }
   if (mini) {
-    const box = mini.querySelector('.w-12.h-12');
+    const box = mini.querySelector('.w-12.h-12') || (settingsMini && mini.querySelector('.w-11.h-11')); 
     if (box) {
       box.replaceChildren();
       artwork = document.createElement('img');
@@ -74,19 +98,15 @@
   }, true);
   window.__xmusicPlayback = function (value) {
     state = value;
+    if (mini) mini.style.display = value.id ? '' : 'none';
     window.dispatchEvent(new CustomEvent('xmusic:playback', { detail: value }));
     text(title, value.title || 'Henüz parça seçilmedi');
     text(artist, value.artist || 'Keşfet bölümünden bir parça seç');
-    const source = value.id?.startsWith('audius:') ? 'Audius' : value.id ? 'Akış' : '';
+    const source = value.id?.startsWith('audius:') ? 'Audius' : /^(drive:|drive-source:)/.test(value.id||'') ? 'Drive' : value.id ? 'Akış' : '';
     text(badge, source);
     if (full) text(document.querySelector('main h2'), source || 'Parça seçilmedi');
-    if (artwork) {
-      const url = value.artwork?.startsWith('https://') ? value.artwork : '';
-      if (url && artwork.getAttribute('src') !== url) artwork.src = url;
-      if (!url) artwork.removeAttribute('src');
-      artwork.style.visibility = url ? 'visible' : 'hidden';
-      artwork.alt = value.title || '';
-    }
+    setArtwork(artwork,value.artwork,value.title);
+    if(full && artwork)artwork.classList.toggle('xm-cover-motion',!!value.id && !!value.playing && !document.hidden);
     text(status, value.error || (!value.ready ? 'Oynatıcı bağlanıyor…' : value.pending ? 'Ses yükleniyor…' : value.ended ? 'Bitti' : value.id ? (value.playing ? 'Çalıyor' : 'Duraklatıldı') : ''));
     controls.forEach(button => {
       const label = button.getAttribute('aria-label');
@@ -108,3 +128,7 @@
   };
   window.__xmusicPlayback({ ready: false });
 })();
+
+
+
+
