@@ -27,6 +27,17 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         webView.post { (context as? MainActivity)?.resumeDriveTrack(id, title, artist, position) }
     }
 
+    @JavascriptInterface fun refreshDriveArchive() { webView.post { (context as? MainActivity)?.refreshDriveArchive() } }
+    @JavascriptInterface fun driveArchiveStatus(): String = try { (context as? MainActivity)?.driveArchiveStatus().orEmpty() } catch (_: Exception) { "Arşiv indeksi açılamadı; yeniden taramayı dene." }
+    @JavascriptInterface fun searchDriveArchive(query: String, requestId: Int) {
+        if (query.isBlank() || query.length > 120) return
+        Thread {
+            val result = try { (context as? MainActivity)?.searchDriveArchive(query) ?: org.json.JSONObject().put("available", false) }
+                catch (_: Exception) { org.json.JSONObject().put("available", true).put("error", "Drive arşivi aranamadı. Yeniden taramayı dene.") }
+            webView.post { webView.evaluateJavascript("window.__xmusicDriveResult && window.__xmusicDriveResult($requestId,$result)", null) }
+        }.start()
+    }
+
     @JavascriptInterface
     fun openDriveLibrary() { webView.post { (context as? MainActivity)?.openDriveLibrary() } }
 
@@ -185,9 +196,19 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     }
 
     @JavascriptInterface
-    fun searchExperimentalSourceMore(query: String, requestId: Int, limit: Int) {
+    fun searchExperimentalSourceMore(query: String, requestId: Int, limit: Int) = searchExperimentalInternal(query, requestId, limit, false)
+
+    @JavascriptInterface fun searchExperimentalSourceLive(query: String, requestId: Int) = searchExperimentalInternal(query, requestId, 10, true)
+
+    private fun searchExperimentalInternal(query: String, requestId: Int, limit: Int, liveOnly: Boolean) {
         if (query.isBlank() || query.length > 120 || limit !in setOf(10, 30)) return
         Thread {
+            val archived = if (liveOnly) null else try { (context as? MainActivity)?.searchDriveArchive(query) } catch (_: Exception) { null }
+            if (archived?.optJSONArray("items")?.length()?.let { it > 0 } == true) {
+                archived.put("archive", true).put("limit", limit)
+                webView.post { webView.evaluateJavascript("window.__xmusicExperimentalResult && window.__xmusicExperimentalResult($requestId,$archived)", null) }
+                return@Thread
+            }
             val result = try {
                 val engine = com.yausername.youtubedl_android.YoutubeDL.getInstance()
                 engine.init(context.applicationContext)
@@ -222,7 +243,8 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     private fun startExperimentalSource(id: String, title: String, artist: String, position: Long) {
         if (!id.matches(Regex("[A-Za-z0-9_-]{11}"))) return
         webView.post {
-        if ((context as? MainActivity)?.playArchivedSource(id, title, artist) == true) {
+        if ((context as? MainActivity)?.playArchivedSource(id, title, artist) == true ||
+            (context as? MainActivity)?.playMatchingDriveArchive(title, artist) == true) {
             if (position > 0) mediaController?.seekTo(position)
             return@post
         }
@@ -678,6 +700,7 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         this.mediaController = controller
     }
 }
+
 
 
 
