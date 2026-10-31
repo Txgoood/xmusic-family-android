@@ -82,9 +82,9 @@ class DriveArchiveIndex(context: Context) : Closeable {
         helper.readableDatabase.query("scans", arrayOf("stamp", "error"), "scope=?", arrayOf(scope), null, null, null).use { if (it.moveToFirst()) result.put("stamp", it.getLong(0)).put("error", it.getString(1)) }
         return result
     }
-    private fun rows(selection: String, args: Array<String>, limit: Int = 30): JSONArray {
+    private fun rows(selection: String, args: Array<String>, limit: Int = 30, order: String = "title COLLATE NOCASE,id"): JSONArray {
         val result = JSONArray()
-        helper.readableDatabase.query("tracks", arrayOf("id", "title", "artist", "album", "path", "name", "source"), selection, args, null, null, "title COLLATE NOCASE,id", limit.toString()).use { c ->
+        helper.readableDatabase.query("tracks", arrayOf("id", "title", "artist", "album", "path", "name", "source"), selection, args, null, null, order, limit.toString()).use { c ->
             while (c.moveToNext()) result.put(JSONObject().put("id", c.getString(0)).put("title", c.getString(1)).put("artist", c.getString(2)).put("album", c.getString(3)).put("path", c.getString(4)).put("name", c.getString(5)).put("sourceId", c.getString(6)))
         }
         return result
@@ -94,7 +94,9 @@ class DriveArchiveIndex(context: Context) : Closeable {
         if (tokens.isEmpty()) return JSONArray()
         val args = mutableListOf(scope)
         val where = "scope=?" + tokens.joinToString("") { token -> args.add("%" + token.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%"); " AND norm LIKE ? ESCAPE '!'" }
-        return rows(where, args.toTypedArray(), limit.coerceIn(1, 100))
+        val term = android.database.DatabaseUtils.sqlEscapeString(normalize(query))
+        val order = "CASE WHEN nt=$term THEN 0 WHEN nt!='' AND na!='' AND instr($term,nt)>0 AND instr($term,na)>0 THEN 1 ELSE 2 END,title COLLATE NOCASE,id"
+        return rows(where, args.toTypedArray(), limit.coerceIn(1, 100), order)
     }
     fun exact(scope: String, title: String, artist: String): JSONObject? {
         val wanted = requested(title, artist)
