@@ -421,9 +421,21 @@ assert.ok(!archiveResults.textContent.includes('Eski Drive sonucu'));checks++;x.
 x=open('ayarlar_ve_profil_y_netimi');
 [...x.d.querySelectorAll('button')].find(b=>b.textContent==='Drive arşivini tara / yenile').click();assert.deepEqual(x.calls.at(-1),['refreshDriveArchive']);checks++;x.dom.window.close();
 
+// Gecikmeli kapak geçmişe ve devam et kartına geçer; hatalı resim tekrar yüklenmez.
+db=JSON.stringify({history:[{id:'drive:coverfile',title:'Her Şeyi Yak',artist:'Duman',artwork:''}],resume:{id:'drive:coverfile',title:'Her Şeyi Yak',artist:'Duman',position:1000,duration:120000}});
+x=open('ana_sayfa');
+x.w.__xmusicPlayback({ready:true,id:'drive:coverfile',title:'Her Şeyi Yak',artist:'Duman',artwork:'',playing:true,position:1000,duration:120000,queue:[]});
+const cachedCover='https://xmusic.local/artwork/'+'b'.repeat(64)+'.jpg';
+x.w.__xmusicPlayback({ready:true,id:'drive:coverfile',title:'Her Şeyi Yak',artist:'Duman',artwork:cachedCover,playing:true,position:2000,duration:120000,queue:[]});
+assert.equal(JSON.parse(db).history[0].artwork,cachedCover);
+assert.ok([...x.d.querySelectorAll('main img')].some(img=>img.getAttribute('src')===cachedCover));checks+=2;
+const cachedImg=[...x.d.querySelectorAll('main img')].find(img=>img.getAttribute('src')===cachedCover);
+cachedImg.dispatchEvent(new x.w.Event('error'));assert.ok(cachedImg.getAttribute('src').startsWith('data:image/svg+xml'));checks++;x.dom.window.close();
+
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
 if(process.env.XMUSIC_AUDIT_OUTPUT)fs.writeFileSync(process.env.XMUSIC_AUDIT_OUTPUT,JSON.stringify(report,null,2));
+
 
 
 
