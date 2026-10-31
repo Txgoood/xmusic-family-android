@@ -272,6 +272,7 @@ x.d.querySelector('[aria-label="Stüdyo kayıt oynat"]').click();assert.deepEqua
 x.dom.window.close();
 
 // Ana sayfa: gerçek geçmiş, 6 kayıt, devam etme, iki kaynak seçkisi.
+approvedMock=[{id:'drive:two',title:'İki',artist:'Sanatçı',artwork:'https://example.com/two.jpg'}];
 x=open('ana_sayfa');
 assert.ok(!x.d.querySelector('main h1').textContent.includes('Burak'));
 assert.ok(!x.d.querySelector('main').textContent.includes('4/6'));
@@ -294,10 +295,21 @@ let homeRecent=[...x.d.querySelectorAll('main section')].find(s=>s.querySelector
 assert.ok(homeRecent.textContent.includes('Son Parça'));
 assert.ok(homeRecent.querySelector('.grid').children.length<=6);checks+=2;
 let homeMix=[...x.d.querySelectorAll('main section')].find(s=>s.querySelector('h2')?.textContent.includes('Günlük Aile Miksi'));
-assert.equal(homeMix.children[1].children.length,2);checks++;
+assert.equal(homeMix.children[1].children.length,3);checks++;
+const archiveReq=x.calls.filter(c=>c[0]==='loadArchiveSelections').at(-1);
+assert.ok(archiveReq);x.w.__xmusicArchiveSelections(archiveReq[1],{items:[
+ {id:'drive:one',title:'Bir',artist:'Sanatçı',artwork:'https://example.com/one.jpg'},
+ {id:'drive:two',title:'İki',artist:'Sanatçı',artwork:'https://example.com/two.jpg'}]});
+const selectionCard=homeMix.children[1].children[2];
+assert.ok(selectionCard.textContent.includes('Arşivden Seçkiler'));assert.equal(selectionCard.querySelectorAll('img').length,4);
+selectionCard.click();assert.ok(x.d.getElementById('xm-dialog').textContent.includes('Bir'));
+assert.equal(x.d.querySelector('#xm-dialog .xm-row strong').textContent,'İki');checks++;
+[...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Dinle').click();
+assert.equal(x.calls.at(-1)[0],'resumeDriveTrack');x.d.getElementById('xm-dialog').remove();checks+=5;
 homeMix.children[1].children[1].click();
 assert.ok(x.calls.some(c=>c[0]==='familyMix'&&c[1]==='history'));checks++;
 x.dom.window.close();
+approvedMock=[];
 x=open('ana_sayfa');
 let resumeCard=[...x.d.querySelectorAll('main section')].find(s=>s.textContent.includes('Kaldığın Yerden Devam Et')).children[1];
 resumeCard.click();
@@ -435,6 +447,7 @@ cachedImg.dispatchEvent(new x.w.Event('error'));assert.ok(cachedImg.getAttribute
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
 if(process.env.XMUSIC_AUDIT_OUTPUT)fs.writeFileSync(process.env.XMUSIC_AUDIT_OUTPUT,JSON.stringify(report,null,2));
+
 
 
 
