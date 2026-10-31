@@ -2,6 +2,16 @@
   'use strict';
   if (window.__xmusicPlaybackInstalled) return;
   window.__xmusicPlaybackInstalled = true;
+  const setArtwork = window.__xmusicSetArtwork ||= function(img, address, label='') {
+    if(!img)return;
+    const fallback=window.__xmusicArtworkFallback ||= 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="384" height="384" viewBox="0 0 384 384"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#17412d"/><stop offset="1" stop-color="#101719"/></linearGradient></defs><rect width="384" height="384" fill="url(#g)"/><path fill="#4efd7d" opacity=".75" d="M231 90v147a42 42 0 1 1-20-36V119l-71 16v118a42 42 0 1 1-20-36V119z"/></svg>');
+    const wanted=typeof address==='string'&&address.startsWith('https://')?address:'';
+    img.alt=label||'';img.style.visibility='visible';img.style.objectFit='cover';
+    if(img.dataset.xmArtwork===wanted)return;
+    img.dataset.xmArtwork=wanted;
+    img.onerror=()=>{img.onerror=null;if(img.getAttribute('src')!==fallback)img.src=fallback;};
+    const next=wanted||fallback;if(img.getAttribute('src')!==next)img.src=next;
+  };
   const full = location.pathname.includes('/imdi_al_yor/');
   const settingsMini = location.pathname.includes('/ayarlar_ve_profil_y_netimi/')
     ? document.querySelector('main .fixed.bottom-2.inset-x-2') : null;
@@ -90,13 +100,7 @@
     const source = value.id?.startsWith('audius:') ? 'Audius' : /^(drive:|drive-source:)/.test(value.id||'') ? 'Drive' : value.id ? 'Akış' : '';
     text(badge, source);
     if (full) text(document.querySelector('main h2'), source || 'Parça seçilmedi');
-    if (artwork) {
-      const url = value.artwork?.startsWith('https://') ? value.artwork : '';
-      if (url && artwork.getAttribute('src') !== url) artwork.src = url;
-      if (!url) artwork.removeAttribute('src');
-      artwork.style.visibility = url ? 'visible' : 'hidden';
-      artwork.alt = value.title || '';
-    }
+    setArtwork(artwork,value.artwork,value.title);
     text(status, value.error || (!value.ready ? 'Oynatıcı bağlanıyor…' : value.pending ? 'Ses yükleniyor…' : value.ended ? 'Bitti' : value.id ? (value.playing ? 'Çalıyor' : 'Duraklatıldı') : ''));
     controls.forEach(button => {
       const label = button.getAttribute('aria-label');
@@ -118,5 +122,6 @@
   };
   window.__xmusicPlayback({ ready: false });
 })();
+
 
 
