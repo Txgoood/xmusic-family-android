@@ -110,6 +110,7 @@ class DriveArchiveIndex(context: Context) : Closeable {
         return matches.singleOrNull()
     }
     fun get(scope: String, id: String): JSONObject? = rows("scope=? AND id=?", arrayOf(scope, id), 1).optJSONObject(0)
+    fun selections(scope: String): JSONArray = rows("scope=?", arrayOf(scope), 5000)
     fun untaggedMp3(scope: String, limit: Int = 8): List<Triple<String, String, String>> {
         val rows = mutableListOf<Triple<String, String, String>>()
         helper.readableDatabase.query("tracks", arrayOf("id", "name", "modified"), "scope=? AND tags='' AND name LIKE '%.mp3'", arrayOf(scope), null, null, "id", limit.toString()).use { c ->
@@ -129,4 +130,5 @@ class DriveArchiveIndex(context: Context) : Closeable {
         helper.writableDatabase.update("tracks", values, "scope=? AND id=? AND modified=?", arrayOf(scope, id, modified))
     }
 }
+
 
