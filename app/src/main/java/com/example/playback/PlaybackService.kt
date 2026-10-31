@@ -104,7 +104,7 @@ class PlaybackService : MediaSessionService() {
         val saved = org.json.JSONObject().put("id", item.mediaId)
             .put("title", item.mediaMetadata.title?.toString().orEmpty())
             .put("artist", item.mediaMetadata.artist?.toString().orEmpty())
-            .put("artwork", item.mediaMetadata.artworkUri?.toString().orEmpty())
+            .put("artwork", com.example.CoverArtStore(this).webArtwork(item.mediaMetadata))
             .put("feed", item.mediaMetadata.extras?.getString("feed").orEmpty())
             .put("position", position).put("duration", p.duration.coerceAtLeast(0L))
             .put("updatedAt", System.currentTimeMillis())
@@ -141,6 +141,11 @@ class PlaybackService : MediaSessionService() {
             .build()
         player!!.addListener(object : androidx.media3.common.Player.Listener {
             private var countedItem = false
+            override fun onMediaMetadataChanged(metadata: androidx.media3.common.MediaMetadata) {
+                val key = player?.currentMediaItem?.mediaMetadata?.extras?.getString(com.example.CoverArtStore.EXTRA) ?: return
+                com.example.CoverArtStore.embedded(this@PlaybackService, key, metadata.artworkData)
+            }
+
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 accountListening()
                 if (isPlaying && !checkFamilyPlayback()) return
@@ -205,6 +210,7 @@ class PlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 }
+
 
 
 
