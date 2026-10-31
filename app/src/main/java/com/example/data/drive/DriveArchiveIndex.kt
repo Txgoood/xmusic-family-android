@@ -12,13 +12,15 @@ import java.util.Locale
 
 /** İndeks yalnızca seçili hesap ve köke aittir. Başarısız tarama eski kaydı silmez. */
 class DriveArchiveIndex(context: Context) : Closeable {
-    private class Database(context: Context) : SQLiteOpenHelper(context, "xmusic_drive_index.db", null, 1) {
+    private class Database(context: Context) : SQLiteOpenHelper(context, "xmusic_drive_index.db", null, 2) {
         override fun onCreate(db: SQLiteDatabase) {
-            db.execSQL("CREATE TABLE tracks(scope TEXT NOT NULL,id TEXT NOT NULL,name TEXT,path TEXT,modified TEXT,source TEXT,title TEXT,artist TEXT,album TEXT,norm TEXT,nt TEXT,na TEXT,tags TEXT,generation TEXT,PRIMARY KEY(scope,id))")
+            db.execSQL("CREATE TABLE tracks(scope TEXT NOT NULL,id TEXT NOT NULL,name TEXT,path TEXT,modified TEXT,source TEXT,title TEXT,artist TEXT,album TEXT,norm TEXT,nt TEXT,na TEXT,tags TEXT,artParents TEXT NOT NULL DEFAULT '',generation TEXT,PRIMARY KEY(scope,id))")
             db.execSQL("CREATE INDEX exact_track ON tracks(scope,nt,na)")
             db.execSQL("CREATE TABLE scans(scope TEXT PRIMARY KEY,stamp INTEGER,error TEXT)")
         }
-        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+            if (oldVersion < 2) db.execSQL("ALTER TABLE tracks ADD COLUMN artParents TEXT NOT NULL DEFAULT ''")
+        }
     }
     private val helper = Database(context.applicationContext).apply { setWriteAheadLoggingEnabled(true) }
     override fun close() = helper.close()
@@ -66,7 +68,7 @@ class DriveArchiveIndex(context: Context) : Closeable {
                 val values = ContentValues().apply {
                     put("scope", scope); put("id", track.id); put("name", track.name); put("path", track.path); put("modified", track.modified); put("source", track.sourceId)
                     put("title", title); put("artist", artist); put("album", album); put("norm", normalize("$title $artist $album ${track.path}")); put("nt", normalize(title)); put("na", normalize(artist))
-                    put("tags", tags); put("generation", generation)
+                    put("artParents", track.artParents); put("tags", tags); put("generation", generation)
                 }
                 check(db.insertWithOnConflict("tracks", null, values, SQLiteDatabase.CONFLICT_REPLACE) >= 0) { "Arşiv indeksi kaydedilemedi" }
             }
@@ -84,8 +86,8 @@ class DriveArchiveIndex(context: Context) : Closeable {
     }
     private fun rows(selection: String, args: Array<String>, limit: Int = 30, order: String = "title COLLATE NOCASE,id"): JSONArray {
         val result = JSONArray()
-        helper.readableDatabase.query("tracks", arrayOf("id", "title", "artist", "album", "path", "name", "source"), selection, args, null, null, order, limit.toString()).use { c ->
-            while (c.moveToNext()) result.put(JSONObject().put("id", c.getString(0)).put("title", c.getString(1)).put("artist", c.getString(2)).put("album", c.getString(3)).put("path", c.getString(4)).put("name", c.getString(5)).put("sourceId", c.getString(6)))
+        helper.readableDatabase.query("tracks", arrayOf("id", "title", "artist", "album", "path", "name", "source", "artParents", "modified"), selection, args, null, null, order, limit.toString()).use { c ->
+            while (c.moveToNext()) result.put(JSONObject().put("id", c.getString(0)).put("title", c.getString(1)).put("artist", c.getString(2)).put("album", c.getString(3)).put("path", c.getString(4)).put("name", c.getString(5)).put("sourceId", c.getString(6)).put("artParents", c.getString(7)).put("modified", c.getString(8)))
         }
         return result
     }
@@ -127,3 +129,4 @@ class DriveArchiveIndex(context: Context) : Closeable {
         helper.writableDatabase.update("tracks", values, "scope=? AND id=? AND modified=?", arrayOf(scope, id, modified))
     }
 }
+
