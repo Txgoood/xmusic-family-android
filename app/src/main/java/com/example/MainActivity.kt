@@ -20,6 +20,7 @@ class MainActivity : ComponentActivity() {
     private var driveLibraryAdapter: android.widget.ArrayAdapter<String>? = null
     private var visibleDriveTracks = emptyList<com.example.data.drive.DriveFolderClient.Track>()
     private var lastDriveSync = 0L
+    @Volatile private var archiveScanning = false
     private val driveSyncHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val driveSyncTicker = object : Runnable {
         override fun run() {
@@ -57,14 +58,18 @@ class MainActivity : ComponentActivity() {
         return com.example.data.drive.DriveArchiveIndex(this).use { index ->
             val info = index.status(com.example.data.drive.DriveArchiveIndex.scope(location.first, location.second))
             val count = info.optInt("count"); val stamp = info.optLong("stamp")
-            if (stamp == 0L) "Arşiv henüz taranmadı. Alt klasörler de taramaya dahildir."
+            if (archiveScanning) "Alt klasörler taranıyor… Önceki indekste $count dosya var."
+            else if (stamp == 0L) "Arşiv henüz taranmadı. Alt klasörler de taramaya dahildir. " + info.optString("error")
             else "$count ses dosyası · Alt klasörler dahil · " + java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT).format(java.util.Date(stamp)) +
                 if (info.optString("error").isEmpty()) "" else " · " + info.optString("error")
         }
     }
     private fun scanDriveArchive(token: String, account: String, folder: String): List<com.example.data.drive.DriveFolderClient.Track> {
         val scope = com.example.data.drive.DriveArchiveIndex.scope(account, folder)
-        return com.example.data.drive.DriveArchiveIndex(this).use { index ->
+        archiveScanning = true
+        fun notifyStatus() { runOnUiThread { if (::appWebView.isInitialized && !isDestroyed) appWebView.evaluateJavascript("window.dispatchEvent(new Event('xmusic:archive'));", null) } }
+        notifyStatus()
+        return try { com.example.data.drive.DriveArchiveIndex(this).use { index ->
             try {
                 val tracks = com.example.data.drive.DriveFolderClient().listAudio(token, folder)
                 index.replace(scope, tracks)
@@ -78,7 +83,7 @@ class MainActivity : ComponentActivity() {
                 }
                 tracks
             } catch (e: Exception) { index.markError(scope); throw e }
-        }
+        } } finally { archiveScanning = false; notifyStatus() }
     }
     fun refreshDriveArchive() {
         if (ProfileStore(this).isChild()) { showDriveError("Arşiv taraması için yetişkin profiline geç."); return }
