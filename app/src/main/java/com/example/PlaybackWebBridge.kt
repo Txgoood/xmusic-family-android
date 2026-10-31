@@ -12,6 +12,7 @@ class PlaybackWebBridge(private val webView: WebView) {
     private val handler = Handler(Looper.getMainLooper())
     private var controller: MediaController? = null
     private var active = false
+    private val coverArt = CoverArtStore(webView.context)
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) { publish() }
     }
@@ -46,7 +47,7 @@ class PlaybackWebBridge(private val webView: WebView) {
                 queue.put(JSONObject().put("id", track.mediaId)
                     .put("title", track.mediaMetadata.title?.toString().orEmpty())
                     .put("artist", track.mediaMetadata.artist?.toString().orEmpty())
-                    .put("artwork", track.mediaMetadata.artworkUri?.toString().orEmpty()))
+                    .put("artwork", coverArt.webArtwork(track.mediaMetadata)))
             }
             put("queue", queue)
             put("index", player?.currentMediaItemIndex ?: -1)
@@ -62,7 +63,7 @@ class PlaybackWebBridge(private val webView: WebView) {
             put("id", item?.mediaId.orEmpty())
             put("title", item?.mediaMetadata?.title?.toString().orEmpty())
             put("artist", item?.mediaMetadata?.artist?.toString().orEmpty())
-            put("artwork", item?.mediaMetadata?.artworkUri?.toString().orEmpty())
+            put("artwork", item?.let { coverArt.webArtwork(it.mediaMetadata) }.orEmpty())
             put("playing", player?.isPlaying == true)
             put("pending", player?.playWhenReady == true && player.playbackState == Player.STATE_BUFFERING)
             put("ended", player?.playbackState == Player.STATE_ENDED)
@@ -87,4 +88,5 @@ class PlaybackWebBridge(private val webView: WebView) {
         webView.evaluateJavascript("window.__xmusicPlayback && window.__xmusicPlayback($state)", null)
     }
 }
+
 
