@@ -15,6 +15,16 @@
   const style = create('style');
   style.textContent = '.xm-panel{background:#181c1f;border:1px solid #3c4a3c;border-radius:16px;padding:16px;margin:12px 0;color:#e0e3e7}.xm-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #313539}.xm-btn{border:1px solid #62796f;border-radius:12px;padding:9px 12px;color:#9af0ba;background:#1c2023;cursor:pointer}.xm-input{width:100%;padding:12px;margin:10px 0;background:#101417;color:#e0e3e7;border:1px solid #62796f;border-radius:10px}.xm-overlay{position:fixed;inset:0;z-index:999;background:#000b;display:flex;align-items:center;justify-content:center;padding:18px}.xm-dialog{background:#181c1f;color:#e0e3e7;border:1px solid #62796f;border-radius:20px;padding:20px;width:100%;max-width:450px;max-height:85vh;overflow:auto}button[data-xm-blocked]{opacity:.5!important}';
   document.head.appendChild(style);
+  const setArtwork = window.__xmusicSetArtwork ||= function(img, address, label='') {
+    if(!img)return;
+    const fallback=window.__xmusicArtworkFallback ||= 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="384" height="384" viewBox="0 0 384 384"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#17412d"/><stop offset="1" stop-color="#101719"/></linearGradient></defs><rect width="384" height="384" fill="url(#g)"/><path fill="#4efd7d" opacity=".75" d="M231 90v147a42 42 0 1 1-20-36V119l-71 16v118a42 42 0 1 1-20-36V119z"/></svg>');
+    const wanted=typeof address==='string'&&address.startsWith('https://')?address:'';
+    img.alt=label||'';img.style.visibility='visible';img.style.objectFit='cover';
+    if(img.dataset.xmArtwork===wanted)return;
+    img.dataset.xmArtwork=wanted;
+    img.onerror=()=>{img.onerror=null;if(img.getAttribute('src')!==fallback)img.src=fallback;};
+    const next=wanted||fallback;if(img.getAttribute('src')!==next)img.src=next;
+  };
   function button(label, fn) { const b = create('button',label,'xm-btn'); b.type='button'; b.dataset.xmOwned='true'; b.__xmOwnedRun=fn; return b; }
   function modal(title, build) {
     document.getElementById('xm-dialog')?.remove();
@@ -153,7 +163,7 @@
         if(name)name.textContent=l.name;
         const subtitle=name?.nextElementSibling;if(subtitle)subtitle.textContent=(l.tracks||[]).length+' parça';
         const image=row.querySelector('img');const artwork=(l.tracks||[]).find(t=>t.artwork?.startsWith('https://'))?.artwork;
-        if(image){if(artwork)image.src=artwork;else image.removeAttribute('src');image.alt='';}
+        setArtwork(image,artwork);
         row.querySelectorAll('.absolute').forEach(n=>n.style.display='none');
         const menu=row.querySelector('button');if(menu)own(menu,()=>{sessionStorage.setItem('xm-playlist',l.id);go('alma_listesi_y_netimi');});
         clickable(row,()=>{sessionStorage.setItem('xm-playlist',l.id);go('alma_listesi_y_netimi');});
@@ -413,7 +423,7 @@
       if(history.length){
         const t=history[0],layout=create('div',undefined,'flex items-center gap-3');
         const image=create('img');image.className='w-16 h-16 rounded-xl object-cover bg-surface-container-lowest';
-        if(t.artwork?.startsWith('https://'))image.src=t.artwork;image.alt='';
+        setArtwork(image,t.artwork);
         const labels=create('div',undefined,'flex flex-col min-w-0');
         labels.append(create('strong',t.title,'font-headline-sm text-headline-sm text-on-surface'),create('p',t.artist||'Podcast','text-body-sm text-on-surface-variant'));
         layout.append(image,labels);card.append(layout);
@@ -424,7 +434,7 @@
       if(!history.length){episodeList.append(create('p','Dinlediğin bölümler burada görünecek.','text-body-sm text-on-surface-variant'));return;}
       history.slice(0,10).forEach(t=>{
         const card=create('div',undefined,'flex items-center gap-3 p-3 rounded-2xl bg-surface-container-low');
-        const art=create('img');art.className='w-14 h-14 rounded-xl object-cover bg-surface-container';if(t.artwork?.startsWith('https://'))art.src=t.artwork;art.alt='';
+        const art=create('img');art.className='w-14 h-14 rounded-xl object-cover bg-surface-container';setArtwork(art,t.artwork);
         const text=create('div',undefined,'flex flex-col min-w-0 flex-1');
         text.append(create('strong',t.title||'Bölüm','font-label-lg text-label-lg text-on-surface'),create('span',t.artist||'Podcast','text-body-sm text-on-surface-variant'));
         const open=button('Programı Aç',()=>openFeed(savedFeed(t)));open.className='px-3 py-2 rounded-full bg-primary text-on-primary font-label-md';
@@ -478,7 +488,7 @@
     function makeCard(feed,appleUrl){
       if(!cardTemplate)return create('div');
       const card=cardTemplate.cloneNode(true);
-      const image=card.querySelector('img');if(image){if(feed.artwork?.startsWith('https://'))image.src=feed.artwork;else image.removeAttribute('src');image.alt='';}
+      const image=card.querySelector('img');setArtwork(image,feed.artwork);
       card.querySelectorAll('span.absolute').forEach(s=>s.style.display='none');
       const name=card.querySelector('h3');if(name)name.textContent=feed.title||'Podcast';
       const artist=card.querySelector('p');if(artist)artist.textContent=[feed.artist,feed.genre].filter(Boolean).join(' · ');
@@ -529,7 +539,7 @@
     if(artist)artist.textContent=info.artist||'';
     function coverImage(img){
       if(!img)return;
-      if(info.artwork?.startsWith('https://'))img.src=info.artwork;else img.removeAttribute('src');
+      setArtwork(img,info.artwork);
       img.alt='';img.style.background='#262a2e';
     }
     coverImage(cover);
@@ -754,6 +764,13 @@
     const childStatus=document.getElementById('xm-child-status');if(childStatus)childStatus.textContent=state.familyBlock||'';
     if(state.familyBlock&&state.familyBlock!==window.__xmLastFamilyBlock){window.__xmLastFamilyBlock=state.familyBlock;N.showToast(state.familyBlock);}if(!state.familyBlock)window.__xmLastFamilyBlock='';
     if(state.playing&&state.id&&library.history[0]?.id!==state.id){library.history=[trackData(),...library.history.filter(t=>t.id!==state.id)].slice(0,100);save();}
+    if(state.id&&state.artwork){
+      let changed=false;
+      const update=t=>{if(t.id===state.id&&t.artwork!==state.artwork){t.artwork=state.artwork;changed=true;}};
+      library.history.forEach(update);library.favorites.forEach(update);library.playlists.forEach(l=>(l.tracks||[]).forEach(update));if(library.resume)update(library.resume);
+      if(changed)save();
+    }
+
     if(state.id && !state.pending && (state.playing||wasPlaying) &&
       (previousId!==state.id || (wasPlaying&&!state.playing) || Date.now()-resumeSavedAt>=5000)){
       library.resume=Object.assign(trackData(),{position:Math.max(0,Number(state.position)||0),duration:Math.max(0,Number(state.duration)||0),updatedAt:Date.now()});
@@ -782,7 +799,7 @@
   }
   function musicRow(item,genre=''){
     const row=create('div',undefined,'flex items-center gap-3 p-3 rounded-xl bg-surface-container-low');
-    const image=create('img');image.src='https://i.ytimg.com/vi/'+item.id+'/mqdefault.jpg';image.alt='';
+    const image=create('img');setArtwork(image,'https://i.ytimg.com/vi/'+item.id+'/mqdefault.jpg');
     image.style.cssText='width:64px;height:48px;object-fit:cover;border-radius:8px;flex-shrink:0;';
     const caption=create('div',undefined,'flex-1 min-w-0');caption.append(create('strong',item.title||'Şarkı'),create('p',item.artist||''));
     const play=button('▶',()=>{if(genre)A.assignMusicGenre(item.id,genre);N.playExperimentalSource(item.id,item.title||'',item.artist||'');});
@@ -999,7 +1016,7 @@
     }
     function refreshHome(){
       const tracks=(library.history||[]).slice(0,6),saved=library.resume||tracks[0]||null;
-      const last=saved&&state.id===saved.id&&!state.pending?Object.assign({},saved,{position:state.position,duration:state.duration}):saved;
+      const last=saved&&state.id===saved.id&&!state.pending?Object.assign({},saved,{position:state.position,duration:state.duration,artwork:state.artwork||saved.artwork}):saved;
       const current=JSON.stringify(tracks);
       if(current!==signature){signature=current;
       grid.replaceChildren();
@@ -1008,7 +1025,7 @@
         if(!sample)return;
         const card=sample.cloneNode(true),name=card.querySelector('p'),art=card.querySelector('img'),play=card.querySelector('button');
         if(name)name.textContent=track.title||'Parça';
-        if(art){if(track.artwork?.startsWith('https://'))art.src=track.artwork;else art.removeAttribute('src');art.alt='';}
+        setArtwork(art,track.artwork);
         makeOwned(card,()=>playTrack(track));if(play)makeOwned(play,()=>playTrack(track));
         grid.append(card);
       });
@@ -1016,7 +1033,7 @@
       if(!last){
         if(resumeInfo)resumeInfo.textContent='Henüz parça dinlenmedi';
         if(resumeArtist)resumeArtist.textContent='Bir parça seçerek başlayabilirsin';
-        if(resumeImage)resumeImage.removeAttribute('src');
+        setArtwork(resumeImage,'');
         if(timeLabel)timeLabel.textContent='';
         if(progress)progress.style.width='0%';
         if(progressLabel)progressLabel.textContent='';
@@ -1024,7 +1041,7 @@
       }else{
         if(resumeInfo)resumeInfo.textContent=last.title||'Son parça';
         if(resumeArtist)resumeArtist.textContent=last.artist||'';
-        if(resumeImage){if(last.artwork?.startsWith('https://'))resumeImage.src=last.artwork;else resumeImage.removeAttribute('src');resumeImage.alt='';}
+        setArtwork(resumeImage,last.artwork);
         const duration=Number(last.duration)||0,position=Number(last.position)||0;
         if(timeLabel)timeLabel.textContent=duration>0?Math.max(0,Math.ceil((duration-position)/60000))+' dk kaldı':'Son dinlenen parça';
         const percentage=duration>0?Math.min(100,Math.max(0,position/duration*100)):0;
@@ -1134,6 +1151,7 @@
   if(profileState().role==='child'&&['ana_sayfa','kitapl_m','ocuk_modu_kids_safe'].includes(page))renderChildLibrary();
   window.__xmusicActionsAudit=()=>Array.from(document.querySelectorAll('button,a')).filter(b=>!b.closest('#xmusic-live-search')).map(b=>({label:b.getAttribute('aria-label')||b.textContent.trim(),action:b.dataset.xmAction|| (b.dataset.xmOwned?'owned':null),blocked:b.dataset.xmBlocked||null}));
 })();
+
 
 
 
