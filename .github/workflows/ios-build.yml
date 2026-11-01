@@ -1,0 +1,32 @@
+name: iOS v0.1.0 (unsigned simulator build)
+on:
+  push:
+    branches: [ios-development]
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build.yml'
+  workflow_dispatch:
+jobs:
+  ios-simulator:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate --spec project.yml
+      - name: Compile iOS simulator app
+        run: |
+          xcodebuild -project XMusicFamily.xcodeproj -scheme XMusicFamily -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - name: Package unsigned simulator app
+        run: |
+          cd build/Build/Products/Release-iphonesimulator
+          zip -r "$GITHUB_WORKSPACE/XMusicFamily-iOS-v0.1.0-simulator.zip" XMusicFamily.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: XMusicFamily-iOS-v0.1.0-simulator
+          path: XMusicFamily-iOS-v0.1.0-simulator.zip
+          if-no-files-found: error
