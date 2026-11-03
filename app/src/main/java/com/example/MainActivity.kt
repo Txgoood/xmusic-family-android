@@ -17,6 +17,38 @@ class MainActivity : ComponentActivity() {
     private var selectingDriveFolder = false
     private var requestContinuousRead = false
     private var syncInFlight = false
+    private var pendingDrivePlayback: List<String>? = null
+    private var driveNoticeVisible = false
+    private fun driveNotice(message: String?) {
+        driveNoticeVisible = message != null
+        if (!::appWebView.isInitialized || isDestroyed) return
+        val payload = if (message == null) "null" else org.json.JSONObject.quote(message)
+        appWebView.evaluateJavascript("""
+            (function(){
+              var id='xm-drive-sync-notice', el=document.getElementById(id);
+              var text=$payload;
+              if(!text){if(el)el.remove();return;}
+              if(!el){
+                el=document.createElement('div');el.id=id;el.setAttribute('role','status');
+                el.setAttribute('aria-live','polite');
+                el.style.cssText='position:fixed;bottom:96px;left:16px;right:16px;z-index:9999;max-width:440px;margin:auto;padding:12px 16px;border-radius:14px;background:#182821;border:1px solid #20df64;color:#f0fff3;font:500 14px sans-serif;box-shadow:0 5px 22px #0008;pointer-events:none';
+                document.body.appendChild(el);
+              }
+              el.textContent=text;
+            })();
+        """.trimIndent(), null)
+    }
+    private fun finishDriveReconnect(ready: Boolean) {
+        syncInFlight = false
+        if (driveNoticeVisible) driveNotice(null)
+        val pending = pendingDrivePlayback
+        pendingDrivePlayback = null
+        if (ready && pending != null && pending.size == 4) {
+            resumeDriveTrack(pending[0], pending[1], pending[2], pending[3].toLongOrNull() ?: 0L)
+        } else if (!ready && pending != null && !isDestroyed) {
+            android.widget.Toast.makeText(this, "Drive bağlantısı tamamlanamadı. İnterneti ve Google iznini kontrol et.", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
     private var driveLibraryAdapter: android.widget.ArrayAdapter<String>? = null
     private var visibleDriveTracks = emptyList<com.example.data.drive.DriveFolderClient.Track>()
     private var lastDriveSync = 0L
@@ -153,7 +185,7 @@ class MainActivity : ComponentActivity() {
         com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this).authorize(request)
             .addOnSuccessListener { auth ->
                 val token = auth.accessToken
-                if (auth.hasResolution() || token.isNullOrBlank()) { syncInFlight = false; return@addOnSuccessListener }
+                if (auth.hasResolution() || token.isNullOrBlank()) { finishDriveReconnect(false); return@addOnSuccessListener }
                 driveFolderWorker.execute {
                     try {
                         val client = com.example.data.drive.DriveFolderClient()
@@ -169,11 +201,11 @@ class MainActivity : ComponentActivity() {
                                 driveAccessToken = token; driveAccountId = account; driveFolderId = folder
                                 if (continuous) cacheSharedTracks(account, tracks)
                             }
-                            syncInFlight = false
+                            finishDriveReconnect(driveAccessToken != null)
                         }
-                    } catch (_: Exception) { runOnUiThread { syncInFlight = false } }
+                    } catch (_: Exception) { runOnUiThread { finishDriveReconnect(false) } }
                 }
-            }.addOnFailureListener { syncInFlight = false }
+            }.addOnFailureListener { finishDriveReconnect(false) }
     }
     fun enableContinuousDrive() {
         if (ProfileStore(this).isChild()) { showDriveError("Bu işlem için yetişkin profiline geç."); return }
@@ -353,7 +385,10 @@ class MainActivity : ComponentActivity() {
         val controller = mediaController
         val service = PlaybackService.activeService
         if (token == null || controller == null || service == null) {
-            showDriveError("Drive dosyası için önce Ayarlar'dan hesabını bağla.")
+            if (token == null && syncInFlight && !ProfileStore(this).isChild()) {
+                pendingDrivePlayback = listOf(fileId, title, artist, position.toString())
+                driveNotice("Google Drive bağlanıyor ve alt klasörler taranıyor. Şarkın hazır olduğunda otomatik başlayacak.")
+            } else showDriveError(if (controller == null || service == null) "Oynatıcı hazırlanıyor. Tekrar dene." else "Drive için Ayarlar'dan Google hesabını bağla.")
             return
         }
         if (!fileId.matches(Regex("[A-Za-z0-9_-]{1,200}"))) return
@@ -388,7 +423,11 @@ class MainActivity : ComponentActivity() {
         if (ProfileStore(this).isChild()) { showDriveError("Bu işlem için yetişkin profiline geç."); return }
         val token = driveAccessToken
         val folder = driveFolderId
-        if (driveBusy) { showDriveError("Drive işlemi sürüyor."); return }
+        if ((syncInFlight || driveBusy) && (token == null || folder == null)) {
+            driveNotice("Google Drive bağlanıyor ve alt klasörler taranıyor. Bu sırada diğer müzikleri kullanabilirsin.")
+            return
+        }
+        if (driveBusy) { driveNotice("Drive alt klasörleri taranıyor. Önceki müziklerini çalmaya devam edebilirsin."); return }
         if (token == null || folder == null) { showDriveError("Önce Ayarlar'dan Google Drive hesabını bağla."); return }
         val account = driveAccountId ?: return
         driveBusy = true
@@ -734,6 +773,7 @@ class MainActivity : ComponentActivity() {
                 super.onPageFinished(view, url)
                 view?.evaluateJavascript(actionsScript, null)
                 view?.evaluateJavascript(playbackScript, null)
+                if (driveNoticeVisible) driveNotice("Google Drive bağlantısı ve alt klasör taraması devam ediyor…")
                 // Stitch HTML/CSS'yi değiştirmeden ekranlara etkileşim ekle.
                 view?.evaluateJavascript("""
                     (function() {
