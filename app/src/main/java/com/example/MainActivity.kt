@@ -138,14 +138,18 @@ class MainActivity : ComponentActivity() {
         }
     }
     private fun reconnectSharedDriveSilently() {
+        if (syncInFlight || driveBusy) return
         if (ProfileStore(this).isChild() && !FamilySyncStore(this).enabled()) return
+        val saved = getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE)
+        val savedAccount = saved.getString("sync_account", null)?.takeIf { it.isNotBlank() } ?: return
+        val savedFolder = saved.getString(savedAccount, null)?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{1,200}")) } ?: return
+        val continuous = saved.getBoolean("sync_enabled", false)
         syncInFlight = true
         lastDriveSync = android.os.SystemClock.elapsedRealtime()
+        val scopes = mutableListOf(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file"))
+        if (continuous) scopes.add(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.readonly"))
         val request = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder()
-            .setRequestedScopes(listOf(
-                com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file"),
-                com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.readonly")))
-            .build()
+            .setRequestedScopes(scopes).build()
         com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(this).authorize(request)
             .addOnSuccessListener { auth ->
                 val token = auth.accessToken
@@ -155,12 +159,16 @@ class MainActivity : ComponentActivity() {
                         val client = com.example.data.drive.DriveFolderClient()
                         val account = client.accountId(token)
                         val prefs = getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE)
-                        require(account == prefs.getString("sync_account", null))
+                        require(account == savedAccount)
                         val folder = prefs.getString(account, "").orEmpty()
-                        require(folder.isNotBlank())
-                        val tracks = scanDriveArchive(token, account, folder)
+                        require(folder == savedFolder && prefs.getString("sync_account", null) == account)
+                        val tracks = if (continuous) scanDriveArchive(token, account, folder) else emptyList()
                         runOnUiThread {
-                            if (!driveBusy) { driveAccessToken = token; driveAccountId = account; driveFolderId = folder; cacheSharedTracks(account, tracks) }
+                            if (!driveBusy && !isDestroyed &&
+                                prefs.getString("sync_account", null) == account && prefs.getString(account, null) == folder) {
+                                driveAccessToken = token; driveAccountId = account; driveFolderId = folder
+                                if (continuous) cacheSharedTracks(account, tracks)
+                            }
                             syncInFlight = false
                         }
                     } catch (_: Exception) { runOnUiThread { syncInFlight = false } }
@@ -544,7 +552,8 @@ class MainActivity : ComponentActivity() {
                     edit.commit()
                 }
                 val prefsEdit = folderPrefs.edit().putString(account, folder)
-                if (continuous) prefsEdit.putBoolean("sync_enabled", true).putString("sync_account", account)
+                prefsEdit.putString("sync_account", account)
+                if (continuous) prefsEdit.putBoolean("sync_enabled", true)
                 prefsEdit.commit()
                 val sharedTracks = if (continuous) scanDriveArchive(token, account, folder) else emptyList()
 
@@ -589,6 +598,7 @@ class MainActivity : ComponentActivity() {
                 client.getOrCreate(token, folder)
                 runOnUiThread {
                     driveAccessToken = token; driveAccountId = account; driveFolderId = folder
+                    getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE).edit().putString("sync_account", account).commit()
                     getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE).edit().putString("account", account).apply()
                     driveBusy = false
                     openDriveLibrary()
@@ -1263,6 +1273,7 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         playbackBridge.start()
         driveSyncHandler.removeCallbacks(driveSyncTicker)
+        if (driveAccessToken == null) reconnectSharedDriveSilently()
         driveSyncHandler.post(driveSyncTicker)
     }
 
