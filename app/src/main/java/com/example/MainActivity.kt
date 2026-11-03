@@ -134,7 +134,11 @@ class MainActivity : ComponentActivity() {
                 }
                 tracks
             } catch (e: Exception) { index.markError(scope); throw e }
-        } } finally { archiveScanning = false; notifyStatus() }
+        } } finally {
+            archiveScanning = false
+            notifyStatus()
+            runOnUiThread { if (!syncInFlight && driveNoticeVisible) driveNotice(null) }
+        }
     }
     fun refreshDriveArchive() {
         if (ProfileStore(this).isChild()) { showDriveError("Arşiv taraması için yetişkin profiline geç."); return }
