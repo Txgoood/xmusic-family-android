@@ -1145,7 +1145,11 @@
         row.append(button(label.includes('PIN')?'PIN ayarla':'Çocuk profillerini yönet',()=>label.includes('PIN')&&familyData.role==='admin'?parentPinForm():go('aile_profili_se_imi')));
       }
     });
-    document.querySelectorAll('main footer p').forEach(p=>{if(/Dolby|Build 4120/.test(p.textContent))p.textContent='XMusic Family';});
+    // Alt bilgi statik Stitch örneğinden değil, yüklü APK'nin gerçek sürümünden okunur.
+    const stamp=document.querySelector('main footer p');
+    if(stamp && typeof A.appVersionInfo==='function') stamp.textContent=A.appVersionInfo();
+    const certification=stamp?.closest('footer')?.querySelectorAll('p')[1];
+    if(certification) certification.textContent='Android Native Edition';
     const section=Array.from(document.querySelectorAll('main section')).find(s=>s.querySelector('h2')?.textContent.includes('Aile Profilleri'));
     if(section){
       const grid=section.querySelector('.grid');
