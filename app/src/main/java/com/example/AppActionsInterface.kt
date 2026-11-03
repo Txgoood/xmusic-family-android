@@ -16,6 +16,9 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
     private var libraryProfileId = profiles.activeId()
     private val prefs get() = activity.getSharedPreferences("xmusic_library_" + profiles.activeId(), Context.MODE_PRIVATE)
     private val avatarPrefs get() = activity.getSharedPreferences("xmusic_profile_avatars", Context.MODE_PRIVATE)
+    @JavascriptInterface fun appVersionInfo(): String =
+        "XMusic Family v" + com.example.BuildConfig.VERSION_NAME +
+            " (Build " + com.example.BuildConfig.VERSION_CODE + ")"
     @JavascriptInterface fun activeAvatar(): String = FamilySyncStore(activity).syncedAvatar(profiles.activeId(), avatarPrefs.getString(profiles.activeId(), "") ?: "")
     @JavascriptInterface fun setActiveAvatar(value: String): Boolean {
         if (value !in setOf("🎵", "🎧", "🎸", "🌸", "🌟", "🐱", "🦊", "🐼")) return false
