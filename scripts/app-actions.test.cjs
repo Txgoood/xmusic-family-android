@@ -4,7 +4,7 @@ const root=path.resolve(__dirname,'..');
 const assets=process.env.XMUSIC_TEST_PAGES||path.join(root,'app/src/main/assets/stitch');
 const script=fs.readFileSync(path.join(root,'app/src/main/assets/app-actions.js'),'utf8');
 const player=fs.readFileSync(path.join(root,'app/src/main/assets/playback.js'),'utf8');
-const main=fs.readFileSync(path.join(root,'app/src/main/java/com/example/MainActivity.kt'),'utf8').split('evaluateJavascript("""')[1].split('""".trimIndent()')[0];
+const main=fs.readFileSync(path.join(root,'app/src/main/java/com/example/MainActivity.kt'),'utf8').split('view?.evaluateJavascript("""')[1].split('""".trimIndent()')[0];
 let db='{}',checks=0,recentState=[],topState=[],resumeOverride={},profileMock={},approvedMock=[],reviewMock={},familyMock={};const report=[];
 function open(folder,session={}){
  const f=path.join(assets,fs.existsSync(path.join(assets,folder+'.html'))?folder+'.html':folder+'/code.html');
