@@ -16,8 +16,9 @@ android {
     applicationId = "com.example"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    // CI yapı numarası APK sürüm koduna da yazılır; güncellemeler veriyi korur.
+    versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 176
+    versionName = "1.0.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
