@@ -1119,13 +1119,27 @@
           grid.append(create('p','Dinlemeye başladığında liste burada oluşacak.','text-on-surface-variant'));
           return;
         }
-        const card=button('','');
-        card.className='bg-surface-container rounded-2xl p-4 text-left';
-        card.append(create('strong','Bu haftaki seçkilerin'),create('p',selected.length+' kayıt','text-body-sm text-on-surface-variant'));
-        makeOwned(card,()=>modal('Bu haftaki seçkilerin',panel=>selected.forEach(track=>panel.append(trackRow(track)))));
-        grid.append(card);
+        grid.className='grid grid-cols-2 gap-3';
+        const showPersonal=(name,items)=>modal(name,panel=>{
+          panel.append(create('p','Bu profilin kayıtlarından hazırlanır.'));
+          items.forEach(track=>panel.append(picturedTrackRow(track)));
+        });
+        const collections=[
+          ['Bu haftaki seçkilerin',selected,'#593c86'],
+          ['Beğendiğin şarkılar',library.favorites.filter(t=>t.id&&!t.id.startsWith('podcast:')),'#a52b66'],
+          ['Son dinlediklerin',library.history.filter(t=>t.id&&!t.id.startsWith('podcast:')),'#236578']
+        ];
+        collections.filter(([,items])=>items.length).forEach(([name,items,color])=>{
+          const card=button('',()=>showPersonal(name,items));
+          card.className='rounded-xl bg-surface-container-low p-3 text-left';
+          const cover=create('div');
+          cover.style.cssText='position:relative;width:100%;aspect-ratio:1;overflow:hidden;border-radius:12px;margin-bottom:12px;background:linear-gradient(145deg,'+color+',#101010)';
+          coverMosaic(cover,items);
+          card.append(cover,create('strong',name),create('p',items.length+' şarkı','text-body-sm text-on-surface-variant'));
+          grid.append(card);
+        });
         const all=personal.querySelector('button');
-        if(all && !grid.contains(all))makeOwned(all,()=>modal('Bu haftaki seçkilerin',panel=>selected.forEach(track=>panel.append(trackRow(track)))));
+        if(all && !grid.contains(all))makeOwned(all,()=>showPersonal('Bu haftaki seçkilerin',selected));
       }
       updatePersonalMix();
       let lastPersonalTrack='';
@@ -1504,10 +1518,13 @@
     panel.innerHTML='<div class="xm-inline-head"><h2>Sıradaki şarkılar</h2><span id="xm-inline-count"></span></div><div id="xm-inline-items"></div>';
     const timer=[...main.querySelectorAll('button')].find(b=>/uyku sayacı|Uyku zamanlayıcısı/i.test(b.textContent));
     const timerRow=timer?.parentElement;
-    if(timerRow){controls.after(timerRow);timerRow.after(panel);}
-    else controls.after(panel);
+    const jumpToQueue=button('Sıraya git',()=>panel.scrollIntoView({behavior:'smooth',block:'start'}));
+    jumpToQueue.className='xm-queue-jump';
+    if(timerRow){timerRow.append(jumpToQueue);controls.after(timerRow);timerRow.after(panel);}
+    else {controls.after(jumpToQueue);jumpToQueue.after(panel);}
     const css=create('style');
     css.textContent=`.xm-inline-queue{width:100%;margin:12px 0 20px;padding:16px;border-radius:18px;background:#171d1c}
+    .xm-queue-jump{margin-left:auto;padding:10px 16px;border:0;border-radius:24px;background:#242424;color:#fff;font-weight:600}
     .xm-inline-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;color:#e4eee7}
     .xm-inline-head h2{font-size:16px;font-weight:700}.xm-inline-head span{font-size:12px;color:#a9bdb0}
     .xm-track{display:flex;align-items:center;gap:10px;min-height:58px;border-bottom:1px solid #29312e}
