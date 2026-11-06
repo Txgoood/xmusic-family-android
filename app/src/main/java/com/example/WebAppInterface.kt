@@ -212,6 +212,53 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     }
 
     @JavascriptInterface
+    fun refreshTurkeyChartCover(key: String, checkedAt: Long, requestId: Int) {
+        if (key !in setOf("spotify", "apple", "youtube", "shazam")) return
+        Thread {
+            val cache = context.getSharedPreferences("xmusic_chart_covers", Context.MODE_PRIVATE)
+            val chart = charts.cached(key)
+            val stamp = chart?.optLong("checkedAt") ?: 0L
+            if (stamp != checkedAt || stamp <= 0L) return@Thread
+            val stored = runCatching { org.json.JSONObject(cache.getString(key, null) ?: "{}") }.getOrNull()
+            val covers = if (stored?.optLong("checkedAt") == stamp &&
+                (stored.optJSONArray("covers")?.length() == 4 ||
+                    System.currentTimeMillis() - stored.optLong("attemptAt") < 60 * 60 * 1000L)) stored.optJSONArray("covers") else null
+            val result = covers ?: org.json.JSONArray().apply {
+                val tracks = chart?.optJSONArray("items") ?: org.json.JSONArray()
+                for (index in 0 until minOf(4, tracks.length())) {
+                    val track = tracks.optJSONObject(index) ?: continue
+                    val title = track.optString("title")
+                    val artist = track.optString("artist")
+                    try {
+                        val query = java.net.URLEncoder.encode("$artist $title", "UTF-8")
+                        val conn = java.net.URL("https://itunes.apple.com/search?country=tr&entity=song&limit=10&term=$query")
+                            .openConnection() as java.net.HttpURLConnection
+                        conn.connectTimeout = 5000
+                        conn.readTimeout = 5000
+                        try {
+                            val rows = org.json.JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+                                .optJSONArray("results") ?: org.json.JSONArray()
+                            for (i in 0 until rows.length()) {
+                                val row = rows.optJSONObject(i) ?: continue
+                                if (!com.example.data.drive.DriveCoverResolver.matches(row, title, artist, "")) continue
+                                val url = row.optString("artworkUrl100").replace("100x100", "384x384")
+                                val uri = android.net.Uri.parse(url)
+                                if (uri.scheme == "https" && uri.host?.endsWith(".mzstatic.com") == true) put(url)
+                                break
+                            }
+                        } finally { conn.disconnect() }
+                    } catch (_: Exception) { }
+                }
+                if (length() > 0) cache.edit().putString(key, org.json.JSONObject()
+                    .put("checkedAt", stamp).put("attemptAt", System.currentTimeMillis()).put("covers", this).toString()).apply()
+            }
+            webView.post {
+                webView.evaluateJavascript("window.__xmusicChartCovers?.($requestId,$result)", null)
+            }
+        }.start()
+    }
+
+    @JavascriptInterface
     fun playTurkeyChartQueue(snapshot: String, index: Int) {
         if (snapshot.length > 48_000) return
         val rows = runCatching { org.json.JSONArray(snapshot) }.getOrNull() ?: return

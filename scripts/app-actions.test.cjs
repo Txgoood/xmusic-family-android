@@ -268,11 +268,16 @@ x=open('m_zik_merkezi');
 assert.equal(x.d.querySelector('nav[data-active-classes] a[data-path="muzik"]').getAttribute('aria-current'),'page');checks++;
 const chartRequests=x.calls.filter(k=>k[0]==='refreshTurkeyChart');
 assert.deepEqual(chartRequests.map(call=>call[1]),['spotify','apple','youtube','shazam']);
-x.w.__xmusicMusicShelfResult(chartRequests[0][2],{date:'2026-11-04',items:[
+x.w.__xmusicMusicShelfResult(chartRequests[0][2],{date:'2026-11-04',checkedAt:123456,items:[
  {rank:1,title:'TRALALA',artist:'manifest'},
  {rank:2,title:'Yüreğime mi Sorsam?',artist:'Aykut Aksöz'}
 ]});
+const coverRequest=x.calls.filter(k=>k[0]==='refreshTurkeyChartCover').at(-1);
+assert.deepEqual(coverRequest.slice(0,3),['refreshTurkeyChartCover','spotify',123456]);
+x.w.__xmusicChartCovers(coverRequest[3],['https://is1-ssl.mzstatic.com/image.jpg']);
 const spotifyChart=[...x.d.querySelectorAll('button')].find(b=>b.textContent.includes('Spotify Türkiye'));
+assert.equal(spotifyChart.querySelectorAll('img').length,4);
+
 assert.ok(spotifyChart.textContent.includes('2026-11-04'));
 spotifyChart.click();
 const chartPlay=x.d.querySelector('#xm-dialog [aria-label="TRALALA oynat"]');

@@ -991,6 +991,13 @@
   }
 
 
+  let chartCoverRequest=0;
+  const chartCoverCallbacks=new Map();
+  window.__xmusicChartCovers=(id,covers)=>{
+    const callback=chartCoverCallbacks.get(id);
+    chartCoverCallbacks.delete(id);
+    if(callback)callback(covers);
+  };
   function initTurkeyCharts(section){
     const grid=section.children[1];
     if(!grid)return;
@@ -1015,9 +1022,24 @@
       const status=create('p','','text-on-surface-variant');
       const card=button('',()=>{});
       card.className='rounded-xl bg-surface-container-low p-4 text-left';
-      card.append(create('strong',name),create('p',period+' · Kworb'),status);
+      const cover=create('div');
+      cover.style.cssText='position:relative;width:100%;aspect-ratio:1;overflow:hidden;border-radius:12px;margin-bottom:12px;background:linear-gradient(145deg,'+
+        ({spotify:'#146b3b',apple:'#a73655',youtube:'#a12f34',shazam:'#275bb0'}[key])+',#101719)';
+      coverMosaic(cover,[]);
+      card.append(cover,create('strong',name),create('p',period+' · Kworb'),status);
       grid.append(card);
+      let coverStamp=0;
       function render(loading){
+        if(chart.items?.length && chart.checkedAt && chart.checkedAt!==coverStamp){
+          const stamp=chart.checkedAt;
+          coverStamp=stamp;
+          const id=++chartCoverRequest;
+          chartCoverCallbacks.set(id,covers=>{
+            if(chart.checkedAt===stamp && Array.isArray(covers) && covers.length)
+              coverMosaic(cover,covers.map(artwork=>({artwork})));
+          });
+          N.refreshTurkeyChartCover(key,stamp,id);
+        }
         status.textContent=chart.items?.length ? date(chart) :
           loading ? 'Yükleniyor…' : 'Liste şu anda alınamıyor';
         card.disabled=!chart.items?.length;
