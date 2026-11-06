@@ -68,15 +68,19 @@ class PlaybackService : MediaSessionService() {
     private var chartDrive: ChartDriveSource? = null
     private var resolvingChartId: String? = null
 
-    internal fun playChartQueue(tracks: List<Pair<String, String>>, index: Int, profile: String, drive: ChartDriveSource?) {
+    internal fun playChartQueue(tracks: List<ChartTrack>, index: Int, profile: String, drive: ChartDriveSource?) {
         val p = player ?: return
         chartGeneration++
         chartProfile = profile
         chartDrive = drive
         chartHeaders.clear()
         resolvingChartId = null
-        val sources = tracks.mapIndexed { position, (title, artist) ->
-            val metadata = MediaMetadata.Builder().setTitle(title).setArtist(artist).build()
+        val sources = tracks.mapIndexed { position, track ->
+            val extras = android.os.Bundle().apply {
+                putLong("chartDuration", track.duration)
+                putString("chartGenre", track.genre)
+            }
+            val metadata = MediaMetadata.Builder().setTitle(track.title).setArtist(track.artist).setExtras(extras).build()
             val item = MediaItem.Builder().setMediaId("chart-pending:$chartGeneration:$position")
                 .setMediaMetadata(metadata).build()
             // Sırayı Media3'e hemen ver; ses adresini yalnızca parça sırası geldiğinde çöz.
@@ -234,7 +238,7 @@ class PlaybackService : MediaSessionService() {
                 val item = player?.currentMediaItem ?: return
                 if (item.mediaId.startsWith("chart-pending:")) return
                 if (!countedItem) {
-                    com.example.MusicListeningStats(this@PlaybackService).record(item.mediaId)
+                    com.example.MusicListeningStats(this@PlaybackService).record(item.mediaId, item.mediaMetadata.extras?.getString("chartGenre"))
                     countedItem = true
                 }
                 if (item.mediaId.startsWith("experimental:") && !com.example.ProfileStore(this@PlaybackService).isChild()) {

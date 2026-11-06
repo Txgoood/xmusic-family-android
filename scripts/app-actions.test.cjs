@@ -255,12 +255,12 @@ x.dom.window.close();
 topState=[];x=open('arama_ve_ke_fet');
 const genreSection=[...x.d.querySelectorAll('main section')].find(s=>s.querySelector('h2')?.textContent.includes('Hızlı Göz At'));
 const popCard=genreSection.querySelector('.grid').firstElementChild;popCard.click();
-let shelfCall=x.calls.filter(k=>k[0]==='searchMusicShelf').at(-1);
+let shelfCall=x.calls.filter(k=>k[0]==='loadEditorialMusicList').at(-1);
 assert.ok(shelfCall[1].includes('pop'));checks++;
 x.w.__xmusicMusicShelfResult(shelfCall[2],{items:[{id:'leTDrileoGI',title:'Örnek Şarkı',artist:'Sanatçı'}]});
 x.d.querySelector('#xm-dialog [aria-label="Örnek Şarkı oynat"]').click();
-assert.deepEqual(x.calls.filter(k=>k[0]==='assignMusicGenre').at(-1),['assignMusicGenre','leTDrileoGI','Pop']);checks++;
-assert.deepEqual(x.calls.at(-1),['playExperimentalSource','leTDrileoGI','Örnek Şarkı','Sanatçı']);checks++;
+assert.equal(x.calls.at(-1)[0],'playTurkeyChartQueue');checks++;
+assert.equal(JSON.parse(x.calls.at(-1)[1])[0].genre,'Pop');checks++;
 [...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Kapat').click();
 const topInput=x.d.getElementById('search-input');
 topInput.value='Tarkan';topInput.dispatchEvent(new x.w.Event('input',{bubbles:true}));
@@ -298,9 +298,9 @@ x.d.querySelector('#xm-dialog [aria-label="Yüreğime mi Sorsam? oynat"]').click
 assert.equal(x.calls.at(-1)[2],1);
 [...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Kapat').click();
 checks+=4;
-const shelfRequests=x.calls.filter(k=>k[0]==='searchMusicShelf');assert.equal(shelfRequests.length,2);checks++;
+const shelfRequests=x.calls.filter(k=>k[0]==='loadEditorialMusicList');assert.equal(shelfRequests.length,2);checks++;
 x.w.__xmusicMusicShelfResult(shelfRequests[0][2],{items:[{id:'leTDrileoGI',title:'Stüdyo kayıt',artist:'Sanatçı'}]});
-x.d.querySelector('[aria-label="Stüdyo kayıt oynat"]').click();assert.deepEqual(x.calls.at(-1),['playExperimentalSource','leTDrileoGI','Stüdyo kayıt','Sanatçı']);checks++;
+x.d.querySelector('[aria-label="Stüdyo kayıt oynat"]').click();assert.equal(x.calls.at(-1)[0],'playTurkeyChartQueue');checks++;
 x.dom.window.close();
 
 // Ana sayfa: gerçek geçmiş, 6 kayıt, devam etme, iki kaynak seçkisi.

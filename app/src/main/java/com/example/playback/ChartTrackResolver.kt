@@ -13,6 +13,8 @@ import org.json.JSONObject
 import java.text.Normalizer
 import java.util.Locale
 
+internal data class ChartTrack(val title: String, val artist: String, val duration: Long, val genre: String)
+
 internal data class ChartDriveSource(val scope: String, val token: String)
 
 internal class ChartTrackResolver(private val context: Context) {
@@ -45,9 +47,11 @@ internal class ChartTrackResolver(private val context: Context) {
         val response = engine.execute(request, item.mediaId) { _, _, _ -> }
         val rows = JSONObject(response.out).getJSONArray("entries")
         val expected = matchKey("$artist - $title")
+        val duration = item.mediaMetadata.extras?.getLong("chartDuration") ?: 0L
         val id = (0 until rows.length()).asSequence().mapNotNull { rows.optJSONObject(it) }
             .firstOrNull { row ->
                 matchKey(row.optString("title")) == expected &&
+                    (duration == 0L || row.optDouble("duration").let { !it.isFinite() || kotlin.math.abs(it * 1000 - duration) <= 35_000 }) &&
                     row.optString("id").matches(Regex("[A-Za-z0-9_-]{11}"))
             }?.optString("id") ?: return null
         val stream = ExperimentalAudioResolver(context).resolve("https://www.youtube.com/watch?v=$id")

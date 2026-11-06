@@ -196,6 +196,18 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         }.start()
     }
 
+    private val editorialLists = com.example.data.source.EditorialMusicLists(context)
+
+    @JavascriptInterface
+    fun loadEditorialMusicList(key: String, requestId: Int) {
+        Thread {
+            val data = editorialLists.load(key)
+            webView.post {
+                webView.evaluateJavascript("window.__xmusicMusicShelfResult?.($requestId,$data)", null)
+            }
+        }.start()
+    }
+
     private val charts = com.example.data.source.TurkeyMusicCharts(context)
 
     @JavascriptInterface
@@ -268,7 +280,7 @@ class WebAppInterface(private val context: Context, private val webView: WebView
             val title = row.optString("title")
             val artist = row.optString("artist")
             if (title.isBlank() || artist.isBlank() || title.length > 180 || artist.length > 180) return
-            title to artist
+            com.example.playback.ChartTrack(title, artist, row.optLong("duration").coerceIn(0, 86_400_000), row.optString("genre").take(40))
         }
         webView.post {
             val activity = context as? MainActivity ?: return@post

@@ -15,10 +15,10 @@ class MusicListeningStats(private val context: Context) {
         if (videoId.matches(Regex("[A-Za-z0-9_-]{11}")) && genre in genres)
             prefs.edit().putString("track_$videoId", genre).apply()
     }
-    fun record(mediaId: String) = synchronized(lock) {
+    fun record(mediaId: String, editorialGenre: String? = null) = synchronized(lock) {
         if (!listOf("experimental:", "drive-source:", "audius:", "local:", "drive:").any { mediaId.startsWith(it) }) return@synchronized
         val id = mediaId.substringAfter(':')
-        val genre = prefs.getString("track_$id", null)?.takeIf { it in genres } ?: "Diğer"
+        val genre = editorialGenre?.takeIf { it in genres } ?: prefs.getString("track_$id", null)?.takeIf { it in genres } ?: "Diğer"
         val key = "profile_" + ProfileStore(context).activeId()
         val counts = try { JSONObject(prefs.getString(key, "{}")) } catch (_: Exception) { JSONObject() }
         counts.put(genre, (counts.optInt(genre, 0) + 1).coerceAtMost(1_000_000))
