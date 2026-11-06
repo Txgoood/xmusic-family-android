@@ -49,7 +49,15 @@ for(const entry of fs.readdirSync(assets)){
 }
 let x=open('imdi_al_yor');
 const state={ready:true,id:'audius:test123',title:'Gerçek Parça',artist:'Sanatçı',playing:true,queue:[],duration:120000,position:1000};
-x.w.__xmusicPlayback(state);
+x.w.__xmusicPlayback({...state,queue:[state,{...state,id:'audius:next',title:'İkinci'}],index:0});
+assert.ok(!x.d.querySelector('main').textContent.includes('Çıkış Cihazı'));
+assert.ok(!x.d.querySelector('main').textContent.includes('Şarkı Sözleri'));
+assert.ok(x.d.querySelector('main').textContent.includes('Uyku zamanlayıcısı'));
+assert.equal(x.d.querySelectorAll('#xm-inline-items .xm-track').length,2);
+x.d.querySelector('#xm-inline-items [aria-label="İkinci oynat"]').click();
+assert.deepEqual(x.calls.at(-1),['queueAction','play',1,0]);
+x.d.querySelector('#xm-inline-items [aria-label="Aşağı taşı"]').click();
+assert.deepEqual(x.calls.at(-1),['queueAction','move',0,1]);checks+=6;
 x.d.querySelector('[aria-label="Favorilere Ekle"]').click();
 assert.equal(JSON.parse(db).favorites[0].id,state.id);checks++;
 x.d.querySelector('[aria-label="Oynat veya Duraklat"]').click();

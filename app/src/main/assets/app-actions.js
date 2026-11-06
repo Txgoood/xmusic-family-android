@@ -818,7 +818,7 @@
       resumeSavedAt=Date.now();save();
     }
     if(page==='ana_sayfa'&&window.__xmusicHomeRefresh)window.__xmusicHomeRefresh();
-    const key=JSON.stringify([state.queue,state.index,state.shuffle,state.repeat]);if(page==='oynatma_s_ras_queue'&&key!==lastQueue){lastQueue=key;renderQueue();}
+    const key=JSON.stringify([state.queue,state.index,state.shuffle,state.repeat]);if(key!==lastQueue){lastQueue=key;if(page==='oynatma_s_ras_queue')renderQueue();if(page==='imdi_al_yor')renderInlineQueue();}
     const sleep=document.getElementById('xm-sleep-status');if(sleep)sleep.textContent=state.sleepAtEnd?'Şarkı bitiminde duracak':state.sleepRemaining>0?'Kalan: '+Math.ceil(state.sleepRemaining/60000)+' dakika':'Zamanlayıcı kapalı';
     const count=document.getElementById('xmusic-queue-count');if(count)count.textContent='Sırada ('+(state.queue?.length||0)+')';
     const sleepLabel=document.getElementById('xmusic-sleep-label');if(sleepLabel)sleepLabel.textContent=state.sleepRemaining>0?Math.ceil(state.sleepRemaining/60000)+' dk uyku sayacı':'Uyku zamanlayıcısı';
@@ -1253,7 +1253,68 @@
     }
   }
 
+  function initInlinePlayer(){
+    const controls=document.getElementById('mainPlayPause')?.parentElement;
+    if(!controls)return;
+    const main=document.querySelector('main');
+    const output=[...main.querySelectorAll('span')].find(n=>n.textContent.trim()==='Çıkış Cihazı');
+    output?.parentElement?.parentElement?.parentElement?.remove();
+    const lyrics=[...main.querySelectorAll('span')].find(n=>n.textContent.trim()==='Şarkı Sözleri');
+    lyrics?.closest('.rounded-2xl')?.remove();
+    const queueButton=main.querySelector('[aria-label="Çalma Sırası"]');
+    const family=queueButton?.parentElement?.querySelector('.-space-x-2');
+    family?.remove();
+    queueButton?.remove();
+    const panel=create('section',undefined,'xm-inline-queue');
+    panel.id='xm-inline-queue';
+    panel.innerHTML='<div class="xm-inline-head"><h2>Sıradaki şarkılar</h2><span id="xm-inline-count"></span></div><div id="xm-inline-items"></div>';
+    const timer=[...main.querySelectorAll('button')].find(b=>/uyku sayacı|Uyku zamanlayıcısı/i.test(b.textContent));
+    const timerRow=timer?.parentElement;
+    if(timerRow){controls.after(timerRow);timerRow.after(panel);}
+    else controls.after(panel);
+    const css=create('style');
+    css.textContent=`.xm-inline-queue{width:100%;margin:12px 0 20px;padding:16px;border-radius:18px;background:#171d1c}
+    .xm-inline-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;color:#e4eee7}
+    .xm-inline-head h2{font-size:16px;font-weight:700}.xm-inline-head span{font-size:12px;color:#a9bdb0}
+    .xm-track{display:flex;align-items:center;gap:10px;min-height:58px;border-bottom:1px solid #29312e}
+    .xm-track:last-child{border:0}.xm-track-current{color:#4efd7d}
+    .xm-track-main{display:flex;flex-direction:column;min-width:0;flex:1;text-align:left;background:none;border:0;color:inherit}
+    .xm-track-main strong,.xm-track-main small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .xm-track-main strong{font-size:14px}.xm-track-main small{font-size:12px;color:#a9bdb0}
+    .xm-track-action{width:36px;height:40px;border:0;border-radius:10px;color:#a9d7b8;background:transparent;font-size:19px}
+    .xm-track-action:disabled{opacity:.25}.xm-track-num{width:22px;text-align:center;color:#93a69a;font-size:12px}`;
+    document.head.append(css);
+    renderInlineQueue();
+  }
+  function renderInlineQueue(){
+    const holder=document.getElementById('xm-inline-items');
+    if(!holder)return;
+    const rows=state.queue||[];
+    const count=document.getElementById('xm-inline-count');
+    if(count)count.textContent=rows.length+' parça';
+    holder.replaceChildren();
+    if(!rows.length){holder.append(create('p','Henüz sırada şarkı yok.','text-on-surface-variant'));return;}
+    rows.forEach((track,index)=>{
+      const row=create('div',undefined,'xm-track'+(index===state.index?' xm-track-current':''));
+      row.append(create('span',index===state.index?'▶':String(index+1),'xm-track-num'));
+      const play=button('',()=>A.queueAction('play',index,0));
+      play.className='xm-track-main';
+      play.setAttribute('aria-label',(track.title||'Şarkı')+' oynat');
+      play.append(create('strong',track.title||'Şarkı'),create('small',track.artist||''));
+      row.append(play);
+      const up=button('↑',()=>A.queueAction('move',index,index-1));
+      const down=button('↓',()=>A.queueAction('move',index,index+1));
+      const remove=button('×',()=>A.queueAction('remove',index,0));
+      [[up,'Yukarı taşı'],[down,'Aşağı taşı'],[remove,'Sıradan çıkar']].forEach(([b,label])=>{
+        b.className='xm-track-action';b.setAttribute('aria-label',label);
+      });
+      up.disabled=index===0;down.disabled=index===rows.length-1;
+      row.append(up,down,remove);holder.append(row);
+    });
+  }
+
   if(page!=='ayarlar_ve_profil_y_netimi')refreshAvatar();
+  if(page==='imdi_al_yor')initInlinePlayer();
   if(page==='ana_sayfa')initHome();
   if(page==='ayarlar_ve_profil_y_netimi')initSettings();
   if(page==='arama_ve_ke_fet')initDiscoverShelves();
