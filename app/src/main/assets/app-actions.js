@@ -133,7 +133,7 @@
       if(localSub)localSub.textContent=library.local.length+' yerel kayıt';
       const q=searchInput.value.trim().toLocaleLowerCase('tr');
       pins.style.display=filter==='all'?'':'none';
-      local.style.display=(filter==='all'||filter==='local')?'':'none';
+      local.style.display='none';
       playlists.style.display=(filter==='all'||filter==='playlists')?'':'none';
       rows.replaceChildren();subfilters.replaceChildren();
       if(filter==='playlists'){
@@ -144,7 +144,6 @@
       const lookup=t=>((t.title||'')+' '+(t.artist||'')).toLocaleLowerCase('tr').includes(q);
       const sections=[];
       if((filter==='all'&&(showFavorites||q))||filter==='favorites')sections.push(['Beğenilen Şarkılar',library.favorites]);
-      if(filter==='all'||filter==='local')sections.push(['Yerel Kayıtlar',library.local]);
       if(filter==='all'&&(library.history.length||q))sections.push(['Dinleme Geçmişi',library.history]);
       if(filter==='podcasts')sections.push(['Takip Edilen Podcastler',library.feeds]);
       if(filter==='artists'){
@@ -214,7 +213,7 @@
     const chips=Array.from(filters.querySelectorAll('button'));
     const modes=['all','playlists','downloads','artists','albums','podcasts','local'];
     chips.forEach((chip,index)=>{
-      const mode=modes[index];if(mode==='albums'){chip.style.display='none';return;}
+      const mode=modes[index];if(mode==='albums'||mode==='local'){chip.style.display='none';return;}
       if(mode==='artists')chip.textContent='Dinlenen Sanatçılar';
       own(chip,()=>{
         if(mode==='downloads'){go('i_ndirme_y_neticisi');return;}
