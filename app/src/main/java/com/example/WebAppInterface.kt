@@ -3,7 +3,6 @@ package com.example
 import android.content.Context
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
-import java.util.Locale
 import android.widget.Toast
 import androidx.media3.session.MediaController
 import androidx.media3.common.MediaItem
@@ -198,7 +197,6 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     }
 
     private val charts = com.example.data.source.TurkeyMusicCharts(context)
-    private val chartPlaybackRequest = java.util.concurrent.atomic.AtomicInteger()
 
     @JavascriptInterface
     fun cachedTurkeyChart(key: String): String = charts.cached(key)?.toString() ?: "{}"
@@ -214,51 +212,25 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     }
 
     @JavascriptInterface
-    fun playTurkeyChartTrack(title: String, artist: String) {
-        if (title.isBlank() || artist.isBlank() || title.length > 180 || artist.length > 180) return
-        val requestId = chartPlaybackRequest.incrementAndGet()
-        val profile = ProfileStore(context)
-        val activeProfile = profile.activeId()
-        webView.post {
-            if (profile.isChild()) return@post
-            if ((context as? MainActivity)?.playMatchingDriveArchive(title, artist) == true) return@post
-            Thread {
-                val videoId = runCatching {
-                    val engine = com.yausername.youtubedl_android.YoutubeDL.getInstance()
-                    engine.init(context.applicationContext)
-                    val request = com.yausername.youtubedl_android.YoutubeDLRequest("ytsearch10:$artist - $title")
-                    request.addOption("--flat-playlist")
-                    request.addOption("--dump-single-json")
-                    request.addOption("--socket-timeout", "10")
-                    val response = engine.execute(request, "xmusic-chart-$requestId") { _, _, _ -> }
-                    val rows = org.json.JSONObject(response.out).getJSONArray("entries")
-                    val expected = chartMatchKey("$artist - $title")
-                    (0 until rows.length()).asSequence().mapNotNull { rows.optJSONObject(it) }
-                        .firstOrNull { row ->
-                            chartMatchKey(row.optString("title")) == expected &&
-                                row.optString("id").matches(Regex("[A-Za-z0-9_-]{11}"))
-                        }?.optString("id")
-                }.getOrNull()
-                webView.post result@{
-                    if (chartPlaybackRequest.get() != requestId || profile.activeId() != activeProfile) return@result
-                    if (videoId == null) {
-                        Toast.makeText(context, "Şu anda oynatılamıyor", Toast.LENGTH_SHORT).show()
-                        return@result
-                    }
-                    context.getSharedPreferences("xmusic_auto_archive", Context.MODE_PRIVATE)
-                        .edit().putBoolean("require_license:$videoId", true).apply()
-                    startExperimentalSource(videoId, title, artist, 0L)
-                }
-            }.start()
+    fun playTurkeyChartQueue(snapshot: String, index: Int) {
+        if (snapshot.length > 48_000) return
+        val rows = runCatching { org.json.JSONArray(snapshot) }.getOrNull() ?: return
+        if (rows.length() !in 1..50 || index !in 0 until rows.length()) return
+        val tracks = (0 until rows.length()).map { position ->
+            val row = rows.optJSONObject(position) ?: return
+            val title = row.optString("title")
+            val artist = row.optString("artist")
+            if (title.isBlank() || artist.isBlank() || title.length > 180 || artist.length > 180) return
+            title to artist
         }
-    }
-
-    private fun chartMatchKey(value: String): String {
-        val normalized = java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD)
-            .lowercase(Locale.ROOT).replace('ı', 'i')
-        return normalized.replace(Regex("""[\p{M}]"""), "")
-            .replace(Regex("""\s*[\[(](official (music )?video|official audio|resmi video)[\])]\s*$"""), "")
-            .replace(Regex("""[^\p{L}\p{N}]"""), "")
+        webView.post {
+            val activity = context as? MainActivity ?: return@post
+            val profile = ProfileStore(context)
+            if (profile.isChild()) return@post
+            com.example.playback.PlaybackService.activeService?.playChartQueue(
+                tracks, index, profile.activeId(), activity.chartDriveSource()
+            )
+        }
     }
 
     @JavascriptInterface

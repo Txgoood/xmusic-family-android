@@ -39,7 +39,8 @@ class PlaybackWebBridge(private val webView: WebView) {
         if (!active) return
         val player = controller
         val item = player?.currentMediaItem
-        val duration = (player?.duration ?: 0L).coerceAtLeast(0L)
+        val chartPending = item?.mediaId?.startsWith("chart-pending:") == true
+        val duration = if (chartPending) 0L else (player?.duration ?: 0L).coerceAtLeast(0L)
         val state = JSONObject().apply {
             val queue = org.json.JSONArray()
             if (player != null) for (i in 0 until player.mediaItemCount) {
@@ -64,10 +65,10 @@ class PlaybackWebBridge(private val webView: WebView) {
             put("title", item?.mediaMetadata?.title?.toString().orEmpty())
             put("artist", item?.mediaMetadata?.artist?.toString().orEmpty())
             put("artwork", item?.let { coverArt.webArtwork(it.mediaMetadata) }.orEmpty())
-            put("playing", player?.isPlaying == true)
-            put("pending", player?.playWhenReady == true && player.playbackState == Player.STATE_BUFFERING)
+            put("playing", player?.isPlaying == true && !chartPending)
+            put("pending", player?.playWhenReady == true && (chartPending || player.playbackState == Player.STATE_BUFFERING))
             put("ended", player?.playbackState == Player.STATE_ENDED)
-            put("position", (player?.currentPosition ?: 0L).coerceAtLeast(0L))
+            put("position", if (chartPending) 0L else (player?.currentPosition ?: 0L).coerceAtLeast(0L))
             put("duration", duration)
             put("seekable", player?.isCurrentMediaItemSeekable == true && duration > 0)
             put("hasNext", player?.hasNextMediaItem() == true)

@@ -2,6 +2,12 @@ package com.example.playback
 
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.SilenceMediaSource
+import com.example.ProfileStore
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -54,6 +60,77 @@ class PlaybackService : MediaSessionService() {
     fun audioSessionId(): Int = player?.audioSessionId ?: 0
 
     private var player: ExoPlayer? = null
+    private lateinit var mediaSourceFactory: DefaultMediaSourceFactory
+    private val chartResolver by lazy { ChartTrackResolver(applicationContext) }
+    private val chartHeaders = java.util.concurrent.ConcurrentHashMap<String, Map<String, String>>()
+    private var chartGeneration = 0L
+    private var chartProfile = ""
+    private var chartDrive: ChartDriveSource? = null
+    private var resolvingChartId: String? = null
+
+    internal fun playChartQueue(tracks: List<Pair<String, String>>, index: Int, profile: String, drive: ChartDriveSource?) {
+        val p = player ?: return
+        chartGeneration++
+        chartProfile = profile
+        chartDrive = drive
+        chartHeaders.clear()
+        resolvingChartId = null
+        val sources = tracks.mapIndexed { position, (title, artist) ->
+            val metadata = MediaMetadata.Builder().setTitle(title).setArtist(artist).build()
+            val item = MediaItem.Builder().setMediaId("chart-pending:$chartGeneration:$position")
+                .setMediaMetadata(metadata).build()
+            // Sırayı Media3'e hemen ver; ses adresini yalnızca parça sırası geldiğinde çöz.
+            SilenceMediaSource(600_000_000L).apply { updateMediaItem(item) }
+        }
+        p.shuffleModeEnabled = false
+        p.repeatMode = Player.REPEAT_MODE_OFF
+        p.setMediaSources(sources, index, 0L)
+        p.prepare()
+        p.play()
+    }
+
+    private fun loadCurrentChartTrack() {
+        val p = player ?: return
+        val item = p.currentMediaItem ?: return
+        val id = item.mediaId
+        if (!id.startsWith("chart-pending:$chartGeneration:") || resolvingChartId == id || !p.playWhenReady) return
+        val profile = ProfileStore(this)
+        if (profile.isChild() || profile.activeId() != chartProfile) {
+            p.pause()
+            p.clearMediaItems()
+            return
+        }
+        resolvingChartId = id
+        val drive = chartDrive
+        Thread {
+            val result = runCatching { chartResolver.resolve(item, drive) }.getOrNull()
+            timerHandler.post {
+                if (resolvingChartId != id || player !== p) return@post
+                resolvingChartId = null
+                if (p.currentMediaItem?.mediaId != id || ProfileStore(this).activeId() != chartProfile) return@post
+                if (result == null) {
+                    skipChartTrack(p)
+                    return@post
+                }
+                chartHeaders[result.url] = result.headers
+                val index = p.currentMediaItemIndex
+                p.addMediaSource(index + 1, mediaSourceFactory.createMediaSource(result.item))
+                p.seekTo(index + 1, 0L)
+                p.removeMediaItem(index)
+            }
+        }.start()
+    }
+
+    private fun skipChartTrack(p: ExoPlayer) {
+        val index = p.currentMediaItemIndex
+        val next = p.nextMediaItemIndex
+        val continuePlaying = next != C.INDEX_UNSET && p.playWhenReady
+        if (!continuePlaying) p.pause()
+        if (next != C.INDEX_UNSET) p.seekToDefaultPosition(next)
+        p.removeMediaItem(index)
+        if (continuePlaying) p.prepare()
+    }
+
     private var mediaSession: MediaSession? = null
     private var resumeProfileId: String? = null
     var familyBlockMessage: String = ""
@@ -85,7 +162,7 @@ class PlaybackService : MediaSessionService() {
         val store = com.example.ProfileStore(this)
         val id = store.activeId()
         if (wasPlaying && listeningProfile == id && familyTickAt > 0) store.recordListening(id, now - familyTickAt)
-        familyTickAt = now; listeningProfile = id; wasPlaying = player?.isPlaying == true
+        familyTickAt = now; listeningProfile = id; wasPlaying = player?.isPlaying == true && player?.currentMediaItem?.mediaId?.startsWith("chart-pending:") != true
     }
     private val familyTicker = object : Runnable {
         override fun run() {
@@ -99,7 +176,7 @@ class PlaybackService : MediaSessionService() {
     private fun saveResume() {
         val p = player ?: return
         val item = p.currentMediaItem ?: return
-        if (item.mediaId.isBlank()) return
+        if (item.mediaId.isBlank() || item.mediaId.startsWith("chart-pending:")) return
         val position = if (p.playbackState == androidx.media3.common.Player.STATE_ENDED) 0L else p.currentPosition.coerceAtLeast(0L)
         val saved = org.json.JSONObject().put("id", item.mediaId)
             .put("title", item.mediaMetadata.title?.toString().orEmpty())
@@ -123,7 +200,7 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         activeService = this
         val resolver = androidx.media3.datasource.ResolvingDataSource.Resolver { spec ->
-            val headers = experimentalHeaders[spec.uri.toString()]
+            val headers = experimentalHeaders[spec.uri.toString()] ?: chartHeaders[spec.uri.toString()]
             if (headers == null) spec else spec.withAdditionalHeaders(headers)
         }
         val dataSource = androidx.media3.datasource.DefaultDataSource.Factory(
@@ -132,8 +209,9 @@ class PlaybackService : MediaSessionService() {
                 androidx.media3.datasource.DefaultHttpDataSource.Factory(), resolver
             )
         )
+        mediaSourceFactory = DefaultMediaSourceFactory(dataSource)
         player = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(androidx.media3.exoplayer.source.DefaultMediaSourceFactory(dataSource))
+            .setMediaSourceFactory(mediaSourceFactory)
             .setAudioAttributes(AudioAttributes.Builder()
                 .setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true)
             .setHandleAudioBecomingNoisy(true)
@@ -141,6 +219,9 @@ class PlaybackService : MediaSessionService() {
             .build()
         player!!.addListener(object : androidx.media3.common.Player.Listener {
             private var countedItem = false
+            override fun onEvents(player: Player, events: Player.Events) {
+                loadCurrentChartTrack()
+            }
             override fun onMediaMetadataChanged(metadata: androidx.media3.common.MediaMetadata) {
                 val key = player?.currentMediaItem?.mediaMetadata?.extras?.getString(com.example.CoverArtStore.EXTRA) ?: return
                 com.example.CoverArtStore.embedded(this@PlaybackService, key, metadata.artworkData)
@@ -151,6 +232,7 @@ class PlaybackService : MediaSessionService() {
                 if (isPlaying && !checkFamilyPlayback()) return
                 if (!isPlaying) { saveResume(); return }
                 val item = player?.currentMediaItem ?: return
+                if (item.mediaId.startsWith("chart-pending:")) return
                 if (!countedItem) {
                     com.example.MusicListeningStats(this@PlaybackService).record(item.mediaId)
                     countedItem = true
@@ -164,6 +246,13 @@ class PlaybackService : MediaSessionService() {
             }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 val id = player?.currentMediaItem?.mediaId.orEmpty()
+                val p = player ?: return
+                val item = p.currentMediaItem
+                if (item?.localConfiguration?.uri?.toString()?.let(chartHeaders::containsKey) == true) {
+                    timerHandler.post {
+                        if (p.currentMediaItem == item && p.playerError == error) skipChartTrack(p)
+                    }
+                }
                 if (id.startsWith("experimental:")) {
                     com.example.data.source.ExperimentalAudioResolver.invalidate(
                         "https://www.youtube.com/watch?v=" + id.removePrefix("experimental:")

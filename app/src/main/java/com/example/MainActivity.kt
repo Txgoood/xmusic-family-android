@@ -155,6 +155,13 @@ class MainActivity : ComponentActivity() {
             finally { runOnUiThread { driveBusy = false } }
         }
     }
+    internal fun chartDriveSource(): com.example.playback.ChartDriveSource? {
+        val token = driveAccessToken ?: return null
+        val (account, folder) = archiveLocation() ?: return null
+        val scope = com.example.data.drive.DriveArchiveIndex.scope(account, folder)
+        return com.example.playback.ChartDriveSource(scope, token)
+    }
+
     fun playMatchingDriveArchive(title: String, artist: String): Boolean {
         // Farklı bir kayıt çocuk onayının yerine geçemez.
         if (ProfileStore(this).isChild() || driveAccessToken == null) return false

@@ -1024,12 +1024,13 @@
         if(card.disabled)return;
         makeOwned(card,()=>modal(name,panel=>{
           panel.append(create('p',period+' · Kworb · '+date(chart),'text-on-surface-variant'));
-          chart.items.forEach(item=>{
+          const snapshot=JSON.stringify(chart.items);
+          chart.items.forEach((item,index)=>{
             const row=create('div',undefined,'flex items-center gap-3 py-2');
             row.append(create('strong',String(item.rank),'text-primary'),
               create('span',item.artist+' – '+item.title,'flex-1'));
             if(profileState().role!=='child'){
-              const play=button('▶',()=>N.playTurkeyChartTrack(item.title,item.artist));
+              const play=button('▶',()=>N.playTurkeyChartQueue(snapshot,index));
               play.setAttribute('aria-label',item.title+' oynat');
               row.append(play);
             }
