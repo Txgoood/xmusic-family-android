@@ -125,6 +125,9 @@
     searchInput.setAttribute('aria-label','Kitaplıkta ara');searchInput.style.cssText='display:none;margin:4px 16px 12px;width:calc(100% - 32px);padding:12px;background:#1c2023;border-radius:14px;color:#e0e3e7;';
     top.insertAdjacentElement('afterend',searchInput);
     let filter='all',showFavorites=false;
+    const libraryStyle=create('style');
+    libraryStyle.textContent=`.xm-library-row{display:flex;align-items:center;gap:12px;min-width:0;padding:10px 4px;border-bottom:1px solid #ffffff0d}.xm-library-row img{width:48px;height:48px;object-fit:cover;border-radius:6px;flex:none}.xm-library-row .xm-library-title{flex:1;min-width:0;text-align:left;background:none;border:0;color:#fff}.xm-library-title strong,.xm-library-title small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.xm-library-title small{color:#aaa;margin-top:3px}.xm-library-menu{border:0;background:none;color:#aaa;font-size:24px;width:40px;height:48px;flex:none}.xm-library-subfilters{display:flex;gap:8px;overflow-x:auto;padding:0 16px 10px}.xm-library-subfilters button{border:0;background:#272727;color:#fff;border-radius:24px;padding:8px 14px;white-space:nowrap}.xm-library-subfilters button[aria-pressed=true]{background:#20df64;color:#111}`;document.head.append(libraryStyle);
+    const subfilters=create('div',undefined,'xm-library-subfilters');filters.insertAdjacentElement('afterend',subfilters);
     function draw(){
       if(favoriteSub)favoriteSub.textContent=library.favorites.length+' şarkı';
       if(localSub)localSub.textContent=library.local.length+' yerel kayıt';
@@ -132,13 +135,30 @@
       pins.style.display=filter==='all'?'':'none';
       local.style.display=(filter==='all'||filter==='local')?'':'none';
       playlists.style.display=(filter==='all'||filter==='playlists')?'':'none';
-      rows.replaceChildren();
+      rows.replaceChildren();subfilters.replaceChildren();
+      if(filter==='playlists'){
+        [['Tümü',()=>{filter='all';draw();},false],['Çalma Listeleri',()=>{},true],['Beğenilenler',()=>{filter='favorites';draw();},false]].forEach(([label,action,active])=>{const chip=button(label,action);chip.setAttribute('aria-pressed',String(active));subfilters.append(chip);});
+      }else if(filter==='favorites'){
+        [['Tümü',()=>{filter='all';draw();},false],['Çalma Listeleri',()=>{filter='playlists';draw();},false],['Beğenilenler',()=>{},true]].forEach(([label,action,active])=>{const chip=button(label,action);chip.setAttribute('aria-pressed',String(active));subfilters.append(chip);});
+      }
       const lookup=t=>((t.title||'')+' '+(t.artist||'')).toLocaleLowerCase('tr').includes(q);
       const sections=[];
       if((filter==='all'&&(showFavorites||q))||filter==='favorites')sections.push(['Beğenilen Şarkılar',library.favorites]);
       if(filter==='all'||filter==='local')sections.push(['Yerel Kayıtlar',library.local]);
       if(filter==='all'&&(library.history.length||q))sections.push(['Dinleme Geçmişi',library.history]);
       if(filter==='podcasts')sections.push(['Takip Edilen Podcastler',library.feeds]);
+      if(filter==='artists'){
+        const seenArtists=new Set();
+        [...library.history,...library.favorites].forEach(track=>{
+          const artist=(track.artist||'').trim(),key=artist.toLocaleLowerCase('tr');
+          if(!artist||seenArtists.has(key)||!key.includes(q)||track.id?.startsWith('podcast:'))return;
+          seenArtists.add(key);
+          const row=button('',()=>search(artist));row.className='xm-library-row';
+          const image=create('img');setArtwork(image,track.artwork,artist);image.style.borderRadius='50%';
+          const name=create('span',artist);name.style.cssText='flex:1;text-align:left;color:#fff';row.append(image,name);rows.append(row);
+        });
+        if(!seenArtists.size)rows.append(create('p','Henüz dinlenen sanatçı yok.','text-on-surface-variant'));
+      }
       sections.forEach(([label,tracks])=>{
         const matching=tracks.filter(t=>lookup(t));
         if(!matching.length&&!q&&label!=='Beğenilen Şarkılar'&&filter!=='podcasts')return;
@@ -149,10 +169,17 @@
           if(label==='Takip Edilen Podcastler'){
             const row=button(t.title,()=>openFeed(t));row.className='w-full text-left p-3 rounded-xl bg-surface-container-low text-on-surface';section.append(row);return;
           }
-          const row=trackRow(t,r=>r.append(button('Listeye Ekle',()=>addToPlaylist(t)),button('Kaldır',()=>{
-            const index=tracks.findIndex(x=>x.id===t.id);if(index>=0)tracks.splice(index,1);if(save())draw();
-          })));
-          row.className='flex items-center gap-2 flex-wrap p-3 rounded-xl bg-surface-container-low';section.append(row);
+          const row=create('div',undefined,'xm-library-row');
+          const image=create('img');setArtwork(image,t.artwork,t.title);
+          const play=button('',()=>playTrack(t));play.className='xm-library-title';
+          play.append(create('strong',t.title||'İsimsiz'),create('small',t.artist||''));
+          const menu=button('⋮',()=>modal('Parça işlemleri',(panel,close)=>{
+            panel.append(button('Listeye Ekle',()=>{close();addToPlaylist(t);}),button('Kaldır',()=>{
+              const index=tracks.findIndex(x=>x.id===t.id);if(index>=0)tracks.splice(index,1);if(save()){close();draw();}
+            }));
+          }));
+          menu.className='xm-library-menu';menu.setAttribute('aria-label',(t.title||'Parça')+' seçenekleri');
+          row.append(image,play,menu);section.append(row);
         });
         rows.append(section);
       });
@@ -177,7 +204,7 @@
         playlistRows.appendChild(row);
       });
     }
-    own(sort,()=>modal('Listeleri sırala',(p,close)=>{[['Son eklenenler','recent'],['Ada göre','name']].forEach(([label,value])=>p.append(button(label,()=>{librarySort=value;close();draw();})));}));
+    own(sort,()=>modal('Listeleri sırala',(p,close)=>{[['Son eklenenler','recent'],['Ada göre','name']].forEach(([label,value])=>p.append(button(label,()=>{librarySort=value;const labelNode=sort.querySelector('span:not(.material-symbols-outlined)');if(labelNode)labelNode.textContent=label;close();draw();})));}));
     own(listBtn,()=>{libraryView='list';draw();});own(gridBtn,()=>{libraryView='grid';draw();});
     clickable(favoriteCard,()=>{filter='favorites';showFavorites=true;draw();});
     own(favoriteCard?.querySelector('button'),()=>{filter='favorites';showFavorites=true;draw();});
@@ -187,7 +214,8 @@
     const chips=Array.from(filters.querySelectorAll('button'));
     const modes=['all','playlists','downloads','artists','albums','podcasts','local'];
     chips.forEach((chip,index)=>{
-      const mode=modes[index];if(mode==='artists'||mode==='albums'){chip.style.display='none';return;}
+      const mode=modes[index];if(mode==='albums'){chip.style.display='none';return;}
+      if(mode==='artists')chip.textContent='Dinlenen Sanatçılar';
       own(chip,()=>{
         if(mode==='downloads'){go('i_ndirme_y_neticisi');return;}
         filter=mode;showFavorites=false;
