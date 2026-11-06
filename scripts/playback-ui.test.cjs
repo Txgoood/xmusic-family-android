@@ -25,6 +25,7 @@ for (const entry of folders) {
     assert.equal(title.textContent, 'Henüz parça seçilmedi'); checks++;
     const state = { ready: true, id: 'audius:test', title: '<img onerror=bad()>', artist: 'Test artist', artwork: '', playing: true, position: 30000, duration: 120000, seekable: true, hasNext: false };
     w.__xmusicPlayback(state);
+    if(full){assert.equal(d.querySelector('.xm-now-compact strong').textContent,state.title);assert.equal(d.querySelector('.xm-now-compact small').textContent,state.artist);checks+=2;}
     const cover=(full?d.querySelector('main img'):mini?.querySelector('img'));
     if(cover){
       assert.ok(cover.getAttribute('src').startsWith('data:image/svg+xml'));

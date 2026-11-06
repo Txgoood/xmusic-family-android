@@ -58,12 +58,37 @@
     image.onerror=()=>{};
     image.src=address;
   }
+  let artwork = full ? document.querySelector('main img') : null;
+  if (full) {
+    const header=document.querySelector('header');
+    const headerTitle=header?.querySelector('h1');
+    const coverFrame=artwork?.parentElement;
+    if(header && headerTitle && coverFrame){
+      const compact=document.createElement('div');compact.className='xm-now-compact';
+      const compactTitle=document.createElement('strong'),compactArtist=document.createElement('small');
+      compact.append(compactTitle,compactArtist);
+      headerTitle.parentElement.appendChild(compact);
+      const style=document.createElement('style');
+      style.textContent=`.xm-now-compact{display:none;min-width:0;flex-direction:column;line-height:1.2}.xm-now-compact strong,.xm-now-compact small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:42vw}.xm-now-compact strong{font-size:14px}.xm-now-compact small{font-size:11px;opacity:.7;margin-top:3px}body.xm-now-scrolled header h1{display:none}body.xm-now-scrolled .xm-now-compact{display:flex}body.xm-now-scrolled header{background:#16241ef5;box-shadow:0 5px 20px #0004} @media(prefers-reduced-motion:reduce){.xm-now-cover-scroll{transform:none!important;opacity:1!important}}`;
+      document.head.appendChild(style);coverFrame.classList.add('xm-now-cover-scroll');
+      let frame=false;
+      const onScroll=()=>{if(frame)return;frame=true;requestAnimationFrame(()=>{frame=false;
+        const offset=window.scrollY||document.documentElement.scrollTop||0;
+        document.body.classList.toggle('xm-now-scrolled',offset>160);
+        if(!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches){
+          coverFrame.style.transform='scale('+Math.max(.86,1-offset/1800)+')';
+          coverFrame.style.opacity=String(Math.max(.5,1-offset/1000));
+        }
+      });};
+      window.addEventListener('scroll',onScroll,{passive:true});
+      window.__xmusicCompactTrack=(value)=>{compactTitle.textContent=value.title||'Şimdi Çalıyor';compactArtist.textContent=value.artist||'';};
+    }
+  }
   const text = (node, value) => { if (node) node.textContent = value; };
   const time = ms => { const n = Math.floor(Math.max(0, ms || 0) / 1000); return Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0'); };
   const title = full ? document.querySelector('main h3') : mini?.querySelector('p');
   const artist = full ? title?.parentElement?.nextElementSibling?.querySelector('p') : mini?.querySelectorAll('p')[1];
   const badge = title?.nextElementSibling;
-  let artwork = full ? document.querySelector('main img') : null;
   if (full && artwork) {
     const visualStyle=document.createElement('style');
     visualStyle.textContent='@keyframes xm-cover-motion{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}} .xm-cover-motion{animation:xm-cover-motion 12s ease-in-out infinite;will-change:transform} @media (prefers-reduced-motion:reduce){.xm-cover-motion{animation:none!important}}';
@@ -132,6 +157,7 @@
   }, true);
   window.__xmusicPlayback = function (value) {
     state = value;
+    if(full)window.__xmusicCompactTrack?.(value);
     if (mini) mini.style.display = value.id ? '' : 'none';
     window.dispatchEvent(new CustomEvent('xmusic:playback', { detail: value }));
     text(title, value.title || 'Henüz parça seçilmedi');
