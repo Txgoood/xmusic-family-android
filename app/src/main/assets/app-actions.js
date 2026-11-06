@@ -987,10 +987,64 @@
     liveSection('Hi-Res & Stüdyo Kayıtları','Stüdyo ve akustik kayıtlar','Türkçe akustik stüdyo performans',5);
     liveSection('Yeni Çıkanlar','Yeni müzik araması','yeni çıkan Türkçe şarkılar',5);
     const popular=findTitle('Popüler Çalma Listeleri');
-    if(popular){
-      const holder=popular.children[1];if(holder){holder.replaceChildren();holder.append(create('p','Türkiye geneli listeler için doğrulanmış bir katalog henüz bağlı değil.','text-on-surface-variant'));}
-      const btn=popular.querySelector('button');if(btn)btn.style.display='none';
-    }
+    if(popular) initTurkeyCharts(popular);
+  }
+
+
+  function initTurkeyCharts(section){
+    const grid=section.children[1];
+    if(!grid)return;
+    grid.replaceChildren();
+    grid.className='grid grid-cols-2 gap-3';
+    const subtitle=section.querySelector('p');
+    if(subtitle)subtitle.textContent='Türkiye Top 50 · haftada bir yenilenir';
+    const all=section.querySelector('button');
+    if(all)all.hidden=true;
+
+    const charts=[
+      ['spotify','Spotify Türkiye','Günlük dinlenme'],
+      ['apple','Apple Music Türkiye','Günlük dinlenme'],
+      ['youtube','YouTube Türkiye','Haftalık izlenme'],
+      ['shazam','Shazam Türkiye','En çok tanımlananlar']
+    ];
+    charts.forEach(([key,name,period])=>{
+      let chart={};
+      try{chart=JSON.parse(N.cachedTurkeyChart(key)||'{}')||{};}catch(_){}
+      const date=data=>data.date ? 'Liste tarihi '+data.date :
+        'Alınma tarihi '+new Date(data.checkedAt).toLocaleDateString('tr-TR');
+      const status=create('p','','text-on-surface-variant');
+      const card=button('',()=>{});
+      card.className='rounded-xl bg-surface-container-low p-4 text-left';
+      card.append(create('strong',name),create('p',period+' · Kworb'),status);
+      grid.append(card);
+      function render(loading){
+        status.textContent=chart.items?.length ? date(chart) :
+          loading ? 'Yükleniyor…' : 'Liste şu anda alınamıyor';
+        card.disabled=!chart.items?.length;
+        if(card.disabled)return;
+        makeOwned(card,()=>modal(name,panel=>{
+          panel.append(create('p',period+' · Kworb · '+date(chart),'text-on-surface-variant'));
+          chart.items.forEach(item=>{
+            const row=create('div',undefined,'flex items-center gap-3 py-2');
+            row.append(create('strong',String(item.rank),'text-primary'),
+              create('span',item.artist+' – '+item.title,'flex-1'));
+            if(profileState().role!=='child'){
+              const play=button('▶',()=>N.playTurkeyChartTrack(item.title,item.artist));
+              play.setAttribute('aria-label',item.title+' oynat');
+              row.append(play);
+            }
+            panel.append(row);
+          });
+        }));
+      }
+      render(true);
+      const id=++shelfId;
+      shelfCallbacks.set(id,result=>{
+        if(result.items?.length)chart=result;
+        render(false);
+      });
+      N.refreshTurkeyChart(key,id);
+    });
   }
 
 

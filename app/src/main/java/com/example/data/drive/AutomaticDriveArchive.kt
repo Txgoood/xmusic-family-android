@@ -68,7 +68,9 @@ class AutomaticDriveArchive(context: Context, params: WorkerParameters) : Worker
                     try {
                         val request = YoutubeDLRequest("https://www.youtube.com/watch?v=$source")
                         request.addOption("--no-playlist")
-                        request.addOption("--match-filter", "!is_live")
+                        val filter = if (prefs.getBoolean("require_license:$source", false))
+                            "!is_live & license*=Creative Commons" else "!is_live"
+                        request.addOption("--match-filter", filter)
                         request.addOption("--socket-timeout", "15")
                         request.addOption("--retries", "1")
                         request.addOption("--fragment-retries", "1")

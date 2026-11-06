@@ -266,6 +266,21 @@ topSection.querySelector('button').click();assert.equal(topInput.value,'Tarkan')
 x.dom.window.close();
 x=open('m_zik_merkezi');
 assert.equal(x.d.querySelector('nav[data-active-classes] a[data-path="muzik"]').getAttribute('aria-current'),'page');checks++;
+const chartRequests=x.calls.filter(k=>k[0]==='refreshTurkeyChart');
+assert.deepEqual(chartRequests.map(call=>call[1]),['spotify','apple','youtube','shazam']);
+x.w.__xmusicMusicShelfResult(chartRequests[0][2],{date:'2026-11-04',items:[
+ {rank:1,title:'TRALALA',artist:'manifest'},
+ {rank:2,title:'Yüreğime mi Sorsam?',artist:'Aykut Aksöz'}
+]});
+const spotifyChart=[...x.d.querySelectorAll('button')].find(b=>b.textContent.includes('Spotify Türkiye'));
+assert.ok(spotifyChart.textContent.includes('2026-11-04'));
+spotifyChart.click();
+const chartPlay=x.d.querySelector('#xm-dialog [aria-label="TRALALA oynat"]');
+assert.ok(chartPlay);
+chartPlay.click();
+assert.deepEqual(x.calls.at(-1),['playTurkeyChartTrack','TRALALA','manifest']);
+[...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Kapat').click();
+checks+=4;
 const shelfRequests=x.calls.filter(k=>k[0]==='searchMusicShelf');assert.equal(shelfRequests.length,2);checks++;
 x.w.__xmusicMusicShelfResult(shelfRequests[0][2],{items:[{id:'leTDrileoGI',title:'Stüdyo kayıt',artist:'Sanatçı'}]});
 x.d.querySelector('[aria-label="Stüdyo kayıt oynat"]').click();assert.deepEqual(x.calls.at(-1),['playExperimentalSource','leTDrileoGI','Stüdyo kayıt','Sanatçı']);checks++;
