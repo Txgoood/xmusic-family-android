@@ -24,6 +24,40 @@
   }
   if (mini) mini.style.display = 'none';
   let state = {};
+  let colorSource='';
+  let colorGeneration=0;
+  function updateMiniColor(address) {
+    if(!mini || colorSource===address)return;
+    colorSource=address;
+    const generation=++colorGeneration;
+    mini.style.backgroundImage='';
+    mini.style.backgroundColor='';
+    if(typeof address!=='string' || !address.startsWith('https://'))return;
+    const image=new Image();
+    image.crossOrigin='anonymous';
+    image.onload=()=>{
+      if(generation!==colorGeneration)return;
+      try{
+        const canvas=document.createElement('canvas');canvas.width=12;canvas.height=12;
+        const context=canvas.getContext('2d',{willReadFrequently:true});
+        if(!context)return;
+        context.drawImage(image,0,0,12,12);
+        const pixels=context.getImageData(0,0,12,12).data;
+        let red=0,green=0,blue=0,count=0;
+        for(let i=0;i<pixels.length;i+=4){
+          if(pixels[i+3]<128)continue;
+          red+=pixels[i];green+=pixels[i+1];blue+=pixels[i+2];count++;
+        }
+        if(!count)return;
+        const scale=.34/count;
+        mini.style.backgroundImage='none';
+        mini.style.backgroundColor='rgb('+Math.round(red*scale)+','+Math.round(green*scale)+','+Math.round(blue*scale)+')';
+        mini.style.transition='background-color 350ms ease';
+      }catch(_){}
+    };
+    image.onerror=()=>{};
+    image.src=address;
+  }
   const text = (node, value) => { if (node) node.textContent = value; };
   const time = ms => { const n = Math.floor(Math.max(0, ms || 0) / 1000); return Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0'); };
   const title = full ? document.querySelector('main h3') : mini?.querySelector('p');
@@ -106,6 +140,7 @@
     text(badge, source);
     if (full) text(document.querySelector('main h2'), source || 'Parça seçilmedi');
     setArtwork(artwork,value.artwork,value.title);
+    if(!full)updateMiniColor(value.artwork||'');
     if(full && artwork)artwork.classList.toggle('xm-cover-motion',!!value.id && !!value.playing && !document.hidden);
     text(status, value.error || (!value.ready ? 'Oynatıcı bağlanıyor…' : value.pending ? 'Ses yükleniyor…' : value.ended ? 'Bitti' : value.id ? (value.playing ? 'Çalıyor' : 'Duraklatıldı') : ''));
     controls.forEach(button => {

@@ -89,7 +89,10 @@ internal class EditorialMusicLists(context: Context) {
             "classical" to "pl.211e4d2b8853476dacc00652fc648e1b",
             "acoustic" to "pl.90a8ad26100b4e3995f3d14bdaaec26c",
             "sufi" to "pl.a6137a599a1d4f8fb37f6aed6313b77c",
-            "new" to "pl.2b0e6e332fdf4b7a91164da3162127b5"
+            "new" to "pl.2b0e6e332fdf4b7a91164da3162127b5",
+            "kpop" to "pl.48229b41bbfc47d7af39dae8e8b5276e",
+            "fitness" to "pl.1cdff292963c489890c4fdc0e5e407b7",
+            "party" to "pl.d838905f50af4200a2ebbc614922dee9"
         )
     }
 }

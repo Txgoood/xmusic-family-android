@@ -257,7 +257,19 @@ const genreSection=[...x.d.querySelectorAll('main section')].find(s=>s.querySele
 const popCard=genreSection.querySelector('.grid').firstElementChild;popCard.click();
 let shelfCall=x.calls.filter(k=>k[0]==='loadEditorialMusicList').at(-1);
 assert.ok(shelfCall[1].includes('pop'));checks++;
-x.w.__xmusicMusicShelfResult(shelfCall[2],{items:[{id:'leTDrileoGI',title:'Örnek Şarkı',artist:'Sanatçı'}]});
+x.w.__xmusicMusicShelfResult(shelfCall[2],{items:[
+ {id:'leTDrileoGI',title:'Örnek Şarkı',artist:'Sanatçı'},
+ {id:'second',title:'İkinci Şarkı',artist:'Başka'}
+]});
+const selection=x.d.querySelector('#xm-dialog .xm-selection-dialog');
+assert.ok(selection.querySelector('.xm-selection-header'));
+const input=selection.querySelector('[aria-label="Listede şarkı ara"]');
+input.value='ikinci';input.dispatchEvent(new x.w.Event('input',{bubbles:true}));
+assert.ok(!selection.textContent.includes('Örnek Şarkı'));
+selection.querySelector('[aria-label="İkinci Şarkı oynat"]').click();
+assert.equal(x.calls.at(-1)[2],1);
+input.value='';input.dispatchEvent(new x.w.Event('input',{bubbles:true}));
+checks+=3;
 x.d.querySelector('#xm-dialog [aria-label="Örnek Şarkı oynat"]').click();
 assert.equal(x.calls.at(-1)[0],'playTurkeyChartQueue');checks++;
 assert.equal(JSON.parse(x.calls.at(-1)[1])[0].genre,'Pop');checks++;
