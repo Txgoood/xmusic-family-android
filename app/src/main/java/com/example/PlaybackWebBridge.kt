@@ -48,7 +48,8 @@ class PlaybackWebBridge(private val webView: WebView) {
                 queue.put(JSONObject().put("id", track.mediaId)
                     .put("title", track.mediaMetadata.title?.toString().orEmpty())
                     .put("artist", track.mediaMetadata.artist?.toString().orEmpty())
-                    .put("artwork", coverArt.webArtwork(track.mediaMetadata)))
+                    .put("artwork", coverArt.webArtwork(track.mediaMetadata))
+                    .put("feed", track.mediaMetadata.extras?.getString("feed").orEmpty()))
             }
             put("queue", queue)
             put("index", player?.currentMediaItemIndex ?: -1)
@@ -64,6 +65,7 @@ class PlaybackWebBridge(private val webView: WebView) {
             put("id", item?.mediaId.orEmpty())
             put("title", item?.mediaMetadata?.title?.toString().orEmpty())
             put("artist", item?.mediaMetadata?.artist?.toString().orEmpty())
+            put("feed", item?.mediaMetadata?.extras?.getString("feed").orEmpty())
             put("artwork", item?.let { coverArt.webArtwork(it.mediaMetadata) }.orEmpty())
             put("playing", player?.isPlaying == true && !chartPending)
             put("pending", player?.playWhenReady == true && (chartPending || player.playbackState == Player.STATE_BUFFERING))

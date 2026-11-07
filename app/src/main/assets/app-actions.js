@@ -52,7 +52,7 @@
     if(track.id.startsWith('drive:')) N.resumeDriveTrack(track.id.slice(6),track.title||'',track.artist||'',0);
     else if(track.id.startsWith('spotify:')) N.playTurkeyChartQueue(JSON.stringify([{title:track.title,artist:track.artist}]),0);
     else if(track.id.startsWith('local:')) A.playSavedTrack(JSON.stringify(track),enqueue);
-    else if(track.id.startsWith('podcast:')) { if(profileState().role==='child'&&track.feed){A.resumePodcast(track.feed,track.id,0);return;} if(track.feed){sessionStorage.setItem('xm-feed',track.feed);go('podcast_program_ve_b_l_m_detay');}else N.showToast('Podcast kaynağını aç.'); }
+    else if(track.id.startsWith('podcast:')) {if(track.feed)podResume(track);else N.showToast('Podcast kaynağını aç.');}
     else if(track.id.startsWith('experimental:')||track.id.startsWith('drive-source:')) {
       const id=track.id.split(':')[1];N.playExperimentalSource(id,track.title||'',track.artist||'');
     }
@@ -543,305 +543,218 @@
     else tracks.forEach(t=>panel.append(trackRow(t)));
     document.querySelectorAll('nav a').forEach(a=>{if(!['ana-sayfa','kitapligim'].includes(a.dataset.path))a.style.display='none';});
   }
-  let rssRequest=0, downloadSnapshot='';
-  let podcastRequest=0, podcastQuery='', podcastTimer;
+  let rssRequest=Number(sessionStorage.getItem('xm-pod-rss-sequence'))||0, downloadSnapshot='';
+  // Podcast ekranları aynı RSS, profil ve Media3 köprüsünü kullanır.
+  let podcastRequest=Number(sessionStorage.getItem('xm-pod-search-sequence'))||0, podcastQuery='', podcastTimer;
+  const podSearchCallbacks=new Map(),podRssCallbacks=new Map();
   function openFeed(feed){
     if(!feed.url){sessionStorage.setItem('xm-podcast-search',feed.title||'');go('podcast_merkezi');N.showToast('Podcast kaynağını arayıp seç.');return;}
-    sessionStorage.setItem('xm-feed',feed.url);
-    sessionStorage.setItem('xm-feed-info',JSON.stringify(feed));
-    go('podcast_program_ve_b_l_m_detay');
+    sessionStorage.setItem('xm-feed',feed.url);sessionStorage.setItem('xm-feed-info',JSON.stringify(feed));go('podcast_program_ve_b_l_m_detay');
   }
   function toggleFeed(feed,control){
-    const previous=library.feeds.slice();
-    const index=library.feeds.findIndex(f=>f.url===feed.url);
-    if(index<0)library.feeds.push(feed);else library.feeds.splice(index,1);
-    if(!save()){library.feeds=previous;return;}
-    control.textContent=index<0?'Takibi Bırak':'Takip Et';
+    const previous=library.feeds.slice(),index=library.feeds.findIndex(f=>f.url===feed.url);
+    if(index<0)library.feeds.push({...feed});else library.feeds.splice(index,1);
+    if(!save()){library.feeds=previous;return false;}
+    if(control){control.textContent=index<0?'Takibi Bırak':'Takip Et';control.setAttribute('aria-pressed',String(index<0));}return true;
   }
-  function renderPodcasts() {
-    const main=document.querySelector('main'),host=main?.firstElementChild;
-    if(!host||host.children.length<5)return;
-    const [header,recent,children,followSection,episodeSection]=Array.from(host.children);
-    // Çocuklara uygunluk doğrulanana kadar örnek güvenlik kartlarını gösterme.
-    children.style.display='none';
-    const chips=document.getElementById('podcast-chips');
-    const nav=document.querySelector('nav');if(nav)nav.querySelectorAll('a[data-path]').forEach(a=>{
-      const active=a.dataset.path==='podcast';a.classList.toggle('text-primary',active);a.classList.toggle('font-bold',active);a.classList.toggle('text-on-surface-variant',!active);
-      if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');
-    });
-    function own(el,fn){
-      if(!el)return;el.dataset.xmOwned='true';delete el.dataset.xmBlocked;el.removeAttribute('aria-disabled');el.disabled=false;el.querySelector('small')?.remove();el.__xmOwnedRun=fn;
-    }
-    const followHeading=followSection.querySelector('h2');if(followHeading)followHeading.textContent='Takip Ettiklerim';
-    const followContainer=followSection.children[1],cardTemplate=followContainer?.firstElementChild?.cloneNode(true);
-    followContainer.id='xm-podcast-following';
-    const allLink=followSection.querySelector('button');if(allLink)allLink.style.display='none';
-    const sectionHeading=episodeSection.querySelector('h2');if(sectionHeading)sectionHeading.textContent='Son Dinlenen Bölümler';
-    const episodeHeader=sectionHeading?.parentElement?.querySelector('p');if(episodeHeader)episodeHeader.textContent='Dinleme geçmişinden';
-    const sorting=episodeSection.querySelector('[aria-label="Sıralama"]');if(sorting)sorting.style.display='none';
-    const episodeList=episodeSection.children[1];
-    function savedFeed(track){
-      return library.feeds.find(f=>f.url===track.feed)||{url:track.feed,title:track.artist||'Podcast',artwork:track.artwork||''};
-    }
-    function recentSection(){
-      const history=library.history.filter(t=>t.id?.startsWith('podcast:')&&t.feed);
-      const old=recent.children[1];
-      if(old)old.remove();
-      const card=create('div',undefined,'relative overflow-hidden rounded-2xl bg-surface-container-high p-4 flex flex-col gap-3.5 shadow-lg');
-      if(history.length){
-        const t=history[0],layout=create('div',undefined,'flex items-center gap-3');
-        const image=create('img');image.className='w-16 h-16 rounded-xl object-cover bg-surface-container-lowest';
-        setArtwork(image,t.artwork);
-        const labels=create('div',undefined,'flex flex-col min-w-0');
-        labels.append(create('strong',t.title,'font-headline-sm text-headline-sm text-on-surface'),create('p',t.artist||'Podcast','text-body-sm text-on-surface-variant'));
-        layout.append(image,labels);card.append(layout);
-        const open=button('Programı Aç',()=>openFeed(savedFeed(t)));open.className='self-end px-5 py-2 rounded-full bg-primary text-on-primary font-label-md';card.append(open);
-      }else card.append(create('p','Henüz podcast dinlemedin.','text-body-sm text-on-surface-variant'));
-      recent.append(card);
-      episodeList.replaceChildren();
-      if(!history.length){episodeList.append(create('p','Dinlediğin bölümler burada görünecek.','text-body-sm text-on-surface-variant'));return;}
-      history.slice(0,10).forEach(t=>{
-        const card=create('div',undefined,'flex items-center gap-3 p-3 rounded-2xl bg-surface-container-low');
-        const art=create('img');art.className='w-14 h-14 rounded-xl object-cover bg-surface-container';setArtwork(art,t.artwork);
-        const text=create('div',undefined,'flex flex-col min-w-0 flex-1');
-        text.append(create('strong',t.title||'Bölüm','font-label-lg text-label-lg text-on-surface'),create('span',t.artist||'Podcast','text-body-sm text-on-surface-variant'));
-        const open=button('Programı Aç',()=>openFeed(savedFeed(t)));open.className='px-3 py-2 rounded-full bg-primary text-on-primary font-label-md';
-        card.append(art,text,open);episodeList.append(card);
-      });
-    }
-    recentSection();
-    (library.spotifyPreferences?.podcastEvents || []).slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30).forEach(item=>{
-      const row=button(item.title+' · '+item.artist,()=>{const feed=library.feeds.find(f=>f.title===item.artist);if(feed)openFeed(feed);else {podcastQuery=item.artist;renderPodcasts();}});
-      row.className='w-full text-left p-3 rounded-xl bg-surface-container-low text-on-surface';episodeList.append(row);
-    });
-    const searchSection=create('section',undefined,'flex flex-col gap-2');
-    const form=create('form',undefined,'flex items-center gap-2');
-    const input=create('input');input.id='xm-podcast-search';input.type='search';input.maxLength=100;input.value=sessionStorage.getItem('xm-podcast-search')||podcastQuery;sessionStorage.removeItem('xm-podcast-search');
-    input.placeholder='Program adı veya yayıncı ara…';input.setAttribute('aria-label','Podcast ara');
-    input.className='w-full rounded-full bg-surface-container px-4 py-3 text-body-md text-on-surface focus:outline-none';
-    const submit=button('Ara',()=>searchNow());submit.className='px-4 py-2 rounded-full bg-primary text-on-primary font-label-md';
-    const clear=button('×',()=>{input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();});
-    clear.setAttribute('aria-label','Podcast aramasını temizle');clear.className='w-10 h-10 rounded-full bg-surface-container-high text-on-surface';
-    form.append(input,submit,clear);searchSection.append(form);
-    const results=create('div');results.id='xm-podcast-results';results.setAttribute('aria-live','polite');results.className='flex flex-col gap-3';
-    searchSection.append(results);
-    const extra=create('div',undefined,'flex gap-3 flex-wrap');
-    const rss=button('RSS Kaynağı Ekle',()=>editName('HTTPS RSS adresi','',address=>{
-      try {const url=new URL(address);if(url.protocol!=='https:')throw Error();}
-      catch(_){N.showToast('Geçerli bir HTTPS RSS adresi gir.');return;}
-      const feed={url:address,title:address};
-      if(!library.feeds.some(f=>f.url===address))library.feeds.push(feed);
-      if(save())openFeed(feed);
-    }));
-    const downloads=button('İndirilen Bölümler',()=>go('i_ndirme_y_neticisi'));
-    [rss,downloads].forEach(b=>{b.className='px-3 py-2 rounded-full bg-surface-container-high text-on-surface-variant font-label-md';extra.append(b);});
-    searchSection.append(extra);header.insertAdjacentElement('afterend',searchSection);
-    let currentQuery='';
-    function searchNow(){
-      clearTimeout(podcastTimer);
-      const query=input.value.trim();podcastQuery=query;const id=++podcastRequest;currentQuery=query;
-      results.replaceChildren();
-      if(query.length<2){results.textContent=query?'En az iki karakter yaz.':'';return;}
-      results.textContent='Podcast’ler aranıyor…';A.searchPodcasts(query,id);
-    }
-    form.addEventListener('submit',e=>{e.preventDefault();searchNow();});
-    input.addEventListener('input',()=>{
-      clearTimeout(podcastTimer);++podcastRequest;podcastQuery=input.value.trim();
-      if(podcastQuery.length<2){results.textContent=podcastQuery?'En az iki karakter yaz.':'';return;}
-      results.textContent='Podcast’ler aranıyor…';podcastTimer=setTimeout(searchNow,650);
-    });
-    if(chips)Array.from(chips.querySelectorAll('button')).forEach((chip,index)=>{
-      if(index===2){chip.style.display='none';return;}
-      own(chip,()=>{
-        chips.querySelectorAll('button').forEach(b=>{const active=b===chip;b.classList.toggle('bg-primary',active);b.classList.toggle('text-on-primary',active);b.classList.toggle('bg-surface-container-high',!active);b.classList.toggle('text-on-surface-variant',!active);});
-        input.value=index===0?'':chip.textContent.trim();input.dispatchEvent(new Event('input',{bubbles:true}));
-      });
-    });
-    function makeCard(feed,appleUrl){
-      if(!cardTemplate)return create('div');
-      const card=cardTemplate.cloneNode(true);
-      const image=card.querySelector('img');setArtwork(image,feed.artwork);
-      card.querySelectorAll('span.absolute').forEach(s=>s.style.display='none');
-      const name=card.querySelector('h3');if(name)name.textContent=feed.title||'Podcast';
-      const artist=card.querySelector('p');if(artist)artist.textContent=[feed.artist,feed.genre].filter(Boolean).join(' · ');
-      const open=card.querySelector('[aria-label="Hızlı Dinle"]');if(open){open.setAttribute('aria-label','Bölümleri Aç');own(open,()=>openFeed(feed));}
-      const follow=card.querySelector('.podcast-follow-btn');
-      if(follow){follow.textContent=library.feeds.some(f=>f.url===feed.url)?'Takibi Bırak':'Takip Et';own(follow,()=>{toggleFeed(feed,follow);drawFollowed();});}
-      if(appleUrl){const link=button('Apple Podcasts’te Gör',()=>A.openPodcastPage(appleUrl));link.className='text-label-sm text-on-surface-variant';card.append(link);}
-      return card;
-    }
-    function drawFollowed(){
-      followContainer.replaceChildren();
-      if(!library.feeds.length){followContainer.append(create('p','Henüz takip ettiğin program yok.','text-body-sm text-on-surface-variant'));return;}
-      library.feeds.forEach(feed=>followContainer.append(makeCard(feed,'')));
-    }
-    window.__xmusicPodcastSearchResult=(id,payload)=>{
-      if(id!==podcastRequest||currentQuery!==input.value.trim())return;
-      results.replaceChildren();
-      if(payload.error){results.append(create('p',payload.error),button('Tekrar Dene',searchNow));return;}
-      if(!payload.items?.length){results.textContent='Açık RSS kaynağı olan program bulunamadı.';return;}
-      const label=create('h2','Arama Sonuçları','font-headline-sm text-headline-sm text-on-surface');
-      const grid=create('div',undefined,'flex gap-4 overflow-x-auto no-scrollbar pb-2');
-      payload.items.forEach(item=>grid.append(makeCard({url:item.feed,title:item.title,artist:item.artist,artwork:item.artwork,genre:item.genre},item.url)));
-      results.append(label,grid);
-    };
-    drawFollowed();
-    if(podcastQuery.length>=2)searchNow();
+  function podSearch(query,callback){const id=++podcastRequest;sessionStorage.setItem('xm-pod-search-sequence',String(id));podSearchCallbacks.set(id,callback);A.searchPodcasts(query,id);return id;}
+  function podRss(feed,callback){const id=++rssRequest;sessionStorage.setItem('xm-pod-rss-sequence',String(id));podRssCallbacks.set(id,callback);A.loadRss(feed,id);return id;}
+  function installPodCallbacks(){
+    window.__xmusicPodcastSearchResult=(id,payload)=>{const cb=podSearchCallbacks.get(id);podSearchCallbacks.delete(id);if(cb)cb(payload);};
+    window.__xmusicRssResult=(id,payload)=>{const cb=podRssCallbacks.get(id);podRssCallbacks.delete(id);if(cb)cb(payload);};
   }
-  function renderFeed(){
-    const main=document.querySelector('main');if(!main)return;
-    const address=sessionStorage.getItem('xm-feed');
-    let info={url:address,title:'Podcast'};
-    try{const saved=JSON.parse(sessionStorage.getItem('xm-feed-info')||'null');if(saved?.url===address)info=saved;}catch(_){}
-    const identity=main.querySelector('.relative.z-10.flex.flex-col.items-center.text-center');
-    const hero=main.querySelector('section.mt-6');
-    const all=main.querySelector('section.mt-8');
-    const filters=document.getElementById('filterContainer');
-    if(!identity||!hero||!all||!filters)return;
-    const list=filters.nextElementSibling;
-    const follow=document.getElementById('followBtn'),followText=document.getElementById('followText');
-    const cover=identity.querySelector('img'),title=identity.querySelector('h2'),artist=title?.nextElementSibling;
-    const coverBadge=cover?.parentElement?.querySelector('span');if(coverBadge)coverBadge.style.display='none';
-    const tags=title?.previousElementSibling;
-    const category=tags?.children[0],rating=tags?.children[1],count=tags?.children[2];
-    if(rating)rating.style.display='none';
-    if(category){category.textContent=info.genre||'';category.hidden=!info.genre;}
-    if(count)count.textContent='';
-    if(title)title.textContent=info.title&&info.title!==address?info.title:'Podcast';
-    if(artist)artist.textContent=info.artist||'';
-    function coverImage(img){
-      if(!img)return;
-      setArtwork(img,info.artwork);
-      img.alt='';img.style.background='#262a2e';
-    }
-    coverImage(cover);
-    const desc=document.getElementById('showDescription'),descToggle=document.getElementById('toggleDescBtn');
-    if(desc)desc.textContent='Program bilgileri yükleniyor…';
-    const bell=document.getElementById('bellBtn');if(bell)bell.style.display='none';
-    const more=follow?.parentElement?.querySelector('[aria-label="Seçenekler"]');if(more)more.style.display='none';
-    function own(node,fn){
-      if(!node)return;
-      node.dataset.xmOwned='true';delete node.dataset.xmBlocked;node.removeAttribute('aria-disabled');
-      node.disabled=false;node.title='';node.querySelector('small')?.remove();node.__xmOwnedRun=fn;
-    }
-    function updateFollow(){
-      if(followText)followText.textContent=library.feeds.some(f=>f.url===address)?'Takip Ediliyor':'Takip Et';
-      follow?.setAttribute('aria-pressed',String(library.feeds.some(f=>f.url===address)));
-    }
-    own(follow,()=>{toggleFeed(info,followText);updateFollow();});
-    updateFollow();
-    if(follow&&!address)follow.style.display='none';
-    if(descToggle){descToggle.style.display='none';own(descToggle,()=>{
-      const expanded=desc.classList.toggle('line-clamp-2')===false;
-      descToggle.querySelector('span:first-child').textContent=expanded?'Daha Az Gör':'Devamını Gör';
-      descToggle.querySelector('.material-symbols-outlined').textContent=expanded?'expand_less':'expand_more';
-    });}
-
-    // Orijinal mini oynatıcının alanları gerçek Media3 durum köprüsüyle eşleşir.
+  const podIconPaths={play_arrow:'M8 5v14l11-7z',pause:'M6 5h4v14H6zM14 5h4v14h-4z',download:'M11 3h2v10l4-4 1.4 1.4L12 17l-6.4-6.6L7 9l4 4zM4 19h16v2H4z',search:'M10 2a8 8 0 1 0 4.9 14.3L21 22l1-1-5.7-6.1A8 8 0 0 0 10 2zm0 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12z',close:'M6 4.6 12 10.6 18 4.6 19.4 6 13.4 12 19.4 18 18 19.4 12 13.4 6 19.4 4.6 18 10.6 12 4.6 6z',check:'M9 16.2 4.8 12 3.4 13.4 9 19 21 7 19.6 5.6z',more_horiz:'M5 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4z'};
+  function podSetIcon(control,icon){control?.querySelector('svg path')?.setAttribute('d',podIconPaths[icon]||podIconPaths.play_arrow);}
+  function podIcon(label,icon,fn,primary=false){
+    const b=button('',fn);b.className='xm-pod-icon'+(primary?' xm-pod-play':'');b.setAttribute('aria-label',label);b.title=label;
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'),path=document.createElementNS('http://www.w3.org/2000/svg','path');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('width','23');svg.setAttribute('height','23');svg.setAttribute('fill','currentColor');svg.setAttribute('aria-hidden','true');path.setAttribute('d',podIconPaths[icon]||podIconPaths.play_arrow);svg.append(path);b.append(svg);return b;
+  }
+  function podImage(address,cls=''){const img=create('img',undefined,cls);img.loading='lazy';img.decoding='async';setArtwork(img,address);return img;}
+  function podSection(root,title,subtitle=''){const section=create('section',undefined,'xm-pod-section');section.append(create('h2',title));if(subtitle)section.append(create('p',subtitle,'xm-pod-muted'));root.append(section);return section;}
+  function podDate(value){const d=new Date(value);return !value||isNaN(d.getTime())?'':d.toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric'});}
+  function podDuration(value){if(!value)return '';if(/^\d+$/.test(String(value)))return Math.ceil(Number(value)/60)+' dk';return value;}
+  function podProgress(id){return library.podcastProgress?.[id] || (library.resume?.id===id?library.resume:null) || {};}
+  function podCompleted(id){const p=podProgress(id);return !!p.completed||(p.duration>0&&p.position/p.duration>=.98);}
+  function podPartial(id){const p=podProgress(id);return p.position>0&&!podCompleted(id);}
+  function podDownloads(){try{return JSON.parse(A.listDownloads()||'[]').filter(d=>d.status===8);}catch(_){return [];}}
+  function podResume(item){
+    if(state.id===item.id){N.togglePlayPause();return;}
+    const p=podProgress(item.id);A.resumePodcast(item.feed,item.id,podCompleted(item.id)?0:p.position||0);
+  }
+  function podMount(){
+    installPodCallbacks();
+    const main=document.querySelector('main');if(!main)return null;
     const mini=main.querySelector('aside');
     if(mini){
-      const image=mini.querySelector('img'),box=image?.parentElement;
-      if(box){box.classList.add('w-12','h-12');box.style.cssText='width:48px;height:48px;overflow:hidden;border-radius:12px;';}
-      const miniTitle=mini.querySelector('.text-label-lg');
-      const miniArtist=mini.querySelector('.text-body-sm');
-      [miniTitle,miniArtist].forEach(node=>{if(node&&node.tagName!=='P'){const p=create('p',node.textContent,node.className);node.replaceWith(p);}});
-      const miniPlay=document.getElementById('miniPlayBtn');
-      if(miniPlay)miniPlay.setAttribute('aria-label','Oynat veya Duraklat');
+      ['.text-label-lg','.text-body-sm'].forEach(sel=>{const n=mini.querySelector(sel);if(n&&n.tagName!=='P'){const p=create('p',n.textContent,n.className);n.replaceWith(p);}});
+      mini.querySelectorAll('span.absolute,[aria-label="Cihaza Bağlan"]').forEach(n=>n.remove());
+      const play=mini.querySelector('#miniPlayBtn');if(play)play.setAttribute('aria-label','Oynat veya Duraklat');
+      mini.style.maxWidth='720px';mini.style.borderRadius='14px';
     }
-
-    hero.style.display='none';list.replaceChildren();
-    const message=create('p','Bölümler yükleniyor…');message.style.cssText='color:#bbcbb8;padding:12px 0;font-size:13px;';
-    all.appendChild(message);
-    const filterButtons=Array.from(filters.querySelectorAll('button'));
-    const filterNames=['Tümü','İndirilenler','Henüz Dinlenmeyenler'];
-    let chosen=0,episodes=[];
-    function downloadStates(){
-      try{return JSON.parse(A.listDownloads()||'[]').filter(x=>x.status===8);}catch(_){return [];}
+    main.replaceChildren();const root=create('div',undefined,'xm-pod');main.append(root);if(mini)main.append(mini);
+    const title=document.querySelector('header h1');if(title)title.textContent='Podcast';
+    document.body.classList.add('xm-pod-page');
+    document.querySelectorAll('nav a[data-path]').forEach(a=>{const active=a.dataset.path==='podcast';a.classList.toggle('text-primary',active);if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
+    if(!document.getElementById('xm-pod-style')){
+      const css=create('style');css.id='xm-pod-style';css.textContent=`
+      body.xm-pod-page,body.xm-pod-page main{background:#101111!important;color:#f7f7f7}body.xm-pod-page main{padding-bottom:0!important}.xm-pod,.xm-pod *{box-sizing:border-box}.xm-pod{font-family:Inter,system-ui,sans-serif;padding:24px 18px 160px;width:100%;max-width:1080px;margin:auto;font-size:14px;line-height:1.5}.xm-pod h1{font-size:32px;font-weight:800;letter-spacing:-.8px}.xm-pod h2{font-size:22px;font-weight:750;letter-spacing:-.4px}.xm-pod h3{font-size:16px;font-weight:700}.xm-pod p{margin:0}.xm-pod-muted{color:#a7afad;font-size:13px}.xm-pod-section{margin:28px 0}.xm-pod-section>h2{margin-bottom:12px}.xm-pod-section>p{margin-top:-5px;margin-bottom:14px}.xm-pod button,.xm-pod input,.xm-pod select{font:inherit}.xm-pod button{cursor:pointer;-webkit-tap-highlight-color:transparent}.xm-pod button:focus-visible,.xm-pod input:focus-visible,.xm-pod select:focus-visible{outline:2px solid #43ed80;outline-offset:3px}.xm-pod button:disabled{opacity:.4}.xm-pod-icon{border:0;background:transparent;color:#c4cbc8;min-width:44px;min-height:44px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}.xm-pod-play{background:#23df68;color:#06180d}.xm-pod-play .material-symbols-outlined{font-size:27px;font-variation-settings:'FILL' 1}.xm-pod-chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:4px 1px 10px}.xm-pod-chip{border:0;background:#292c2b;color:#eee;border-radius:24px;padding:10px 16px;white-space:nowrap;min-height:44px}.xm-pod-chip[aria-pressed=true]{background:#23df68;color:#092111;font-weight:700}.xm-pod-search{display:flex;gap:8px;align-items:center;margin:16px 0}.xm-pod input{min-width:0;width:100%;padding:13px 15px;background:#252928;border:1px solid transparent;border-radius:12px;color:white}.xm-pod-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.xm-pod-cover{width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px;background:#222}.xm-pod-follow{position:relative;min-width:0}.xm-pod-follow>button:first-child{width:100%;text-align:left;border:0;background:transparent;color:#fff}.xm-pod-follow strong{display:block;font-size:12px;margin-top:6px;line-height:1.4}.xm-pod-follow .xm-pod-icon{position:absolute;right:4px;top:4px;background:#101111bb;min-width:32px;min-height:32px}.xm-pod-add{border:1px dashed #65716a!important;border-radius:12px;aspect-ratio:1;background:#1c211f!important;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#c8d3cd!important}.xm-pod-rail{display:flex;gap:14px;overflow-x:auto;padding:2px 0 14px;scroll-snap-type:x proximity;scrollbar-width:thin}.xm-pod-rail>.xm-pod-program{flex:0 0 156px;scroll-snap-align:start}.xm-pod-program{border:0;background:#191d1b;border-radius:14px;overflow:hidden;padding:12px;min-width:0;color:#fff}.xm-pod-program>button:first-child{background:none;border:0;color:inherit;text-align:left;width:100%}.xm-pod-program .xm-pod-chip{margin-top:12px;padding:7px 12px;min-height:38px;font-size:12px}.xm-pod-program h3{margin:10px 0 2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.xm-pod-categories{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}.xm-pod-category-rail{display:flex!important;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin}.xm-pod-category-rail>button{flex:0 0 150px}.xm-pod-category{border:0;border-radius:12px;color:#fff;text-align:left;padding:18px 14px;min-height:76px;font-weight:750!important}.xm-pod-episodes{display:flex;flex-direction:column;gap:12px}.xm-pod-episode{background:#191d1b;border-radius:16px;padding:15px}.xm-pod-episode-top{display:flex;gap:12px;align-items:start}.xm-pod-episode-top img{width:64px;height:64px;border-radius:9px;flex:none}.xm-pod-copy{min-width:0;flex:1}.xm-pod-copy h3,.xm-pod-copy h4{font-size:15px;font-weight:700;line-height:1.45;overflow-wrap:anywhere}.xm-pod-description{color:#a7afad;font-size:13px;margin-top:10px!important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.xm-pod-actions{display:flex;align-items:center;justify-content:space-between;margin-top:10px;gap:8px}.xm-pod-actions>div{display:flex;gap:3px;flex-shrink:0}.xm-pod-actions>span{min-width:0;flex:1;line-height:1.5}.xm-pod h1,.xm-pod h2,.xm-pod h3,.xm-pod h4{margin-top:0}.xm-pod-section h2{overflow-wrap:anywhere}.xm-pod-progress{height:3px;background:#3b4540;border-radius:4px;overflow:hidden;margin-top:12px}.xm-pod-progress>i{height:100%;display:block;background:#23df68}.xm-pod-episode[data-playing=true] h3,.xm-pod-episode[data-playing=true] h4{color:#23df68}.xm-pod-hero{padding:22px 18px 25px;margin:-24px -18px 12px;text-align:center;background:linear-gradient(#17443f,#101111);border-radius:0 0 22px 22px}.xm-pod-hero>img{width:190px;height:190px;border-radius:14px;box-shadow:0 15px 35px #0005;margin:0 auto 22px;will-change:transform}.xm-pod-hero h2{font-size:28px;line-height:1.2;margin-bottom:12px}.xm-pod-hero .xm-pod-chip{margin-top:15px}.xm-pod-tabs{display:flex;position:sticky;top:64px;z-index:12;background:#101111f5;border-bottom:1px solid #323733;gap:18px;overflow-x:auto}.xm-pod-tabs button{background:none;border:0;border-bottom:3px solid transparent;color:#a7afad;white-space:nowrap;padding:14px 0}.xm-pod-tabs button[aria-selected=true]{border-color:#23df68;color:#fff;font-weight:700}.xm-pod-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:14px 0}.xm-pod-toolbar select{background:#292c2b;color:#fff;border:0;border-radius:22px;padding:12px;min-height:44px}.xm-pod-empty{padding:22px 0;color:#a7afad}.xm-pod-backtop{position:fixed;bottom:160px;left:50%;transform:translateX(-50%);z-index:30;background:#f3f7f4;color:#131b16;border:0;border-radius:30px;padding:10px 18px;box-shadow:0 4px 20px #0006;font-size:13px}.xm-pod-backtop[hidden],.xm-pod [hidden]{display:none!important}.xm-pod-page header{background:#101111ed;transition:background-color .2s}.xm-pod-page.xm-pod-scrolled header{background:#15352df5}.xm-pod-page.xm-pod-scrolled header h1{font-size:15px}.xm-pod-picker{max-width:720px!important;background:#101111!important;border:1px solid #414a44!important}.xm-pod-picker .xm-pod{padding:0 0 16px}.xm-pod-picker .xm-pod-section{margin:18px 0}.xm-pod-picker .xm-pod-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.xm-pod-picker footer{position:sticky;bottom:-20px;background:#101111;padding:12px 0}.xm-pod-picker footer button{width:100%;background:#23df68;color:#092111;border:0;border-radius:26px;padding:12px;font-weight:750}.xm-pod-page header img{flex-shrink:0}@media(min-width:650px){.xm-pod{padding:28px 28px 160px}.xm-pod-grid{grid-template-columns:repeat(6,minmax(0,1fr))}.xm-pod-categories{grid-template-columns:repeat(4,minmax(0,1fr))}.xm-pod-episodes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.xm-pod-hero{margin:-28px -28px 12px}.xm-pod-hero>img{width:230px;height:230px}.xm-pod-rail>.xm-pod-program{flex-basis:190px}}@media(prefers-reduced-motion:reduce){.xm-pod-hero>img{transform:none!important;opacity:1!important}.xm-pod-page header{transition:none}}`;
+      document.head.append(css);
     }
-    function isDownloaded(item){return downloadStates().some(d=>d.id===item.id);}
-    function play(item){
-      if(isDownloaded(item))A.playDownload(item.id);
-      else A.playPodcast(item.id,false);
+    try{const native=JSON.parse(A.loadPlaybackResume()||'{}');if(native.id&&(!library.resume||native.updatedAt>library.resume.updatedAt))library.resume=native;}catch(_){}
+    return root;
+  }
+  function podProgram(feed,onChange){
+    const card=create('article',undefined,'xm-pod-program'),open=button('',()=>openFeed(feed));open.setAttribute('aria-label','Bölümleri Aç');
+    open.append(podImage(feed.artwork,'xm-pod-cover'),create('h3',feed.title||'Podcast'),create('p',feed.artist||feed.genre||'','xm-pod-muted'));
+    const follow=button('',()=>{if(toggleFeed(feed,follow))onChange?.();});follow.className='xm-pod-chip';follow.textContent=library.feeds.some(f=>f.url===feed.url)?'Takibi Bırak':'Takip Et';follow.setAttribute('aria-pressed',String(library.feeds.some(f=>f.url===feed.url)));
+    card.append(open,follow);return card;
+  }
+  function podEpisode(item,play,onDownload,featured=false){
+    const card=create('article',undefined,'xm-pod-episode');card.dataset.episode=item.id;card.dataset.playing=String(state.id===item.id);
+    const top=create('div',undefined,'xm-pod-episode-top'),text=create('div',undefined,'xm-pod-copy');
+    text.append(create('h4',item.title||'Bölüm'),create('p',item.artist||'','xm-pod-muted'));
+    top.append(podImage(item.artwork),text);card.append(top);
+    if(item.description)card.append(create('p',item.description,'xm-pod-description'));
+    const p=podProgress(item.id),details=[podDate(item.published),podDuration(item.duration)];
+    if(podCompleted(item.id))details.push('Dinlendi');else if(p.duration>p.position&&p.position>0)details.push(Math.ceil((p.duration-p.position)/60000)+' dk kaldı');
+    const actions=create('div',undefined,'xm-pod-actions'),controls=create('div');
+    controls.append(podIcon('Bölüm işlemleri','more_horiz',()=>modal('Bölüm işlemleri',(panel,close)=>{
+      panel.append(create('h3',item.title||'Bölüm'),button('Sıraya Ekle',()=>{A.playPodcast(item.id,true);close();}),button('Listeye Ekle',()=>{close();addToPlaylist(item);}),button(podCompleted(item.id)?'Dinlenmedi olarak işaretle':'Dinlendi olarak işaretle',()=>{
+        library.podcastProgress||={};library.podcastProgress[item.id]={...p,completed:!podCompleted(item.id),position:0,updatedAt:Date.now()};save();close();window.__xmusicPodcastRefresh?.();
+      }));
+    })),podIcon('İndir','download',()=>onDownload?onDownload():A.downloadPodcast(item.id)),podIcon('Oynat','play_arrow',play,true));
+    actions.append(create('span',details.filter(Boolean).join(' · '),'xm-pod-muted'),controls);card.append(actions);
+    if(state.id===item.id&&state.playing)podSetIcon(controls.querySelector('[aria-label="Oynat"]'),'pause');
+    const progress=create('div',undefined,'xm-pod-progress'),bar=create('i');bar.style.width=(p.duration>0?Math.min(100,p.position/p.duration*100):podCompleted(item.id)?100:0)+'%';progress.append(bar);card.append(progress);
+    if(featured)tintFromArtwork(card,item.artwork);return card;
+  }
+  const podCategories=[['Bilim ve Teknoloji','Bilim teknoloji','#215b79'],['Kültür ve Sanat','Kültür sanat','#9a611f'],['Komedi','Komedi','#685081'],['Haber ve Gündem','Haber gündem','#863537'],['Tarih','Tarih','#663e8c'],['Kişisel Gelişim','Kişisel gelişim','#266c60'],['İş ve Ekonomi','Ekonomi','#98512a'],['Öykü ve Edebiyat','Edebiyat','#7b3659']];
+  function podGenreQuery(genre){const value=(genre||'').toLocaleLowerCase('tr');return /comedy|komedi/.test(value)?'Komedi':/techn|bilim|science/.test(value)?'Bilim teknoloji':/histor|tarih/.test(value)?'Tarih':/news|haber/.test(value)?'Haber gündem':/business|ekonomi/.test(value)?'Ekonomi':/art|kültür|culture/.test(value)?'Kültür sanat':genre||'Türkçe podcast';}
+  function podPreferredGenre(){
+    const scores=new Map();library.feeds.forEach(feed=>{
+      if(!feed.genre)return;let score=2+library.history.filter(t=>t.feed===feed.url).length;
+      score+=(library.spotifyPreferences?.podcastEvents||[]).filter(t=>t.artist===feed.title).length;
+      scores.set(feed.genre,(scores.get(feed.genre)||0)+score);
+    });return [...scores].sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
+  }
+  function renderPodcasts(){
+    const root=podMount();if(!root)return;
+    let filter='all',searchGeneration=0;
+    root.append(create('h1','Podcast'));
+    const chips=create('div',undefined,'xm-pod-chips');chips.id='podcast-chips';root.append(chips);
+    const following=podSection(root,'Takip ettiklerin'),followingGrid=create('div',undefined,'xm-pod-grid');followingGrid.id='xm-podcast-following';following.append(followingGrid);
+    const searchArea=podSection(root,'Yeni bir şey keşfet'),form=create('form',undefined,'xm-pod-search'),input=create('input');input.type='search';input.id='xm-podcast-search';input.maxLength=100;input.placeholder='Program adı veya yayıncı ara';input.setAttribute('aria-label','Podcast ara');
+    const submit=podIcon('Ara','search',searchNow),clear=podIcon('Podcast aramasını temizle','close',()=>{input.value='';searchNow();});form.append(input,submit,clear);searchArea.append(form);
+    const results=create('div');results.id='xm-podcast-results';results.setAttribute('aria-live','polite');searchArea.append(results);
+    const categoryGrid=create('div',undefined,'xm-pod-categories xm-pod-category-rail');searchArea.append(categoryGrid);
+    podCategories.forEach(([label,term,color])=>{const b=button(label,()=>{input.value=term;searchNow();});b.className='xm-pod-category';b.style.background=color;categoryGrid.append(b);});
+    const rss=button('RSS adresi ekle',()=>editName('HTTPS RSS adresi','',address=>{try{const u=new URL(address);if(u.protocol!=='https:')throw Error();}catch(_){N.showToast('Geçerli bir HTTPS RSS adresi gir.');return;}const f={url:address,title:address};if(!library.feeds.some(x=>x.url===address)&&toggleFeed(f))drawFollowing();openFeed(f);}));rss.className='xm-pod-chip';searchArea.append(rss);
+    const continueSection=podSection(root,'Kaldığın yerden devam et'),continueList=create('div',undefined,'xm-pod-episodes');continueSection.append(continueList);
+    const latestSection=podSection(root,'Takip ettiklerinden yeni bölümler','Yayıncıların RSS kaynaklarından'),latestList=create('div',undefined,'xm-pod-episodes');latestList.id='xm-podcast-latest';latestSection.append(latestList);
+    const recentSection=podSection(root,'Son dinlenenler'),recentList=create('div',undefined,'xm-pod-episodes');recentSection.append(recentList);
+    const recommendations=podSection(root,'Hoşuna gidebilecek programlar','Takip ettiğin kategorilerden keşif'),recommendedGrid=create('div',undefined,'xm-pod-rail');recommendations.append(recommendedGrid);
+    const recommendedEpisodes=podSection(root,'Beğenebileceğin bölümler','Dinlediğin kategorilerdeki programlardan'),recommendedEpisodeList=create('div',undefined,'xm-pod-episodes');recommendedEpisodes.append(recommendedEpisodeList);
+    root.insertBefore(continueSection,searchArea);root.insertBefore(latestSection,searchArea);root.insertBefore(recentSection,searchArea);
+    let downloads=podDownloads(),feedQueue=[],loadedFeeds=new Set(),inflight=0,latest=[],recommendationTerm='';
+    function feedFor(t){return library.feeds.find(f=>f.url===t.feed)||{url:t.feed,title:t.artist||'Podcast',artwork:t.artwork||''};}
+    function historyRow(t){const item={...t,artwork:t.artwork||feedFor(t).artwork};return podEpisode(item,()=>podResume(item));}
+    function drawSections(){
+      const history=library.history.filter(t=>t.id?.startsWith('podcast:')&&t.feed);
+      continueList.replaceChildren();history.filter(t=>podPartial(t.id)).slice(0,6).forEach(t=>continueList.append(historyRow(t)));
+      continueSection.hidden=!continueList.children.length||!['all','partial'].includes(filter);
+      recentList.replaceChildren();history.slice(0,8).forEach(t=>recentList.append(historyRow(t)));recentSection.hidden=!history.length||filter!=='all';
+      latestList.replaceChildren();let rows=latest.filter(t=>library.feeds.some(f=>f.url===t.feed));
+      if(filter==='partial')rows=rows.filter(t=>podPartial(t.id));
+      if(filter==='downloads')rows=downloads;
+      if(filter==='new')rows=rows.filter(t=>!podCompleted(t.id)&&!library.history.some(h=>h.id===t.id));
+      latestSection.querySelector('h2').textContent=filter==='downloads'?'İndirilen bölümler':filter==='partial'?'Yarım kalan bölümler':'Takip ettiklerinden yeni bölümler';
+      const shown=rows.sort((a,b)=>(Date.parse(b.published)||0)-(Date.parse(a.published)||0)).slice(0,20);
+      shown.forEach(t=>latestList.append(podEpisode(t,()=>{if(state.id===t.id){N.togglePlayPause();return;}const p=podProgress(t.id);A.playPodcastSequence(JSON.stringify(shown.map(x=>x.id)),shown.indexOf(t),podCompleted(t.id)?0:p.position||0);},undefined,true)));
+      if(!rows.length)latestList.append(create('p',inflight||feedQueue.length?'Bölümler yükleniyor…':filter==='downloads'?'Henüz indirilmiş bölüm yok.':filter==='partial'?'Yarım kalan bölüm yok.':'Program takip ettiğinde yeni bölümler burada görünecek.','xm-pod-empty'));
+      more.hidden=library.feeds.every(f=>loadedFeeds.has(f.url)||feedQueue.some(q=>q.url===f.url));
+      following.hidden=!['all','following'].includes(filter);searchArea.hidden=filter!=='all';recommendations.hidden=filter!=='all';recommendedEpisodes.hidden=filter!=='all';latestSection.hidden=filter==='following';
     }
-    function episodeButton(label,icon,fn){
-      const b=button('',fn);b.setAttribute('aria-label',label);b.title=label;
-      b.style.cssText='border:0;background:transparent;color:#bbcbb8;padding:5px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;';
-      const symbol=create('span',icon,'material-symbols-outlined');symbol.style.fontSize='21px';b.appendChild(symbol);return b;
-    }
-    function dateLabel(value){
-      if(!value)return '';
-      const date=new Date(value);return isNaN(date.getTime())?value:date.toLocaleDateString('tr-TR',{day:'numeric',month:'short',year:'numeric'});
-    }
-    function updateFilters(){
-      filterButtons.forEach((b,i)=>{
-        b.textContent=i===0?'Tümü ('+episodes.length+')':filterNames[i];
-        b.classList.toggle('bg-primary',i===chosen);b.classList.toggle('text-on-primary',i===chosen);
-        b.classList.toggle('bg-surface-container',i!==chosen);b.classList.toggle('text-on-surface-variant',i!==chosen);
-        b.setAttribute('aria-pressed',String(i===chosen));
-      });
-    }
-    function drawEpisodes(){
-      updateFilters();list.replaceChildren();
-      const downloaded=downloadStates();const played=new Set(library.history.map(t=>t.id));
-      const shown=episodes.filter(t=>chosen===0||(chosen===1?downloaded.some(d=>d.id===t.id):!played.has(t.id)));
-      message.textContent=episodes.length?(shown.length?'':'Bu filtrede bölüm yok.'):'Desteklenen ses bölümü bulunamadı.';
-      shown.forEach(t=>{
-        const card=create('article',undefined,'flex flex-col p-3 rounded-xl bg-surface-container-low transition-colors');
-        const top=create('div',undefined,'flex items-start gap-3');
-        const art=create('img');art.className='w-12 h-12 rounded-lg object-cover flex-shrink-0';coverImage(art);
-        const text=create('div',undefined,'flex-1 min-w-0');
-        const meta=create('div',undefined,'flex items-center justify-between');
-        const detail=[dateLabel(t.published),t.duration||''].filter(Boolean).join(' · ');
-        meta.append(create('span',detail,'text-label-sm font-label-sm text-on-surface-variant'));
-        if(downloaded.some(d=>d.id===t.id))meta.append(create('span','✓ İndirildi','text-primary text-label-sm'));
-        const name=create('h4',t.title||'Bölüm','text-body-lg font-body-lg text-on-surface font-semibold mt-0.5');
-        text.append(meta,name);
-        if(t.description)text.append(create('p',t.description,'text-body-sm font-body-sm text-on-surface-variant line-clamp-1 mt-0.5'));
-        top.append(art,text);card.append(top);
-        const actions=create('div',undefined,'mt-2 pt-2 flex items-center justify-end gap-3');
-        actions.append(episodeButton('Oynat','play_arrow',()=>play(t)),episodeButton('İndir','download',()=>A.downloadPodcast(t.id)),
-          episodeButton('Sıraya Ekle','playlist_add',()=>A.playPodcast(t.id,true)),episodeButton('Listeye Ekle','add',()=>addToPlaylist(t)));
-        card.append(actions);list.appendChild(card);
-      });
-    }
-    filterButtons.forEach((b,i)=>own(b,()=>{chosen=i;drawEpisodes();}));
-    updateFilters();
-    if(!address){message.textContent='Önce bir podcast programı seç.';return;}
-    const id=++rssRequest;
-    window.__xmusicRssResult=(request,payload)=>{
-      if(request!==rssRequest||(payload.feed&&payload.feed!==address))return;
-      if(payload.error){
-        message.textContent=payload.error;
-        const retry=button('Tekrar Dene',renderFeed);message.append(' ',retry);return;
+    function pumpFeeds(){
+      while(inflight<2&&feedQueue.length){const feed=feedQueue.shift();if(loadedFeeds.has(feed.url))continue;loadedFeeds.add(feed.url);inflight++;
+        podRss(feed.url,payload=>{inflight--;if(!root.isConnected)return;
+          if(!payload.error){const artwork=payload.artwork||feed.artwork||'';A.setPodcastArtwork(feed.url,artwork);let changed=false;if(payload.artwork&&feed.artwork!==payload.artwork){feed.artwork=payload.artwork;changed=true;}if(payload.title&&feed.title!==payload.title){feed.title=payload.title;changed=true;}if(changed){save();drawFollowing(false);}latest.push(...(payload.items||[]).slice(0,5).map(t=>({...t,feed:feed.url,artwork:t.artwork||artwork})));}
+          else {const note=create('p',(feed.title||'Program')+': '+payload.error,'xm-pod-muted');note.append(button('Tekrar Dene',()=>{note.remove();loadedFeeds.delete(feed.url);feedQueue.push(feed);pumpFeeds();}));latestSection.append(note);}
+          drawSections();pumpFeeds();
+        });
       }
-      info.title=payload.title||info.title;
-      if(title)title.textContent=info.title;
-      if(artist)artist.textContent=info.artist||payload.author||'';
-      if(desc)desc.textContent=payload.description||'Bu program için açıklama bulunamadı.';
-      if(descToggle)descToggle.style.display=(payload.description||'').length>150?'':'none';
-      const feed=library.feeds.find(f=>f.url===address);
-      if(feed&&feed.title!==info.title){feed.title=info.title;save();}
-      episodes=payload.items||[];
-      if(count)count.textContent=episodes.length?'• '+episodes.length+' bölüm yüklendi':'';
-      drawEpisodes();
-      if(!episodes.length)return;
-      const latest=episodes[0];hero.style.display='';
-      const heroImg=hero.querySelector('img');coverImage(heroImg);
-      const heroTitle=hero.querySelector('h3');if(heroTitle)heroTitle.textContent=latest.title||'Bölüm';
-      const heroDate=hero.querySelector('div.flex.items-center.justify-between > span');if(heroDate)heroDate.textContent=dateLabel(latest.published);
-      const heroLabel=hero.querySelector('.bg-surface-container-lowest.text-primary');if(heroLabel)heroLabel.textContent='Son bölüm';
-      const heroInfo=heroTitle?.previousElementSibling?.querySelectorAll('span');if(heroInfo?.[1])heroInfo[1].textContent=latest.duration||'';
-      const heroSubtitle=heroTitle?.nextElementSibling;if(heroSubtitle)heroSubtitle.textContent=info.artist||payload.author||'';
-      const heroDescription=hero.querySelector('p.mt-3');if(heroDescription)heroDescription.textContent=latest.description||'';
-      const heroPlay=document.getElementById('heroPlayBtn'),heroText=document.getElementById('heroPlayText');
-      if(heroText)heroText.textContent='Bölümü Oynat';
-      own(heroPlay,()=>play(latest));
-      own(document.getElementById('downloadHeroBtn'),()=>A.downloadPodcast(latest.id));
-      own(hero.querySelector('[aria-label="Sıraya Ekle"]'),()=>A.playPodcast(latest.id,true));
-      own(hero.querySelector('[aria-label="15 saniye geri sar"]'),()=>A.queueAction('back15',0,0));
-      own(hero.querySelector('[aria-label="30 saniye ileri sar"]'),()=>A.queueAction('forward30',0,0));
-    };
-    A.loadRss(address,id);
+    }
+    function loadMoreFeeds(){const unrequested=library.feeds.filter(f=>f.url&&!loadedFeeds.has(f.url)&&!feedQueue.some(q=>q.url===f.url)).slice(0,8);feedQueue.push(...unrequested);pumpFeeds();}
+    function discover(){const term=podGenreQuery(podPreferredGenre());if(recommendationTerm===term)return;recommendationTerm=term;recommendedGrid.textContent='Programlar yükleniyor…';podSearch(term,payload=>{
+      if(!root.isConnected||recommendationTerm!==term)return;recommendedGrid.replaceChildren();
+      const items=(payload.items||[]).filter(t=>!library.feeds.some(f=>f.url===t.feed));items.slice(0,10).forEach(t=>recommendedGrid.append(podProgram({url:t.feed,title:t.title,artist:t.artist,genre:t.genre,artwork:t.artwork},()=>{drawFollowing();drawSections();})));
+      recommendedEpisodeList.replaceChildren();if(!items.length)recommendedEpisodes.hidden=true;
+      items.slice(0,2).forEach(t=>podRss(t.feed,payload=>{if(!root.isConnected||recommendationTerm!==term||payload.error)return;A.setPodcastArtwork(t.feed,t.artwork||'');(payload.items||[]).slice(0,2).forEach(episode=>{const item={...episode,feed:t.feed,artwork:episode.artwork||payload.artwork||t.artwork};recommendedEpisodeList.append(podEpisode(item,()=>podResume(item),undefined,true));});}));
+      if(!items.length){recommendedGrid.append(create('p',payload.error||'Yeni program bulmak için kategorilerden birini seç.','xm-pod-muted'));if(payload.error)recommendedGrid.append(button('Tekrar Dene',()=>{recommendationTerm='';discover();}));}
+    });}
+    function drawFollowing(load=true){
+      followingGrid.replaceChildren();library.feeds.forEach(feed=>{const box=create('div',undefined,'xm-pod-follow'),open=button('',()=>openFeed(feed));open.append(podImage(feed.artwork,'xm-pod-cover'),create('strong',feed.title||'Podcast'));box.append(open,podIcon('Takibi Bırak','check',()=>{if(toggleFeed(feed)){drawFollowing();drawSections();}}));followingGrid.append(box);});
+      const add=button('',showPicker);add.className='xm-pod-add';add.setAttribute('aria-label','Podcast seç');const plus=create('span','+');plus.style.fontSize='36px';add.append(plus,create('strong','Podcast seç'));followingGrid.append(add);
+      if(load){loadMoreFeeds();discover();}
+    }
+    function searchNow(){
+      clearTimeout(podcastTimer);const query=input.value.trim(),generation=++searchGeneration;podcastQuery=query;results.replaceChildren();categoryGrid.hidden=!!query;
+      if(query.length<2){if(query)results.textContent='En az iki karakter yaz.';return;}
+      results.textContent='Podcast’ler aranıyor…';podSearch(query,payload=>{if(generation!==searchGeneration||!root.isConnected)return;results.replaceChildren();if(payload.error){results.append(create('p',payload.error),button('Tekrar Dene',searchNow));return;}
+        const rail=create('div',undefined,'xm-pod-rail');(payload.items||[]).forEach(t=>rail.append(podProgram({url:t.feed,title:t.title,artist:t.artist,artwork:t.artwork,genre:t.genre},()=>{drawFollowing();drawSections();})));results.append(rail);if(!rail.children.length)results.append(create('p','Açık RSS kaynağı olan program bulunamadı.','xm-pod-muted'));
+      });
+    }
+    function showPicker(){modal('Podcast seç',(panel,close)=>{
+      panel.classList.add('xm-pod-picker');const picker=create('div',undefined,'xm-pod'),searchForm=create('form',undefined,'xm-pod-search'),field=create('input');field.type='search';field.placeholder='Program veya konu ara';field.maxLength=100;field.setAttribute('aria-label','Podcast seçimi için ara');
+      const items=create('div',undefined,'xm-pod-grid'),categories=create('div',undefined,'xm-pod-categories');let generation=0;
+      function run(term){field.value=term;const version=++generation;items.textContent='Programlar yükleniyor…';podSearch(term,payload=>{if(version!==generation||!picker.isConnected)return;items.replaceChildren();if(payload.error){items.append(create('p',payload.error),button('Tekrar Dene',()=>run(term)));return;}(payload.items||[]).forEach(t=>{const feed={url:t.feed,title:t.title,artwork:t.artwork,artist:t.artist,genre:t.genre};items.append(podProgram(feed,()=>{drawFollowing();drawSections();}));});if(!items.children.length)items.textContent='Program bulunamadı.';});}
+      searchForm.append(field,podIcon('Ara','search',()=>{if(field.value.trim().length>=2)run(field.value.trim());}));searchForm.addEventListener('submit',e=>{e.preventDefault();if(field.value.trim().length>=2)run(field.value.trim());});
+      podCategories.forEach(([label,term,color])=>{const b=button(label,()=>run(term));b.className='xm-pod-category';b.style.background=color;categories.append(b);});
+      picker.append(searchForm,categories,items);panel.append(picker);const footer=create('footer');footer.append(button('Bitti',close));panel.append(footer);run(podGenreQuery(podPreferredGenre()));
+    });}
+    [['all','Tümü'],['following','Takip Ettiklerim'],['new','Yeni Bölümler'],['partial','Yarım Kalanlar'],['downloads','İndirilenler']].forEach(([key,label])=>{const b=button(label,()=>{filter=key;downloads=podDownloads();chips.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));drawSections();});b.className='xm-pod-chip';b.setAttribute('aria-pressed',String(key===filter));chips.append(b);});
+    const more=button('Diğer takiplerimin bölümlerini yükle',()=>{loadMoreFeeds();drawSections();});more.className='xm-pod-chip';latestSection.append(more);
+    form.addEventListener('submit',e=>{e.preventDefault();searchNow();});input.addEventListener('input',()=>{searchGeneration++;clearTimeout(podcastTimer);podcastTimer=setTimeout(searchNow,650);});
+    window.__xmusicPodcastRefresh=drawSections;drawFollowing();drawSections();
+    input.value=sessionStorage.getItem('xm-podcast-search')||podcastQuery;sessionStorage.removeItem('xm-podcast-search');if(input.value.trim().length>=2)searchNow();
+  }
+  function renderFeed(){
+    const root=podMount();if(!root)return;const address=sessionStorage.getItem('xm-feed');let info={url:address,title:'Podcast'};
+    try{const v=JSON.parse(sessionStorage.getItem('xm-feed-info')||'null');if(v?.url===address)info=v;}catch(_){}
+    const identity=create('div',undefined,'xm-pod-hero'),cover=podImage(info.artwork),title=create('h2',info.title||'Podcast'),author=create('p',info.artist||'','xm-pod-muted'),description=create('p','Program bilgileri yükleniyor…','xm-pod-description');description.id='showDescription';
+    const follow=button('',()=>{toggleFeed(info,followText);updateFollow();});follow.className='xm-pod-chip';follow.id='followBtn';const followText=create('span');followText.id='followText';follow.append(followText);
+    function updateFollow(){const active=library.feeds.some(f=>f.url===address);followText.textContent=active?'Takip Ediliyor':'Takip Et';follow.setAttribute('aria-pressed',String(active));}updateFollow();identity.append(cover,title,author,description,follow);root.append(identity);tintFromArtwork(identity,info.artwork);
+    const tabs=create('div',undefined,'xm-pod-tabs');tabs.setAttribute('role','tablist');root.append(tabs);const panels=['Bölümler','Hakkında','Benzer Programlar'].map((label,i)=>{const panel=create('section');panel.id='xm-pod-tab-'+i;panel.setAttribute('role','tabpanel');panel.hidden=i!==0;const b=button(label,()=>{panels.forEach((p,j)=>p.hidden=j!==i);tabs.querySelectorAll('button').forEach((t,j)=>{t.setAttribute('aria-selected',String(j===i));t.tabIndex=j===i?0:-1;});if(i===2)loadSimilar();});b.id='xm-pod-tab-button-'+i;b.setAttribute('role','tab');b.setAttribute('aria-selected',String(i===0));b.setAttribute('aria-controls',panel.id);panel.setAttribute('aria-labelledby',b.id);b.tabIndex=i===0?0:-1;tabs.append(b);root.append(panel);return panel;});
+    tabs.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;const buttons=[...tabs.querySelectorAll('button')],current=buttons.indexOf(document.activeElement);if(current<0)return;e.preventDefault();const next=e.key==='Home'?0:e.key==='End'?buttons.length-1:(current+(e.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;buttons[next].click();buttons[next].focus();});
+    const hero=create('section',undefined,'mt-6 xm-pod-episode');hero.style.display='none';hero.append(create('p','Son bölüm','xm-pod-muted'),create('h3',''));const heroPlay=podIcon('Son bölümü oynat','play_arrow',()=>play(episodes[0]),true);heroPlay.id='heroPlayBtn';hero.append(heroPlay);panels[0].append(hero);
+    const form=create('form',undefined,'xm-pod-search'),search=create('input');search.type='search';search.maxLength=150;search.placeholder='Bölümlerde ara';search.setAttribute('aria-label','Bölümlerde ara');form.append(search);form.addEventListener('submit',e=>e.preventDefault());panels[0].append(form);
+    const toolbar=create('div',undefined,'xm-pod-toolbar'),filters=create('div',undefined,'xm-pod-chips');filters.id='filterContainer';const order=create('select');order.setAttribute('aria-label','Bölüm sıralaması');[['new','En yeni'],['old','En eski']].forEach(([value,text])=>{const opt=create('option',text);opt.value=value;order.append(opt);});toolbar.append(order);panels[0].append(toolbar,filters);
+    const list=create('div',undefined,'xm-pod-episodes');list.id='xm-podcast-episodes';const message=create('p','Bölümler yükleniyor…','xm-pod-empty');message.setAttribute('aria-live','polite');panels[0].append(message,list);
+    const loadMore=button('Daha fazla bölüm göster',()=>{limit+=20;drawEpisodes();});loadMore.className='xm-pod-chip';loadMore.hidden=true;panels[0].append(loadMore);
+    let episodes=[],chosen=0,limit=20,similarRequested=false,showDescription='';
+    const descriptions=podSection(panels[1],'Program hakkında');const about=create('p','','xm-pod-muted');descriptions.append(about);const expand=button('Açıklamanın tamamını göster',()=>{description.classList.toggle('xm-pod-description');expand.textContent=description.classList.contains('xm-pod-description')?'Açıklamanın tamamını göster':'Açıklamayı daralt';});expand.className='xm-pod-chip';descriptions.append(expand);
+    const similar=create('div',undefined,'xm-pod-grid');panels[2].append(similar);
+    function loadSimilar(){if(similarRequested)return;similarRequested=true;similar.textContent='Benzer kategorideki programlar yükleniyor…';podSearch(podGenreQuery(info.genre),payload=>{if(!root.isConnected)return;similar.replaceChildren();const items=(payload.items||[]).filter(t=>t.feed!==address);items.slice(0,12).forEach(t=>similar.append(podProgram({url:t.feed,title:t.title,artist:t.artist,artwork:t.artwork,genre:t.genre})));if(!items.length){similar.append(create('p',payload.error||'Bu kategoride başka program bulunamadı.','xm-pod-muted'));if(payload.error)similar.append(button('Tekrar Dene',()=>{similarRequested=false;loadSimilar();}));}});}
+    function visibleEpisodes(){const downloads=podDownloads();return episodes.filter(t=>{if(!t.title?.toLocaleLowerCase('tr').includes(search.value.trim().toLocaleLowerCase('tr')))return false;return chosen===0||chosen===1&&downloads.some(d=>d.id===t.id)||chosen===2&&!podCompleted(t.id)&&!podPartial(t.id)||chosen===3&&podPartial(t.id);}).slice().sort((a,b)=>{const diff=(Date.parse(b.published)||0)-(Date.parse(a.published)||0);return order.value==='old'?-diff:diff;});}
+    function play(item){if(!item)return;if(state.id===item.id){N.togglePlayPause();return;}const shown=visibleEpisodes(),index=shown.findIndex(t=>t.id===item.id),p=podProgress(item.id);A.playPodcastSequence(JSON.stringify(shown.map(t=>t.id)),Math.max(0,index),podCompleted(item.id)?0:p.position||0);}
+    function drawEpisodes(){
+      if(!root.isConnected)return;list.replaceChildren();const shown=visibleEpisodes();message.textContent=episodes.length?(shown.length?'':'Bu filtrede bölüm yok.'):'Desteklenen ses bölümü bulunamadı.';
+      shown.slice(0,limit).forEach(t=>list.append(podEpisode(t,()=>play(t))));loadMore.hidden=shown.length<=limit;
+      filters.querySelectorAll('button').forEach((b,i)=>b.setAttribute('aria-pressed',String(i===chosen)));
+    }
+    ['Tümü','İndirilenler','Henüz Dinlenmeyenler','Yarım Kalanlar'].forEach((label,i)=>{const b=button(label,()=>{chosen=i;limit=20;drawEpisodes();});b.className='xm-pod-chip';b.setAttribute('aria-pressed',String(i===0));filters.append(b);});
+    search.addEventListener('input',()=>{limit=20;drawEpisodes();});order.addEventListener('change',()=>{limit=20;drawEpisodes();});
+    const backTop=button('↑ En üste dön',()=>window.scrollTo({top:0,behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}));backTop.className='xm-pod-backtop';backTop.hidden=true;root.append(backTop);let frame=false;
+    window.addEventListener('scroll',()=>{if(frame)return;frame=true;requestAnimationFrame(()=>{frame=false;const offset=window.scrollY||0;backTop.hidden=offset<650;document.body.classList.toggle('xm-pod-scrolled',offset>180);const heading=document.querySelector('header h1');if(heading)heading.textContent=offset>180?info.title||'Podcast':'Podcast';if(!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches){cover.style.transform='scale('+Math.max(.76,1-offset/1300)+')';cover.style.opacity=String(Math.max(.2,1-offset/600));}});},{passive:true});
+    window.__xmusicPodcastRefresh=drawEpisodes;
+    if(!address){message.textContent='Önce bir podcast programı seç.';return;}
+    function load(){message.textContent='Bölümler yükleniyor…';podRss(address,payload=>{
+      if(!root.isConnected||(payload.feed&&payload.feed!==address))return;if(payload.error){message.textContent=payload.error;message.append(button('Tekrar Dene',load));return;}
+      info={...info,title:payload.title||info.title,artist:info.artist||payload.author||'',artwork:payload.artwork||info.artwork||''};title.textContent=info.title;author.textContent=info.artist;A.setPodcastArtwork(address,info.artwork);showDescription=payload.description||'Bu program için açıklama bulunamadı.';description.textContent=showDescription;about.textContent=showDescription;setArtwork(cover,info.artwork);tintFromArtwork(identity,info.artwork);
+      const followed=library.feeds.find(f=>f.url===address);if(followed){Object.assign(followed,info);save();}sessionStorage.setItem('xm-feed-info',JSON.stringify(info));
+      episodes=(payload.items||[]).map(t=>({...t,feed:address,artwork:t.artwork||info.artwork}));drawEpisodes();
+      if(payload.stale)message.textContent='Çevrimdışı: son alınan bölümler gösteriliyor.';
+      if(episodes.length){hero.style.display='';hero.dataset.episode=episodes[0].id;heroPlay.setAttribute('aria-label','Oynat');hero.querySelector('h3').textContent=episodes[0].title;tintFromArtwork(hero,episodes[0].artwork);}
+    });}load();
   }
   function renderDownloads(){
     let rows=[];try{rows=JSON.parse(A.listDownloads()||'[]');}catch(_){}
@@ -931,7 +844,10 @@
   window.__xmusicLocalImported=t=>{if(!library.local.some(x=>x.id===t.id))library.local.push(t);if(save()&&page==='kitapl_m')renderLibrary();};
   let resumeSavedAt=0;
   window.addEventListener('xmusic:playback',e=>{
-    const wasPlaying=state.playing,previousId=state.id;
+    const wasPlaying=state.playing,previousId=state.id,previousState=state;
+    if(previousId?.startsWith('podcast:')&&previousId!==e.detail.id&&previousState.duration>0&&previousState.position>=previousState.duration-1500){
+      library.podcastProgress||={};library.podcastProgress[previousId]={position:previousState.duration,duration:previousState.duration,completed:true,updatedAt:Date.now()};
+    }
     state=e.detail;updateFavorites();
     const childStatus=document.getElementById('xm-child-status');if(childStatus)childStatus.textContent=state.familyBlock||'';
     if(state.familyBlock&&state.familyBlock!==window.__xmLastFamilyBlock){window.__xmLastFamilyBlock=state.familyBlock;N.showToast(state.familyBlock);}if(!state.familyBlock)window.__xmLastFamilyBlock='';
@@ -948,6 +864,18 @@
       library.resume=Object.assign(trackData(),{position:Math.max(0,Number(state.position)||0),duration:Math.max(0,Number(state.duration)||0),updatedAt:Date.now()});
       resumeSavedAt=Date.now();save();
     }
+    if(state.id?.startsWith('podcast:') && state.duration>0 && (state.playing||wasPlaying||state.ended)){
+      library.podcastProgress||={};const previous=library.podcastProgress[state.id];
+      if(!previous||previousId!==state.id||wasPlaying!==state.playing||state.ended||Date.now()-(previous.updatedAt||0)>=5000){
+        library.podcastProgress[state.id]={position:Math.max(0,state.position||0),duration:state.duration,completed:!!state.ended||(state.position/state.duration>=.98),updatedAt:Date.now()};
+        const entries=Object.entries(library.podcastProgress).sort((a,b)=>(b[1].updatedAt||0)-(a[1].updatedAt||0));library.podcastProgress=Object.fromEntries(entries.slice(0,500));save();
+      }
+    }
+    if(document.body.classList.contains('xm-pod-page'))document.querySelectorAll('[data-episode]').forEach(card=>{
+      const current=card.dataset.episode===state.id;card.dataset.playing=String(current);
+      podSetIcon(card.querySelector('[aria-label="Oynat"]'),current&&state.playing?'pause':'play_arrow');
+      if(current){const bar=card.querySelector('.xm-pod-progress>i');if(bar)bar.style.width=(state.duration>0?Math.min(100,(state.position||0)/state.duration*100):0)+'%';}
+    });
     if(page==='ana_sayfa'&&window.__xmusicHomeRefresh)window.__xmusicHomeRefresh();
     const key=JSON.stringify([state.queue,state.index,state.shuffle,state.repeat]);if(key!==lastQueue){lastQueue=key;if(page==='oynatma_s_ras_queue')renderQueue();if(page==='imdi_al_yor')renderInlineQueue();}
     const sleep=document.getElementById('xm-sleep-status');if(sleep)sleep.textContent=state.sleepAtEnd?'Şarkı bitiminde duracak':state.sleepRemaining>0?'Kalan: '+Math.ceil(state.sleepRemaining/60000)+' dakika':'Zamanlayıcı kapalı';

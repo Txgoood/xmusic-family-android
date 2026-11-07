@@ -12,6 +12,7 @@ object PodcastRssParser {
                 var feedTitle = "Podcast"
                 var feedDescription = ""
                 var feedAuthor = ""
+                var feedArtwork = ""
                 var event = parser.eventType
                 while (event != org.xmlpull.v1.XmlPullParser.END_DOCUMENT && rows.length() < 100) {
                     if (event == org.xmlpull.v1.XmlPullParser.START_TAG) {
@@ -26,6 +27,16 @@ object PodcastRssParser {
                                 val description = android.text.Html.fromHtml(raw, android.text.Html.FROM_HTML_MODE_LEGACY).toString().trim().take(1000)
                                 if (item != null) item.put("description", description) else feedDescription = description
                             }
+                            "image" -> {
+                                val image = parser.getAttributeValue(null, "href").orEmpty()
+                                if (image.startsWith("https://")) {
+                                    if (item != null) item.put("artwork", image) else feedArtwork = image
+                                }
+                            }
+                            "url" -> if (item == null && parser.depth == 4) {
+                                val image = parser.nextText()
+                                if (image.startsWith("https://")) feedArtwork = image
+                            }
                             "enclosure" -> if (item != null) {
                                 val url = parser.getAttributeValue(null, "url").orEmpty()
                                 val type = parser.getAttributeValue(null, "type").orEmpty()
@@ -39,12 +50,13 @@ object PodcastRssParser {
                             val digest = java.security.MessageDigest.getInstance("SHA-256").digest(url.toByteArray()).joinToString("") { "%02x".format(it) }
                             val id = "podcast:$digest"
                             row.put("id", id).put("artist", feedTitle).put("feed", address)
+                            if (!row.has("artwork")) row.put("artwork", feedArtwork)
                             rows.put(row)
                         }
                         item = null
                     }
                     event = parser.next()
                 }
-                return JSONObject().put("title", feedTitle).put("description", feedDescription).put("author", feedAuthor).put("items", rows)
+                return JSONObject().put("title", feedTitle).put("description", feedDescription).put("author", feedAuthor).put("artwork", feedArtwork).put("items", rows)
     }
 }

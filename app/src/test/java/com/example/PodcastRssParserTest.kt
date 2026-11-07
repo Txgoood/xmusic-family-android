@@ -45,6 +45,27 @@ class PodcastRssParserTest {
         assertEquals("Sunucu", result.getString("author"))
         assertEquals("30:00", result.getJSONArray("items").getJSONObject(0).getString("duration"))
     }
+    @Test fun usesEpisodeArtworkAndFallsBackToProgramArtwork() {
+        val xml = """<rss xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"><channel>
+            <title>Kapaklı Program</title><itunes:image href="https://example.org/show.jpg"/>
+            <item><title>Özel kapak</title><itunes:image href="https://example.org/episode.jpg"/>
+            <enclosure url="https://example.org/one.mp3" type="audio/mpeg"/></item>
+            <item><title>Program kapağı</title><enclosure url="https://example.org/two.mp3" type="audio/mpeg"/></item>
+            </channel></rss>"""
+        val result = PodcastRssParser.parse(xml, "https://example.org/rss")
+        assertEquals("https://example.org/show.jpg", result.getString("artwork"))
+        assertEquals("https://example.org/episode.jpg", result.getJSONArray("items").getJSONObject(0).getString("artwork"))
+        assertEquals("https://example.org/show.jpg", result.getJSONArray("items").getJSONObject(1).getString("artwork"))
+    }
+    @Test fun readsStandardRssImageAndRejectsInsecureArtwork() {
+        val xml = """<rss xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"><channel>
+            <title>Program</title><image><url>https://example.org/rss.jpg</url><title>Kapak</title></image>
+            <item><title>Bölüm</title><itunes:image href="http://example.org/unsafe.jpg"/>
+            <enclosure url="https://example.org/one.mp3" type="audio/mpeg"/></item></channel></rss>"""
+        val result = PodcastRssParser.parse(xml, "https://example.org/rss")
+        assertEquals("Program", result.getString("title"))
+        assertEquals("https://example.org/rss.jpg", result.getJSONArray("items").getJSONObject(0).getString("artwork"))
+    }
     @Test(expected = IllegalArgumentException::class)
     fun rejectsExternalEntities() {
         PodcastRssParser.parse("<!DOCTYPE rss [<!ENTITY secret SYSTEM 'file:///etc/passwd'>]><rss/>", "https://example.org/rss")

@@ -107,12 +107,12 @@ x.w.__xmusicRssResult(1,{title:'Gerçek Podcast',description:'Gerçek program a�
 assert.equal(x.d.querySelector('main h2').textContent.trim(),'Gerçek Podcast');
 assert.equal(x.d.getElementById('showDescription').textContent,'Gerçek program açıklaması');
 assert.equal(x.d.querySelector('section.mt-6 h3').textContent,'Bölüm');checks+=3;
-x.d.getElementById('heroPlayBtn').click();assert.deepEqual(x.calls.at(-1),['playPodcast','podcast:one',false]);checks++;
+x.d.getElementById('heroPlayBtn').click();assert.deepEqual(x.calls.at(-1),['playPodcastSequence','["podcast:one"]',0,0]);checks++;
 x.d.querySelector('#filterContainer button:nth-child(2)').click();assert.ok(x.d.querySelector('main').textContent.includes('Bu filtrede bölüm yok.'));checks++;
 x.d.querySelector('#filterContainer button:first-child').click();
 x.w.__xmusicPlayback({ready:true,id:'podcast:one',title:'Bölüm',artist:'Program',playing:true,queue:[]});
 x.d.querySelector('aside [aria-label="Oynat veya Duraklat"]').click();assert.deepEqual(x.calls.at(-1),['togglePlayPause']);checks++;
-x.d.querySelector('article [aria-label="Oynat"]').click();assert.deepEqual(x.calls.at(-1),['playPodcast','podcast:one',false]);checks++;
+x.d.querySelector('article [aria-label="Oynat"]').click();assert.deepEqual(x.calls.at(-1),['togglePlayPause']);checks++;
 x.d.querySelector('article [aria-label="İndir"]').click();assert.deepEqual(x.calls.at(-1),['downloadPodcast','podcast:one']);checks++;
 x.w.__xmusicRssResult(999,{title:'Eski yanıt',items:[]});assert.ok(!x.d.querySelector('main').textContent.includes('Eski yanıt'));checks++;
 x.dom.window.close();
@@ -234,14 +234,14 @@ assert.equal(rssCall[1],pod.feed);checks++;
 x.w.__xmusicRssResult(rssCall[2],{feed:pod.feed,title:'Tarih Sohbetleri',items:[{id:'podcast:test',title:'İlk bölüm',artist:'Tarih Sohbetleri',published:'2026',description:'Yeni bölüm'}]});
 assert.ok(x.d.querySelector('main').textContent.includes('Yeni bölüm'));checks++;
 x.d.querySelector('article [aria-label="Oynat"]').click();
-assert.deepEqual(x.calls.at(-1),['playPodcast','podcast:test',false]);checks++;
+assert.deepEqual(x.calls.at(-1),['playPodcastSequence','["podcast:test"]',0,0]);checks++;
 x.d.querySelector('article [aria-label="İndir"]').click();
 assert.deepEqual(x.calls.at(-1),['downloadPodcast','podcast:test']);checks++;
 x.dom.window.close();
 x=open('podcast_merkezi');
 assert.ok(x.d.getElementById('xm-podcast-following').textContent.includes('Tarih Sohbetleri'));
 assert.ok(x.d.querySelector('#podcast-chips'));checks+=2;
-assert.equal([...x.d.querySelectorAll('main h2')].find(h=>h.textContent.includes('Aile & Çocuk Podcastleri')).closest('section').style.display,'none');checks++;
+assert.ok(!x.d.querySelector('main').textContent.includes('Aile & Çocuk Podcastleri'));checks++;
 x.dom.window.close();
 x=open('kitapl_m');
 const podcastsChip=[...x.d.querySelectorAll('.filter-chip')].find(b=>b.textContent.trim()==="Podcast'ler");
@@ -493,8 +493,6 @@ assert.ok([...x.d.querySelectorAll('main img')].some(img=>img.getAttribute('src'
 const cachedImg=[...x.d.querySelectorAll('main img')].find(img=>img.getAttribute('src')===cachedCover);
 cachedImg.dispatchEvent(new x.w.Event('error'));assert.ok(cachedImg.getAttribute('src').startsWith('data:image/svg+xml'));checks++;x.dom.window.close();
 
-console.log('Application actions: '+checks+' assertions passed.');
-console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
 if(process.env.XMUSIC_AUDIT_OUTPUT)fs.writeFileSync(process.env.XMUSIC_AUDIT_OUTPUT,JSON.stringify(report,null,2));
 
 
@@ -525,3 +523,45 @@ assert.equal(imported.favorites.find(t=>t.title==='New').artwork,'https://exampl
 assert.equal(imported.playlists[0].tracks.length,1);
 assert.equal(imported.playlists[0].tracks[0].artwork,'https://example.org/new-cover.jpg');
 x.dom.window.close();
+
+// Podcast yenilemesi: sıraya alma, ilerleme, filtreleme ve profil verilerini koruma.
+const beforePodcasts=db;
+const podcastRows=[
+ {id:'podcast:old',title:'Eski bölüm',published:'2026-10-01',duration:'1800',description:'Geçmiş bölüm'},
+ {id:'podcast:partial',title:'Yarım bölüm',published:'2026-11-01',duration:'1800'},
+ {id:'podcast:new',title:'Yeni bölüm',published:'2026-11-07',duration:'1800'}
+];
+db=JSON.stringify({feeds:[{url:'https://example.org/rss',title:'Bilim',genre:'Science',artwork:'https://example.org/show.jpg'}],history:[{id:'podcast:partial',title:'Yarım bölüm',artist:'Bilim',feed:'https://example.org/rss'}],favorites:[],playlists:[],local:[],podcastProgress:{'podcast:partial':{position:60000,duration:1800000},'podcast:old':{completed:true,position:1800000,duration:1800000}},weeklyMusicMix:{week:'preserve-week',tracks:['existing']}});
+x=open('podcast_program_ve_b_l_m_detay',{'xm-feed':'https://example.org/rss'});
+let podcastRssCall=x.calls.find(c=>c[0]==='loadRss');
+x.w.__xmusicRssResult(podcastRssCall[2],{feed:'https://example.org/rss',title:'Bilim',artwork:'https://example.org/rss-art.jpg',items:podcastRows});
+assert.deepEqual([...x.d.querySelectorAll('#xm-podcast-episodes article h4')].map(n=>n.textContent),['Yeni bölüm','Yarım bölüm','Eski bölüm']);checks++;
+assert.ok(x.calls.some(c=>c[0]==='setPodcastArtwork'&&c[2]==='https://example.org/rss-art.jpg'));checks++;
+x.d.querySelector('#xm-podcast-episodes [data-episode="podcast:partial"] [aria-label="Oynat"]').click();
+let sequence=x.calls.at(-1);assert.equal(sequence[0],'playPodcastSequence');assert.deepEqual(JSON.parse(sequence[1]),['podcast:new','podcast:partial','podcast:old']);assert.equal(sequence[2],1);assert.equal(sequence[3],60000);checks+=4;
+const order=x.d.querySelector('[aria-label="Bölüm sıralaması"]');order.value='old';order.dispatchEvent(new x.w.Event('change'));
+assert.equal(x.d.querySelector('#xm-podcast-episodes article h4').textContent,'Eski bölüm');checks++;
+x.d.querySelector('#filterContainer button:nth-child(4)').click();assert.equal(x.d.querySelectorAll('#xm-podcast-episodes article').length,1);assert.equal(x.d.querySelector('#xm-podcast-episodes h4').textContent,'Yarım bölüm');checks+=2;
+x.d.querySelector('#filterContainer button:nth-child(3)').click();assert.equal(x.d.querySelectorAll('#xm-podcast-episodes article').length,1);assert.equal(x.d.querySelector('#xm-podcast-episodes h4').textContent,'Yeni bölüm');checks+=2;
+x.d.querySelector('#filterContainer button:first-child').click();const podSearchField=x.d.querySelector('[aria-label="Bölümlerde ara"]');podSearchField.value='yeni';podSearchField.dispatchEvent(new x.w.Event('input'));assert.equal(x.d.querySelectorAll('#xm-podcast-episodes article').length,1);checks++;
+x.d.querySelector('[role="tab"]:nth-child(2)').click();assert.equal(x.d.querySelector('#xm-pod-tab-1').hidden,false);assert.equal(x.d.querySelector('#xm-pod-tab-0').hidden,true);checks+=2;
+x.d.querySelector('[role="tab"]:nth-child(3)').click();assert.ok(x.calls.some(c=>c[0]==='searchPodcasts'));checks++;
+x.w.__xmusicPlayback({ready:true,id:'podcast:partial',feed:'https://example.org/rss',title:'Yarım bölüm',artist:'Bilim',artwork:'https://example.org/rss-art.jpg',playing:true,position:120000,duration:1800000,queue:[]});
+assert.equal(JSON.parse(db).podcastProgress['podcast:partial'].position,120000);assert.equal(JSON.parse(db).history[0].feed,'https://example.org/rss');assert.equal(JSON.parse(db).weeklyMusicMix.week,'preserve-week');checks+=3;
+x.dom.window.close();
+x=open('podcast_merkezi');
+assert.equal(x.d.querySelectorAll('#podcast-chips button').length,5);assert.ok(!x.d.querySelectorAll('main input').length||x.d.querySelector('#xm-podcast-search'));checks+=2;
+const hubLoad=x.calls.find(c=>c[0]==='loadRss');x.w.__xmusicRssResult(hubLoad[2],{feed:'https://example.org/rss',title:'Bilim',items:podcastRows});
+assert.equal(x.d.querySelectorAll('#xm-podcast-latest article').length,3);checks++;
+[...x.d.querySelectorAll('#podcast-chips button')].find(b=>b.textContent==='Yarım Kalanlar').click();assert.equal(x.d.querySelectorAll('#xm-podcast-latest article').length,1);checks++;
+[...x.d.querySelectorAll('#podcast-chips button')].find(b=>b.textContent==='İndirilenler').click();assert.ok(x.d.querySelector('#xm-podcast-latest').textContent.includes('Henüz indirilmiş bölüm yok'));checks++;
+[...x.d.querySelectorAll('#podcast-chips button')].find(b=>b.textContent==='Tümü').click();x.d.querySelector('[aria-label="Podcast seç"]').click();
+assert.ok(x.d.querySelector('#xm-dialog .xm-pod-categories'));assert.ok(x.d.querySelector('#xm-dialog [aria-label="Podcast seçimi için ara"]'));checks+=2;
+const pickerCall=x.calls.filter(c=>c[0]==='searchPodcasts').at(-1);x.w.__xmusicPodcastSearchResult(pickerCall[2],{items:[{feed:'https://example.org/new-feed',title:'Yeni program',genre:'History'}]});
+[...x.d.querySelectorAll('#xm-dialog .xm-pod-program button')].find(b=>b.textContent==='Takip Et').click();
+assert.ok(JSON.parse(db).feeds.some(f=>f.url==='https://example.org/new-feed'));assert.equal(JSON.parse(db).weeklyMusicMix.week,'preserve-week');checks+=2;
+[...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Bitti').click();assert.equal(x.d.querySelector('#xm-dialog'),null);checks++;
+x.dom.window.close();db=beforePodcasts;
+
+console.log('Application actions: '+checks+' assertions passed.');
+console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));

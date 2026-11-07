@@ -137,30 +137,108 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         webView.evaluateJavascript("window.__xmusicRssResult && window.__xmusicRssResult($requestId,$data)", null)
     } }
 
-    @JavascriptInterface fun loadRss(address: String, requestId: Int) {
-        Thread {
-            val result = try {
-                val uri = android.net.Uri.parse(address)
-                require(uri.scheme == "https" && !uri.host.isNullOrBlank())
+    // RSS önbelleği müzik listelerinin haftalık takviminden ve Drive taramasından bağımsızdır.
+    private val rssExecutor = java.util.concurrent.ThreadPoolExecutor(2, 2, 30L, java.util.concurrent.TimeUnit.SECONDS,
+        java.util.concurrent.LinkedBlockingQueue<Runnable>()).apply { allowCoreThreadTimeOut(true) }
+    private val rssCacheLock = Any()
+    private fun readPodcastFeed(address: String): JSONObject {
+        val uri = android.net.Uri.parse(address)
+        require(address.length <= 2048 && uri.scheme == "https" && !uri.host.isNullOrBlank())
+        val key = java.security.MessageDigest.getInstance("SHA-256").digest(address.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        val cache = java.io.File(activity.cacheDir, "podcast-rss").apply { mkdirs() }
+        val file = java.io.File(cache, "$key.json")
+        var saved: JSONObject? = null
+        synchronized(rssCacheLock) {
+            try { if (file.isFile) saved = JSONObject(file.readText()) } catch (_: Exception) { }
+        }
+        val parsed = if (saved != null && System.currentTimeMillis() - file.lastModified() < 30 * 60_000L) saved!! else {
+            try {
                 val conn = java.net.URL(address).openConnection() as java.net.HttpURLConnection
                 conn.connectTimeout = 10000; conn.readTimeout = 12000
                 val xml = try {
                     if (conn.responseCode !in 200..299) throw java.io.IOException("RSS HTTP ${conn.responseCode}")
-                    conn.inputStream.use { input ->
-                        val bytes = input.readBytesLimited(2_000_000)
-                        String(bytes, Charsets.UTF_8)
-                    }
+                    conn.inputStream.use { String(it.readBytesLimited(2_000_000), Charsets.UTF_8) }
                 } finally { conn.disconnect() }
-                val parsed = PodcastRssParser.parse(xml, address)
-                val rows = parsed.getJSONArray("items")
-                for (i in 0 until rows.length()) {
-                    val row = rows.getJSONObject(i)
-                    episodes[row.getString("id")] = row
+                val fresh = PodcastRssParser.parse(xml, address).put("feed", address)
+                synchronized(rssCacheLock) {
+                    file.writeText(fresh.toString())
+                    cache.listFiles()?.sortedByDescending { it.lastModified() }?.drop(40)?.forEach { it.delete() }
                 }
-                parsed.put("feed", address)
-            } catch (_: Exception) { JSONObject().put("feed", address).put("error", "RSS açılamadı. HTTPS adresini ve internet bağlantısını kontrol et.") }
+                fresh
+            } catch (error: Exception) {
+                // Bağlantı yokken son başarılı listeyi göster; hata metni başarılı önbelleği silmez.
+                saved?.put("stale", true) ?: throw error
+            }
+        }
+        val rows = parsed.optJSONArray("items") ?: org.json.JSONArray()
+        for (i in 0 until rows.length()) {
+            val row = rows.getJSONObject(i)
+            episodes[row.getString("id")] = row
+        }
+        return parsed.put("feed", address)
+    }
+
+    @JavascriptInterface fun loadRss(address: String, requestId: Int) {
+        rssExecutor.execute {
+            val result = try { readPodcastFeed(address) }
+            catch (_: Exception) { JSONObject().put("feed", address).put("error", "RSS açılamadı. HTTPS adresini ve internet bağlantısını kontrol et.") }
             reply(requestId, result)
-        }.start()
+        }
+    }
+
+    @JavascriptInterface fun setPodcastArtwork(address: String, artwork: String) {
+        val image = android.net.Uri.parse(artwork)
+        if (image.scheme != "https" || image.host.isNullOrBlank() || artwork.length > 2048) return
+        episodes.entries.filter { it.value.optString("feed") == address && it.value.optString("artwork").isBlank() }.forEach { entry ->
+            episodes[entry.key] = JSONObject(entry.value.toString()).put("artwork", artwork)
+        }
+    }
+
+    private fun podcastMediaItem(data: JSONObject): MediaItem {
+        val id = data.getString("id")
+        var audio = android.net.Uri.parse(data.getString("url"))
+        try {
+            val saved = downloadsPrefs.getString(id.removePrefix("podcast:"), null)
+            if (saved != null) {
+                val manager = activity.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                manager.getUriForDownloadedFile(JSONObject(saved).getLong("downloadId"))?.let { audio = it }
+            }
+        } catch (_: Exception) { }
+        val metadata = MediaMetadata.Builder().setTitle(data.optString("title")).setArtist(data.optString("artist"))
+            .setExtras(android.os.Bundle().apply { putString("feed", data.optString("feed")) })
+        data.optString("artwork").takeIf { it.startsWith("https://") }?.let { metadata.setArtworkUri(android.net.Uri.parse(it)) }
+        return MediaItem.Builder().setMediaId(id).setUri(audio).setMediaMetadata(metadata.build()).build()
+    }
+
+    private val podcastStartGeneration = java.util.concurrent.atomic.AtomicInteger()
+    @JavascriptInterface fun playPodcastSequence(value: String, start: Int, position: Long) {
+        val profileId = profiles.activeId()
+        val generation = podcastStartGeneration.incrementAndGet()
+        rssExecutor.execute {
+            try {
+                require(value.length <= 12000)
+                val ids = org.json.JSONArray(value)
+                require(ids.length() in 1..100 && start in 0 until ids.length())
+                val rows = (0 until ids.length()).map {
+                    val id = ids.getString(it)
+                    episodes[id] ?: downloadsPrefs.getString(id.removePrefix("podcast:"), null)?.let { saved -> JSONObject(saved) }
+                    ?: throw IllegalArgumentException()
+                }
+                val media = rows.map { podcastMediaItem(it) }
+                webView.post {
+                    if (profiles.activeId() == profileId && podcastStartGeneration.get() == generation) controller?.let { player ->
+                        player.shuffleModeEnabled = false
+                        player.repeatMode = androidx.media3.common.Player.REPEAT_MODE_OFF
+                        player.setMediaItems(media, start, position.coerceIn(0L, 86_400_000L))
+                        player.prepare(); player.play()
+                    }
+                }
+            } catch (_: Exception) { webView.post {
+                if (profiles.activeId() == profileId && podcastStartGeneration.get() == generation)
+                    android.widget.Toast.makeText(activity, "Bölüm sırası açılamadı. Programı yeniden açıp dene.", 0).show()
+            } }
+        }
     }
 
     private fun java.io.InputStream.readBytesLimited(limit: Int): ByteArray {
@@ -177,9 +255,7 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
     @JavascriptInterface fun playPodcast(id: String, enqueue: Boolean) { webView.post {
         val data = episodes[id]
         if (data == null) { android.widget.Toast.makeText(activity, "Önce podcast RSS kaynağını aç", 0).show(); return@post }
-        val item = MediaItem.Builder().setMediaId(id).setUri(data.getString("url"))
-            .setMediaMetadata(MediaMetadata.Builder().setTitle(data.optString("title")).setArtist(data.optString("artist"))
-                .setExtras(android.os.Bundle().apply { putString("feed", data.optString("feed")) }).build()).build()
+        val item = podcastMediaItem(data)
         val p = controller ?: return@post
         if (enqueue) p.addMediaItem(item) else { p.setMediaItem(item); p.prepare(); p.play() }
     } }
@@ -198,25 +274,15 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
                     if (audioUri != null) data = saved
                 }
                 if (data == null) {
-                    val source = android.net.Uri.parse(address)
-                    require(source.scheme == "https" && !source.host.isNullOrBlank())
-                    val conn = java.net.URL(address).openConnection() as java.net.HttpURLConnection
-                    conn.connectTimeout = 10000; conn.readTimeout = 12000
-                    val xml = try {
-                        if (conn.responseCode !in 200..299) throw java.io.IOException("RSS bağlantısı açılamadı")
-                        conn.inputStream.use { String(it.readBytesLimited(2_000_000), Charsets.UTF_8) }
-                    } finally { conn.disconnect() }
-                    val items = PodcastRssParser.parse(xml, address).getJSONArray("items")
-                    for (i in 0 until items.length()) {
-                        val row = items.getJSONObject(i)
-                        if (row.optString("id") == id) { data = row; episodes[id] = row; break }
-                    }
+                    readPodcastFeed(address)
+                    data = episodes[id]
                 }
                 val track = data ?: throw java.io.IOException("Bölüm bulunamadı")
                 val uri = audioUri ?: android.net.Uri.parse(track.getString("url"))
-                val item = MediaItem.Builder().setMediaId(id).setUri(uri).setMediaMetadata(MediaMetadata.Builder()
-                    .setTitle(track.optString("title")).setArtist(track.optString("artist"))
-                    .setExtras(android.os.Bundle().apply { putString("feed", track.optString("feed")) }).build()).build()
+                val metadata = MediaMetadata.Builder().setTitle(track.optString("title")).setArtist(track.optString("artist"))
+                    .setExtras(android.os.Bundle().apply { putString("feed", track.optString("feed")) })
+                track.optString("artwork").takeIf { it.startsWith("https://") }?.let { metadata.setArtworkUri(android.net.Uri.parse(it)) }
+                val item = MediaItem.Builder().setMediaId(id).setUri(uri).setMediaMetadata(metadata.build()).build()
                 webView.post {
                     controller?.let { p ->
                         p.setMediaItem(item);p.seekTo(position.coerceIn(0L, 86_400_000L));p.prepare();p.play()
@@ -282,8 +348,7 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
             val item = JSONObject(downloadsPrefs.getString(id.removePrefix("podcast:"), null) ?: return@post)
             val manager = activity.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
             val uri = manager.getUriForDownloadedFile(item.getLong("downloadId")) ?: return@post
-            val media = MediaItem.Builder().setMediaId(id).setUri(uri).setMediaMetadata(MediaMetadata.Builder()
-                .setTitle(item.optString("title")).setArtist(item.optString("artist")).build()).build()
+            val media = podcastMediaItem(item)
             controller?.let { it.setMediaItem(media); it.prepare(); it.play() }
         } catch (_: Exception) { android.widget.Toast.makeText(activity, "İndirilen dosya açılamadı", 0).show() }
     } }
