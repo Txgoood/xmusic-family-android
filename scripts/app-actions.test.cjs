@@ -349,7 +349,7 @@ assert.ok(selectionCard.textContent.includes('Arşivden Seçkiler'));assert.equa
 selectionCard.click();assert.ok(x.d.getElementById('xm-dialog').textContent.includes('Bir'));
 assert.equal(x.d.querySelector('#xm-dialog .xm-row strong').textContent,'İki');checks++;
 [...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Dinle').click();
-assert.equal(x.calls.at(-1)[0],'resumeDriveTrack');x.d.getElementById('xm-dialog').remove();checks+=5;
+assert.equal(x.calls.at(-1)[0],'playTurkeyChartQueue');assert.ok(JSON.parse(x.calls.at(-1)[1])[0].sourceId.startsWith('drive:'));x.d.getElementById('xm-dialog').remove();checks+=5;
 approvedMock=Array.from({length:112},(_,i)=>({id:'drive:file'+i,title:'Şarkı '+i,artist:'Sanatçı',artwork:'https://example.com/cover.jpg'}));
 homeMix.children[1].children[1].click();
 assert.ok(x.calls.some(c=>c[0]==='familyMix'&&c[1]==='history'));
@@ -599,6 +599,16 @@ x.dom.window.close();
 // Tekrar çizim ve çözümleme takip veya geçmiş kayıtlarını çoğaltmaz.
 assert.equal(JSON.parse(db).feeds.length,1);assert.equal(JSON.parse(db).history.length,1);checks+=2;
 db=coverBaseline;
+
+// Kaynak hazırlığı çalan parçanın durumunu ve kitaplığı değiştirmez, yalnızca ilgili satırı işaretler.
+const flowDb=db;
+db=JSON.stringify({history:[{id:'spotify:track:test',title:'Akış testi',artist:'Sanatçı'}],favorites:[],feeds:[],playlists:[],local:[],weeklyMusicMix:{week:'preserved'}});
+x=open('kitapl_m');
+x.w.__xmusicPlayback({ready:true,id:'drive:old',title:'Çalan parça',artist:'Eski',playing:true,queue:[],selectionBusy:true,selectionTitle:'Akış testi',selectionArtist:'Sanatçı',selectionMessage:'Kaynak hazırlanıyor'});
+assert.equal(x.d.querySelector('.xm-source-status').textContent,'Kaynak hazırlanıyor');assert.equal(JSON.parse(db).weeklyMusicMix.week,'preserved');checks+=2;
+x.w.__xmusicPlayback({ready:true,id:'drive:old',title:'Çalan parça',artist:'Eski',playing:true,queue:[],selectionBusy:false,selectionTitle:'Akış testi',selectionArtist:'Sanatçı',selectionMessage:'Şimdilik kullanılamıyor · daha sonra tekrar denenecek'});
+assert.ok(x.d.querySelector('.xm-source-status').textContent.includes('Şimdilik'));assert.equal(x.calls.filter(c=>c[0]==='showToast').length,0);checks+=2;
+x.dom.window.close();db=flowDb;
 
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));

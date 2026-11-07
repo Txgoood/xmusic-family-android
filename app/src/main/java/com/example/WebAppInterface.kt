@@ -320,6 +320,23 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         }.start()
     }
 
+    @JavascriptInterface fun warmMusicQueue(snapshot: String) {
+        if (snapshot.length > 12000) return
+        val rows = runCatching { org.json.JSONArray(snapshot) }.getOrNull() ?: return
+        if (rows.length() !in 1..3) return
+        val tracks = (0 until rows.length()).map { i ->
+            val row = rows.optJSONObject(i) ?: return
+            val title = row.optString("title").trim(); val artist = row.optString("artist").trim()
+            if (title.isBlank() || artist.isBlank() || title.length > 1000 || artist.length > 1000) return
+            com.example.playback.ChartTrack(title, artist, row.optLong("duration").coerceIn(0, 86_400_000), row.optString("genre").take(40), row.optString("sourceId").take(300))
+        }
+        webView.post {
+            val profile = ProfileStore(context)
+            if (!profile.isChild()) com.example.playback.PlaybackService.activeService?.warmChartQueue(
+                tracks, profile.activeId(), (context as? MainActivity)?.chartDriveSource())
+        }
+    }
+
     @JavascriptInterface
     fun playTurkeyChartQueue(snapshot: String, index: Int) {
         if (snapshot.length > 450_000) return

@@ -467,10 +467,10 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
     @JavascriptInterface fun queueAction(action: String, index: Int, target: Int) { webView.post {
         val p = controller ?: return@post
         when (action) {
-            "clear" -> p.clearMediaItems()
+            "clear" -> { com.example.playback.PlaybackService.activeService?.cancelPendingSelection(); p.clearMediaItems() }
             "remove" -> if (index in 0 until p.mediaItemCount) p.removeMediaItem(index)
             "move" -> if (index in 0 until p.mediaItemCount && target in 0 until p.mediaItemCount) p.moveMediaItem(index, target)
-            "play" -> if (index in 0 until p.mediaItemCount) { p.seekToDefaultPosition(index); p.prepare(); p.play() }
+            "play" -> if (index in 0 until p.mediaItemCount && com.example.playback.PlaybackService.activeService?.retryQueuedChart(index) != true) { p.seekToDefaultPosition(index); p.prepare(); p.play() }
             "shuffle" -> p.shuffleModeEnabled = !p.shuffleModeEnabled
             "repeat" -> p.repeatMode = (p.repeatMode + 1) % 3
             "back15" -> if (p.isCurrentMediaItemSeekable) p.seekTo((p.currentPosition - 15000).coerceAtLeast(0))

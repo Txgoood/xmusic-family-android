@@ -49,8 +49,9 @@
   }); }
   function search(query='') { sessionStorage.setItem('xm-search',query);go('arama_ve_ke_fet'); }
   function playTrack(track, enqueue=false) {
+    if(profileState().role!=='child'&&/^(drive:|experimental:|drive-source:)/.test(track.id)){N.playTurkeyChartQueue(JSON.stringify([{title:track.title,artist:track.artist,sourceId:track.id}]),0);return;}
     if(track.id.startsWith('drive:')) N.resumeDriveTrack(track.id.slice(6),track.title||'',track.artist||'',0);
-    else if(track.id.startsWith('spotify:')) N.playTurkeyChartQueue(JSON.stringify([{title:track.title,artist:track.artist}]),0);
+    else if(track.id.startsWith('spotify:')) N.playTurkeyChartQueue(JSON.stringify([{title:track.title,artist:track.artist,sourceId:track.id}]),0);
     else if(track.id.startsWith('local:')) A.playSavedTrack(JSON.stringify(track),enqueue);
     else if(track.id.startsWith('podcast:')) {if(track.feed)podResume(track);else N.showToast('Podcast kaynağını aç.');}
     else if(track.id.startsWith('experimental:')||track.id.startsWith('drive-source:')) {
@@ -74,7 +75,7 @@
     p.append(button('Favori ekle / kaldır',()=>{favorite();close();}),button('Çalma listesine ekle',()=>{close();addToPlaylist();}),button('Oynatma sırasını aç',()=>go('oynatma_s_ras_queue')),button('Uyku zamanlayıcısı',()=>go('uyku_zamanlay_c_s')));
   });}
   function trackRow(track, extra) {
-    const row=create('div',undefined,'xm-row'),label=create('div');label.style.flex='1';label.append(create('strong',track.title||'İsimsiz'),create('p',track.artist||''));row.append(label,button('Dinle',()=>playTrack(track)));
+    const row=create('div',undefined,'xm-row'),label=create('div');row.dataset.xmSourceKey=selectionKey(track);label.style.flex='1';label.append(create('strong',track.title||'İsimsiz'),create('p',track.artist||''));row.append(label,button('Dinle',()=>playTrack(track)));
     if(extra)extra(row);return row;
   }
   function picturedTrackRow(track) { return picturedTrackRowWithActions(track); }
@@ -170,7 +171,7 @@
           if(label==='Takip Edilen Podcastler'){
             const row=button('',()=>openFeed(t));row.className='xm-library-row';const image=create('img');artworkForTrack(image,t);const text=create('span',t.title||'Podcast');text.style.cssText='flex:1;text-align:left;color:#fff';row.append(image,text);section.append(row);return;
           }
-          const row=create('div',undefined,'xm-library-row');
+          const row=create('div',undefined,'xm-library-row');row.dataset.xmSourceKey=selectionKey(t);
           const image=create('img');artworkForTrack(image,t);
           const play=button('',()=>playTrack(t));play.className='xm-library-title';
           play.append(create('strong',t.title||'İsimsiz'),create('small',t.artist||''));
@@ -913,6 +914,14 @@
     });
     if(page==='ana_sayfa'&&window.__xmusicHomeRefresh)window.__xmusicHomeRefresh();
     const key=JSON.stringify([state.queue,state.index,state.shuffle,state.repeat]);if(key!==lastQueue){lastQueue=key;if(page==='oynatma_s_ras_queue')renderQueue();if(page==='imdi_al_yor')renderInlineQueue();}
+    const requestedKey=selectionKey({title:state.selectionTitle||'',artist:state.selectionArtist||''});
+    document.querySelectorAll('[data-xm-source-key]').forEach(row=>{
+      let note=row.querySelector('.xm-source-status');
+      if(requestedKey&&row.dataset.xmSourceKey===requestedKey&&state.selectionMessage){
+        if(!note){note=create('small',undefined,'xm-source-status');note.style.cssText='display:block;color:#a9b5ad;font-size:11px;line-height:1.5;flex-basis:100%';note.setAttribute('role','status');(row.querySelector('.xm-library-title')||row.querySelector('div')||row.querySelector('span.flex-1')||row).append(note);}
+        note.textContent=state.selectionMessage;
+      }else note?.remove();
+    });
     const sleep=document.getElementById('xm-sleep-status');if(sleep)sleep.textContent=state.sleepAtEnd?'Şarkı bitiminde duracak':state.sleepRemaining>0?'Kalan: '+Math.ceil(state.sleepRemaining/60000)+' dakika':'Zamanlayıcı kapalı';
     const count=document.getElementById('xmusic-queue-count');if(count)count.textContent='Sırada ('+(state.queue?.length||0)+')';
     const sleepLabel=document.getElementById('xmusic-sleep-label');if(sleepLabel)sleepLabel.textContent=state.sleepRemaining>0?Math.ceil(state.sleepRemaining/60000)+' dk uyku sayacı':'Uyku zamanlayıcısı';
@@ -993,8 +1002,10 @@
       holder.append(row);
     });
   }
-  function selectionChrome(panel,title,items,color,onPlay,showItems,total=items.length,detail='Haftalık seçki'){
+  function selectionChrome(panel,title,items,color,onPlay,showItems,total=items.length,detail='Haftalık seçki',sourceTracks=items){
     panel.classList.add('xm-selection-dialog');
+    const warm=sourceTracks.filter(t=>t.title&&t.artist&&!String(t.id||'').startsWith('podcast:')&&!String(t.id||'').startsWith('local:')).slice(0,3).map(t=>({title:t.title,artist:t.artist,sourceId:t.id||'',duration:Number(t.duration)||0}));
+    if(warm.length&&typeof N.warmMusicQueue==='function')N.warmMusicQueue(JSON.stringify(warm));
     panel.style.setProperty('--xm-list-color',color);
     panel.querySelector('h2')?.remove();
     const header=create('div',undefined,'xm-selection-header');
@@ -1041,7 +1052,7 @@
         selectionChrome(panel,title,items,color,()=>N.playTurkeyChartQueue(snapshot,0),(holder,term)=>{
           items.forEach((item,index)=>{
             if(term && !(item.title+' '+item.artist).toLocaleLowerCase('tr').includes(term))return;
-            const row=create('div',undefined,'flex items-center gap-3 p-3 rounded-xl bg-surface-container-low');
+            const row=create('div',undefined,'flex items-center gap-3 p-3 rounded-xl bg-surface-container-low');row.dataset.xmSourceKey=selectionKey(item);
             const art=create('img');art.loading='lazy';art.style.cssText='width:48px;height:48px;flex-shrink:0;border-radius:8px';artworkForTrack(art,item);
             const label=create('div',undefined,'flex-1 min-w-0');label.append(create('strong',item.title),create('p',item.artist));
             row.append(art,label);
@@ -1344,7 +1355,7 @@
           selectionChrome(panel,name,artwork.length?artwork:items,sourceColor,()=>N.playTurkeyChartQueue(snapshot,0),(holder,term)=>{
             items.forEach((item,index)=>{
               if(term && !(item.title+' '+item.artist).toLocaleLowerCase('tr').includes(term))return;
-              const row=create('div',undefined,'flex items-center gap-3 py-2');
+              const row=create('div',undefined,'flex items-center gap-3 py-2');row.dataset.xmSourceKey=selectionKey(item);
               const image=create('img');image.loading='lazy';image.style.cssText='width:42px;height:42px;border-radius:6px;object-fit:cover;flex:none';artworkForTrack(image,item);
               row.append(create('strong',String(item.rank),'text-primary'),image,create('span',item.artist+' – '+item.title,'flex-1'));
               if(profileState().role!=='child'){
@@ -1353,7 +1364,7 @@
               }
               holder.append(row);
             });
-          },items.length,period+' · Kworb · '+date(chart));
+          },items.length,period+' · Kworb · '+date(chart),items);
           if(profileState().role==='child')panel.querySelector('.xm-selection-play').remove();
         }));
       }
@@ -1723,7 +1734,7 @@
       const play=button('',()=>A.queueAction('play',index,0));
       play.className='xm-track-main';
       play.setAttribute('aria-label',(track.title||'Şarkı')+' oynat');
-      play.append(create('strong',track.title||'Şarkı'),create('small',track.artist||''));
+      play.append(create('strong',track.title||'Şarkı'),create('small',(track.artist||'')+(track.availability==='unavailable'?' · Şimdilik kullanılamıyor':track.availability==='preparing'?' · Hazırlanıyor':'')));
       row.append(play);
       const up=button('↑',()=>A.queueAction('move',index,index-1));
       const down=button('↓',()=>A.queueAction('move',index,index+1));
