@@ -77,8 +77,9 @@
     const row=create('div',undefined,'xm-row'),label=create('div');label.style.flex='1';label.append(create('strong',track.title||'İsimsiz'),create('p',track.artist||''));row.append(label,button('Dinle',()=>playTrack(track)));
     if(extra)extra(row);return row;
   }
-  function picturedTrackRow(track) {
-    const row=trackRow(track),img=create('img');
+  function picturedTrackRow(track) { return picturedTrackRowWithActions(track); }
+  function picturedTrackRowWithActions(track,extra) {
+    const row=trackRow(track,extra),img=create('img');
     img.style.cssText='width:44px;height:44px;object-fit:cover;border-radius:8px;flex:none';
     artworkForTrack(img,track);row.prepend(img);return row;
   }
@@ -258,7 +259,7 @@
     });
     const name=create('input',undefined,'xm-input');name.value=list.name;name.maxLength=80;name.setAttribute('aria-label','Liste adı');panel.append(name,button('Kaydet',()=>{if(!name.value.trim())return;list.name=name.value.trim();if(save())N.showToast('Kaydedildi');}),button('Şarkı Ekle veya Ara',()=>search()),button('Çalan Parçayı Ekle',()=>{if(!state.id)return N.showToast('Önce bir parça seç.');if(!list.tracks.some(t=>t.id===state.id))list.tracks.push(trackData());if(save())renderPlaylist();}));
     if(!list.tracks.length)panel.append(create('p','Liste boş. Oynatıcıdaki seçeneklerden gerçek parçalar ekleyebilirsin.'));
-    list.tracks.forEach((track,index)=>panel.append(trackRow(track,row=>{
+    list.tracks.forEach((track,index)=>panel.append(picturedTrackRowWithActions(track,row=>{
       row.dataset.xmPlaylistSearch=((track.title||'')+' '+(track.artist||'')).toLocaleLowerCase('tr');
       row.append(button('↑',()=>{if(index>0){[list.tracks[index-1],list.tracks[index]]=[list.tracks[index],list.tracks[index-1]];if(save())renderPlaylist();}}),button('↓',()=>{if(index<list.tracks.length-1){[list.tracks[index+1],list.tracks[index]]=[list.tracks[index],list.tracks[index+1]];if(save())renderPlaylist();}}),button('Kaldır',()=>{list.tracks.splice(index,1);if(save())renderPlaylist();}));
     })));
@@ -476,14 +477,20 @@
     pumpArtwork();
   };
   function artworkForTrack(img,track){
+    if(!img)return;
+    img.dataset.xmTrackKey=selectionKey(track);
+    if(!track.artwork){const known=[...library.favorites,...library.history,...library.playlists.flatMap(list=>list.tracks||[])].find(t=>selectionKey(t)===selectionKey(track)&&t.artwork);if(known)track.artwork=known.artwork;}
     setArtwork(img,track.artwork,track.title);
     if(track.artwork)return;
-    const load=()=>loadTrackArtwork(track,url=>{if(img.isConnected)setArtwork(img,url,track.title);});
+    img.dataset.xmTrackKey=selectionKey(track);
+    const expected=img.dataset.xmTrackKey;
+    const load=()=>loadTrackArtwork(track,url=>{if(img.isConnected && img.dataset.xmTrackKey===expected)setArtwork(img,url,track.title);});
     if('IntersectionObserver' in window){
       const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){observer.disconnect();load();}},{rootMargin:'200px'});
       observer.observe(img);
     }else load();
   }
+  window.__xmusicArtworkForTrack=artworkForTrack;
   function tintFromArtwork(holder,address){
     if(!address)return;
     const img=new Image();img.crossOrigin='anonymous';
@@ -1013,7 +1020,7 @@
       const row=create('div',undefined,'flex items-center gap-3 p-3 rounded-xl bg-surface-container-low');
       const image=create('img');
       image.loading='lazy';image.style.cssText='width:48px;height:48px;flex-shrink:0;border-radius:8px';
-      setArtwork(image,item.artwork);
+      artworkForTrack(image,item);
       const label=create('div',undefined,'flex-1 min-w-0');
       label.append(create('strong',item.title),create('p',item.artist));
       const play=button('▶',()=>N.playTurkeyChartQueue(snapshot,index));
@@ -1072,7 +1079,7 @@
           items.forEach((item,index)=>{
             if(term && !(item.title+' '+item.artist).toLocaleLowerCase('tr').includes(term))return;
             const row=create('div',undefined,'flex items-center gap-3 p-3 rounded-xl bg-surface-container-low');
-            const art=create('img');art.loading='lazy';art.style.cssText='width:48px;height:48px;flex-shrink:0;border-radius:8px';setArtwork(art,item.artwork);
+            const art=create('img');art.loading='lazy';art.style.cssText='width:48px;height:48px;flex-shrink:0;border-radius:8px';artworkForTrack(art,item);
             const label=create('div',undefined,'flex-1 min-w-0');label.append(create('strong',item.title),create('p',item.artist));
             row.append(art,label);
             if(profileState().role!=='child'){
@@ -1469,7 +1476,7 @@
         if(!sample)return;
         const card=sample.cloneNode(true),name=card.querySelector('p'),art=card.querySelector('img'),play=card.querySelector('button');
         if(name)name.textContent=track.title||'Parça';
-        setArtwork(art,track.artwork);
+        artworkForTrack(art,track);
         makeOwned(card,()=>playTrack(track));if(play)makeOwned(play,()=>playTrack(track));
         grid.append(card);
       });
@@ -1485,7 +1492,7 @@
       }else{
         if(resumeInfo)resumeInfo.textContent=last.title||'Son parça';
         if(resumeArtist)resumeArtist.textContent=last.artist||'';
-        setArtwork(resumeImage,last.artwork);
+        artworkForTrack(resumeImage,last);
         const duration=Number(last.duration)||0,position=Number(last.position)||0;
         if(timeLabel)timeLabel.textContent=duration>0?Math.max(0,Math.ceil((duration-position)/60000))+' dk kaldı':'Son dinlenen parça';
         const percentage=duration>0?Math.min(100,Math.max(0,position/duration*100)):0;
@@ -1748,6 +1755,7 @@
     rows.forEach((track,index)=>{
       const row=create('div',undefined,'xm-track'+(index===state.index?' xm-track-current':''));
       row.append(create('span',index===state.index?'▶':String(index+1),'xm-track-num'));
+      const image=create('img');image.style.cssText='width:40px;height:40px;object-fit:cover;border-radius:6px;flex:none';artworkForTrack(image,track);row.append(image);
       const play=button('',()=>A.queueAction('play',index,0));
       play.className='xm-track-main';
       play.setAttribute('aria-label',(track.title||'Şarkı')+' oynat');

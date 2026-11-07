@@ -24,22 +24,43 @@ class WebAppInterface(private val context: Context, private val webView: WebView
             val cache = context.getSharedPreferences("xmusic_track_artwork", Context.MODE_PRIVATE)
             val key = com.example.data.drive.DriveArchiveIndex.normalize("$artist | $title")
             val cached = cache.getString(key, null)
-            val result = if (cached != null) cached else try {
+            val failedUntil = cache.getLong("retry:" + key, 0L)
+            val result = if (cached != null) cached else if (failedUntil > System.currentTimeMillis()) "" else {
+                var artwork = ""
+                var failed = false
                 val term = java.net.URLEncoder.encode("$artist $title", "UTF-8")
-                val conn = java.net.URL("https://itunes.apple.com/search?country=tr&entity=song&limit=15&term=$term").openConnection() as java.net.HttpURLConnection
-                conn.connectTimeout = 5000; conn.readTimeout = 5000
-                try {
-                    val text = conn.inputStream.bufferedReader().use { it.readText().take(250000) }
-                    val rows = org.json.JSONObject(text).optJSONArray("results") ?: org.json.JSONArray()
-                    val matches = (0 until rows.length()).mapNotNull { rows.optJSONObject(it) }.filter {
-                        com.example.data.drive.DriveCoverResolver.matches(it, title, artist, "")
-                    }
-                    val image = matches.firstOrNull()?.optString("artworkUrl100").orEmpty().replace("100x100", "384x384")
-                    val uri = android.net.Uri.parse(image)
-                    if (uri.scheme == "https" && uri.host?.endsWith(".mzstatic.com") == true) image else ""
-                } finally { conn.disconnect() }
-            } catch (_: Exception) { "" }
-            if (cached == null && result.isNotEmpty()) cache.edit().putString(key, result).apply()
+                for (country in listOf("tr", "us")) {
+                    if (artwork.isNotEmpty()) break
+                    try {
+                        val conn = java.net.URL("https://itunes.apple.com/search?country=$country&entity=song&limit=20&term=$term").openConnection() as java.net.HttpURLConnection
+                        conn.connectTimeout = 5000; conn.readTimeout = 5000
+                        try {
+                            val bytes = conn.inputStream.use { input ->
+                                val output = java.io.ByteArrayOutputStream()
+                                val buffer = ByteArray(8192)
+                                while (true) {
+                                    val size = input.read(buffer)
+                                    if (size < 0) break
+                                    require(output.size() + size <= 250_000)
+                                    output.write(buffer, 0, size)
+                                }
+                                output.toString("UTF-8")
+                            }
+                            val rows = org.json.JSONObject(bytes).optJSONArray("results") ?: org.json.JSONArray()
+                            for (i in 0 until rows.length()) {
+                                val row = rows.optJSONObject(i) ?: continue
+                                if (!com.example.data.drive.TrackArtworkMatch.matches(row, title, artist)) continue
+                                val image = row.optString("artworkUrl100").replace("100x100", "384x384")
+                                val uri = android.net.Uri.parse(image)
+                                if (uri.scheme == "https" && uri.host?.endsWith(".mzstatic.com") == true) { artwork = image; break }
+                            }
+                        } finally { conn.disconnect() }
+                    } catch (_: Exception) { failed = true }
+                }
+                if (artwork.isNotEmpty()) cache.edit().putString(key, artwork).remove("retry:" + key).apply()
+                else cache.edit().putLong("retry:" + key, System.currentTimeMillis() + if (failed) 15 * 60_000L else 24 * 60 * 60_000L).apply()
+                artwork
+            }
             webView.post { webView.evaluateJavascript("window.__xmusicArtworkResult && window.__xmusicArtworkResult($requestId," + org.json.JSONObject.quote(result) + ")", null) }
         }
     }

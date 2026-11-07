@@ -165,7 +165,8 @@
     const source = value.id?.startsWith('audius:') ? 'Audius' : /^(drive:|drive-source:)/.test(value.id||'') ? 'Drive' : value.id ? 'Akış' : '';
     text(badge, source);
     if (full) text(document.querySelector('main h2'), source || 'Parça seçilmedi');
-    setArtwork(artwork,value.artwork,value.title);
+    if(artwork && value.id && !value.artwork && !value.id.startsWith('podcast:') && typeof window.__xmusicArtworkForTrack==='function') window.__xmusicArtworkForTrack(artwork,{...value});
+    else setArtwork(artwork,value.artwork,value.title);
     if(!full)updateMiniColor(value.artwork||'');
     if(full && artwork)artwork.classList.toggle('xm-cover-motion',!!value.id && !!value.playing && !document.hidden);
     text(status, value.error || (!value.ready ? 'Oynatıcı bağlanıyor…' : value.pending ? 'Ses yükleniyor…' : value.ended ? 'Bitti' : value.id ? (value.playing ? 'Çalıyor' : 'Duraklatıldı') : ''));
