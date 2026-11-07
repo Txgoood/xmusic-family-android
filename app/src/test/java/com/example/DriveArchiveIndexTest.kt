@@ -22,7 +22,7 @@ class DriveArchiveIndexTest {
             assertEquals(1, index.search(scope, "Deneme").length())
             index.addUploaded(scope, "file123", "Deneme.m4a", "abcdefghijk", "Deneme", "Sanatçı", "folder")
             assertEquals(1, index.status(scope).getInt("count"))
-            index.replace(scope, listOf(DriveFolderClient.Track("file123", "Sanatçı - Deneme.m4a", "abcdefghijk")))
+            index.replace(scope, listOf(DriveFolderClient.Track("file123", "Deneme.m4a", "abcdefghijk", modified = "2026-11-07T00:00:00Z")))
             assertEquals("file123", index.exact(scope, "Deneme", "Sanatçı")?.optString("id"))
         }
     }

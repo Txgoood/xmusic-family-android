@@ -61,7 +61,7 @@ class DriveArchiveIndex(context: Context) : Closeable {
         try {
             for (track in tracks) {
                 val fallback = infer(track.name, track.path)
-                val tags = old[track.id]?.takeIf { it.first == track.modified }?.second.orEmpty()
+                val tags = old[track.id]?.takeIf { it.first == track.modified || (it.first.isEmpty() && it.second.isNotEmpty()) }?.second.orEmpty()
                 val tagged = try { JSONObject(tags) } catch (_: Exception) { JSONObject() }
                 val title = tagged.optString("title").ifBlank { fallback.title }
                 val artist = tagged.optString("artist").ifBlank { fallback.artist }
@@ -86,7 +86,7 @@ class DriveArchiveIndex(context: Context) : Closeable {
             put("scope", scope); put("id", id); put("name", name); put("path", ""); put("modified", "")
             put("source", source); put("title", safeTitle); put("artist", safeArtist); put("album", "")
             put("norm", normalize("$safeTitle $safeArtist")); put("nt", normalize(safeTitle)); put("na", normalize(safeArtist))
-            put("artParents", parent); put("tags", ""); put("generation", "uploaded")
+            put("artParents", parent); put("tags", JSONObject().put("title", safeTitle).put("artist", safeArtist).toString()); put("generation", "uploaded")
         }
         synchronized(archiveWriteLock) {
             check(helper.writableDatabase.insertWithOnConflict("tracks", null, values, SQLiteDatabase.CONFLICT_IGNORE) >= 0 || get(scope, id) != null)
