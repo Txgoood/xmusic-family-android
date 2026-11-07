@@ -244,7 +244,7 @@ class PlaybackService : MediaSessionService() {
                 if (item.mediaId.startsWith("experimental:") && !com.example.ProfileStore(this@PlaybackService).isChild()) {
                     com.example.data.drive.AutomaticDriveArchive.enqueue(
                         this@PlaybackService, item.mediaId.removePrefix("experimental:"),
-                        item.mediaMetadata.title?.toString().orEmpty()
+                        item.mediaMetadata.title?.toString().orEmpty(), item.mediaMetadata.artist?.toString().orEmpty()
                     )
                 }
             }

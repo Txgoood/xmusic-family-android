@@ -30,7 +30,9 @@ class AutomaticDriveArchive(context: Context, params: WorkerParameters) : Worker
         val source = inputData.getString("source") ?: return Result.failure()
         val account = inputData.getString("account") ?: return Result.failure()
         if (!source.matches(Regex("[A-Za-z0-9_-]{11}"))) return Result.failure()
-        val name = inputData.getString("title").orEmpty().take(180).ifBlank { source } + ".m4a"
+        val title = inputData.getString("title").orEmpty().take(180)
+        val artist = inputData.getString("artist").orEmpty().take(180)
+        val name = title.ifBlank { source } + ".m4a"
         val prefs = applicationContext.getSharedPreferences("xmusic_auto_archive", Context.MODE_PRIVATE)
         val dir = java.io.File(applicationContext.cacheDir, "archive-$id")
         return try {
@@ -50,6 +52,7 @@ class AutomaticDriveArchive(context: Context, params: WorkerParameters) : Worker
                 val folder = client.getOrCreate(token, inputData.getString("folder").orEmpty())
                 val existing = client.findBySource(token, folder, source)
                 if (existing != null) {
+                    DriveArchiveIndex(applicationContext).use { it.addUploaded(DriveArchiveIndex.scope(account, folder), existing, name, source, title, artist, folder) }
                     prefs.edit().putString(account + ":" + source, existing).commit()
                     return Result.success(workDataOf("name" to name, "duplicate" to true))
                 }
@@ -116,6 +119,7 @@ class AutomaticDriveArchive(context: Context, params: WorkerParameters) : Worker
                         if (sent >= total) report(name, "Drive onayı bekleniyor")
                         else report(name, "Drive'a yükleniyor", (sent * 100 / total).toInt().coerceIn(0, 99))
                     })
+                DriveArchiveIndex(applicationContext).use { it.addUploaded(DriveArchiveIndex.scope(account, folder), file.id, name, source, title, artist, folder) }
                 prefs.edit().putString(account + ":" + source, file.id).commit()
                 Result.success(workDataOf("name" to name, "fileId" to file.id))
             }
@@ -133,14 +137,14 @@ class AutomaticDriveArchive(context: Context, params: WorkerParameters) : Worker
 
     companion object {
         private val downloadLock = Any()
-        fun enqueue(context: Context, source: String, title: String) {
+        fun enqueue(context: Context, source: String, title: String, artist: String = "") {
             val prefs = context.getSharedPreferences("xmusic_auto_archive", Context.MODE_PRIVATE)
             if (!prefs.getBoolean("enabled", true)) return
             val account = prefs.getString("account", null) ?: return
             if (prefs.contains(account + ":" + source)) return
             val network = if (context.getSharedPreferences("xmusic_settings", Context.MODE_PRIVATE).getBoolean("download_unmetered_only", false)) NetworkType.UNMETERED else NetworkType.CONNECTED
             val work = OneTimeWorkRequestBuilder<AutomaticDriveArchive>()
-                .setInputData(workDataOf("source" to source, "title" to title, "account" to account, "folder" to context.getSharedPreferences("xmusic_drive_folders", Context.MODE_PRIVATE).getString(account, "").orEmpty()))
+                .setInputData(workDataOf("source" to source, "title" to title, "artist" to artist, "account" to account, "folder" to context.getSharedPreferences("xmusic_drive_folders", Context.MODE_PRIVATE).getString(account, "").orEmpty()))
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(network).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .addTag("xmusic-drive-upload").addTag("xmusic-auto-archive").build()

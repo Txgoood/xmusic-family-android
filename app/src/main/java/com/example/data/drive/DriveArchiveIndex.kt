@@ -26,6 +26,7 @@ class DriveArchiveIndex(context: Context) : Closeable {
     override fun close() = helper.close()
     data class Metadata(val title: String, val artist: String = "", val album: String = "")
     companion object {
+        val archiveWriteLock = Any()
         fun scope(account: String, folder: String): String = java.security.MessageDigest.getInstance("SHA-256")
             .digest((account + "\u0000" + folder).toByteArray()).joinToString("") { "%02x".format(it.toInt() and 255) }
         fun normalize(value: String): String = Normalizer.normalize(value.lowercase(Locale.ROOT).replace('ı', 'i'), Normalizer.Form.NFKD)
@@ -76,6 +77,20 @@ class DriveArchiveIndex(context: Context) : Closeable {
             db.insertWithOnConflict("scans", null, ContentValues().apply { put("scope", scope); put("stamp", System.currentTimeMillis()); put("error", "") }, SQLiteDatabase.CONFLICT_REPLACE)
             db.setTransactionSuccessful()
         } finally { db.endTransaction() }
+    }
+    fun addUploaded(scope: String, id: String, name: String, source: String, title: String, artist: String, parent: String) {
+        val metadata = requested(title, artist)
+        val safeTitle = metadata.title.ifBlank { infer(name, "").title }
+        val safeArtist = metadata.artist
+        val values = ContentValues().apply {
+            put("scope", scope); put("id", id); put("name", name); put("path", ""); put("modified", "")
+            put("source", source); put("title", safeTitle); put("artist", safeArtist); put("album", "")
+            put("norm", normalize("$safeTitle $safeArtist")); put("nt", normalize(safeTitle)); put("na", normalize(safeArtist))
+            put("artParents", parent); put("tags", ""); put("generation", "uploaded")
+        }
+        synchronized(archiveWriteLock) {
+            check(helper.writableDatabase.insertWithOnConflict("tracks", null, values, SQLiteDatabase.CONFLICT_IGNORE) >= 0 || get(scope, id) != null)
+        }
     }
     fun markError(scope: String) { helper.writableDatabase.execSQL("INSERT OR IGNORE INTO scans(scope,stamp,error) VALUES(?,0,?)", arrayOf(scope, "")); helper.writableDatabase.execSQL("UPDATE scans SET error=? WHERE scope=?", arrayOf("Tarama tamamlanamadı; önceki arşiv gösteriliyor.", scope)) }
     fun status(scope: String): JSONObject {

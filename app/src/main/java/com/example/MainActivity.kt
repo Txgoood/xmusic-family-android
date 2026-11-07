@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
         override fun run() {
             syncFamilyIfReady()
             if (getSharedPreferences("xmusic_drive_folders", MODE_PRIVATE).getBoolean("sync_enabled", false) &&
-                !driveBusy && !syncInFlight && android.os.SystemClock.elapsedRealtime() - lastDriveSync > 55000L) {
+                !driveBusy && !syncInFlight && android.os.SystemClock.elapsedRealtime() - lastDriveSync > 1_800_000L) {
                 reconnectSharedDriveSilently()
             }
             driveSyncHandler.postDelayed(this, 15000L)
@@ -123,8 +123,11 @@ class MainActivity : ComponentActivity() {
         notifyStatus()
         return try { com.example.data.drive.DriveArchiveIndex(this).use { index ->
             try {
-                val tracks = com.example.data.drive.DriveFolderClient().listAudio(token, folder)
-                index.replace(scope, tracks)
+                val tracks = synchronized(com.example.data.drive.DriveArchiveIndex.archiveWriteLock) {
+                    val result = com.example.data.drive.DriveFolderClient().listAudio(token, folder)
+                    index.replace(scope, result)
+                    result
+                }
                 val network = getSystemService(CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
                 if (!network.isActiveNetworkMetered) {
                     val started = android.os.SystemClock.elapsedRealtime()
@@ -224,7 +227,7 @@ class MainActivity : ComponentActivity() {
         if (driveBusy || syncInFlight) { showDriveError("Drive işlemi sürüyor; biraz sonra tekrar dene."); return }
         if (driveFolderId == null) { showDriveError("Önce ortak müzik klasörünü seç."); return }
         android.app.AlertDialog.Builder(this).setTitle("Ortak arşivi otomatik yenile")
-            .setMessage("Google bir kez daha geniş Drive okuma izni isteyecek. Bu izin hesabının erişebildiği Drive dosyalarını okumayı kapsar; XMusic yalnızca seçtiğin müzik klasörünü tarar. Yeni şarkılar uygulama açıkken yaklaşık bir dakika içinde alınır.")
+            .setMessage("Google bir kez daha geniş Drive okuma izni isteyecek. Bu izin hesabının erişebildiği Drive dosyalarını okumayı kapsar; XMusic yalnızca seçtiğin müzik klasörünü tarar. Arşiv uygulama açıkken yaklaşık 30 dakikada bir taranır.")
             .setPositiveButton("Google ile yetkilendir") { _, _ -> requestContinuousRead = true; authorizeDrive() }
             .setNegativeButton("Vazgeç", null).show()
     }
@@ -614,7 +617,7 @@ class MainActivity : ComponentActivity() {
                         cacheSharedTracks(account, sharedTracks)
                         getSharedPreferences("xmusic_auto_archive", MODE_PRIVATE).edit().putString("account", account).apply()
                     }
-                    showDriveError(if (continuous) "Ortak arşiv otomatik yenileme açık. Yeni şarkılar uygulama açıkken yaklaşık bir dakika içinde görünür. Tek tek dosya seçmen gerekmez." else "Drive bağlantısı hazır. Ortak arşivin yeni dosyalarını otomatik görmek için Otomatik ortak arşiv bağlantısını aç.")
+                    showDriveError(if (continuous) "Ortak arşiv otomatik yenileme açık. Arşiv uygulama açıkken yaklaşık 30 dakikada bir taranır. Tek tek dosya seçmen gerekmez." else "Drive bağlantısı hazır. Ortak arşivin yeni dosyalarını otomatik görmek için Otomatik ortak arşiv bağlantısını aç.")
                     requestContinuousRead = false
                 }
             } catch (e: Exception) {
@@ -1199,7 +1202,7 @@ class MainActivity : ComponentActivity() {
                           details.appendChild(explain('Bir kez kurulum: Her telefonda kendi Google hesabını ve aynı ortak müzik klasörünü kullan.'));
                           details.appendChild(explain('1. Ortak klasörü seç. Daha önce seçtiysen bu adımı tekrarlama.'));
                           appendAction(details,shared);
-                          details.appendChild(explain('2. Otomatik bağlantı iznini bir kez ver. Yeni müzikler uygulama açıkken yaklaşık dakikada bir alınır; tek tek şarkı seçmen gerekmez.'));
+                          details.appendChild(explain('2. Otomatik bağlantı iznini bir kez ver. Arşiv uygulama açıkken yaklaşık 30 dakikada bir taranır; tek tek şarkı seçmen gerekmez.'));
                           appendAction(details,sync);
                           details.appendChild(explain('Günlük kullanım: Ortak arşivdeki müzikleri aç ve dinle.'));
                           appendAction(details,library);appendAction(details,scan);details.appendChild(scanStatus);
