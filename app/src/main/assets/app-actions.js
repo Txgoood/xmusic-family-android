@@ -1382,7 +1382,8 @@
             items.forEach((item,index)=>{
               if(term && !(item.title+' '+item.artist).toLocaleLowerCase('tr').includes(term))return;
               const row=create('div',undefined,'flex items-center gap-3 py-2');
-              row.append(create('strong',String(item.rank),'text-primary'),create('span',item.artist+' – '+item.title,'flex-1'));
+              const image=create('img');image.loading='lazy';image.style.cssText='width:42px;height:42px;border-radius:6px;object-fit:cover;flex:none';artworkForTrack(image,item);
+              row.append(create('strong',String(item.rank),'text-primary'),image,create('span',item.artist+' – '+item.title,'flex-1'));
               if(profileState().role!=='child'){
                 const play=button('▶',()=>N.playTurkeyChartQueue(snapshot,index));
                 play.setAttribute('aria-label',item.title+' oynat');row.append(play);

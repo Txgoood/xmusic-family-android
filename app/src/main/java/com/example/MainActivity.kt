@@ -1021,8 +1021,11 @@ class MainActivity : ComponentActivity() {
                           function catalogRow(item,kind){
                             const row=document.createElement('button');
                             row.style.cssText='display:flex;gap:12px;align-items:center;text-align:left;width:100%;padding:12px 0;color:#e0e3e7;border-bottom:1px solid #313539;';
-                            if(item.artwork && item.artwork.startsWith('https://')){
-                              const image=document.createElement('img');window.__xmusicSetArtwork(image,item.artwork);image.loading='lazy';
+                            if((item.artwork && item.artwork.startsWith('https://')) || (kind==='songs' && item.artist)){
+                              const image=document.createElement('img');
+                              if(item.artwork)window.__xmusicSetArtwork(image,item.artwork);
+                              else if(window.__xmusicArtworkForTrack)window.__xmusicArtworkForTrack(image,item);
+                              image.loading='lazy';
                               image.style.cssText='width:48px;height:48px;flex-shrink:0;object-fit:cover;border-radius:9px;';
                               row.appendChild(image);
                             }
@@ -1073,7 +1076,7 @@ class MainActivity : ComponentActivity() {
                             target.appendChild(rows);draw();
                           };
                           function driveRow(item){
-                            const row=catalogRow({title:item.title,subtitle:'Drive · '+(item.artist||'')+(item.album?' · '+item.album:''),artwork:''},'songs');
+                            const row=catalogRow({title:item.title,subtitle:'Drive · '+(item.artist||'')+(item.album?' · '+item.album:''),artist:item.artist||'',artwork:''},'songs');
                             owned(row,function(){window.Android.resumeDriveTrack(item.id,item.title||'',item.artist||'',0);});return row;
                           }
                           window.__xmusicDriveResult=function(id,payload){
