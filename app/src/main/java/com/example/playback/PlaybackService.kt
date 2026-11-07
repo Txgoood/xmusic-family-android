@@ -171,6 +171,10 @@ class PlaybackService : MediaSessionService() {
                     if (!retry) attempt(position, failed, true, excluded + ready.mediaId) else unavailable()
                 }
                 listener = object : Player.Listener {
+                    override fun onMediaMetadataChanged(metadata: MediaMetadata) {
+                        val coverKey = warm.currentMediaItem?.mediaMetadata?.extras?.getString(com.example.CoverArtStore.EXTRA) ?: return
+                        com.example.CoverArtStore.embedded(this@PlaybackService, coverKey, metadata.artworkData)
+                    }
                     override fun onPlaybackStateChanged(state: Int) {
                         if (state != Player.STATE_READY || finished) return
                         if (!selectionValid(serial, profile)) { failedWarmup(); return }
