@@ -25,6 +25,19 @@ for (const entry of folders) {
     assert.equal(title.textContent, 'Henüz parça seçilmedi'); checks++;
     const state = { ready: true, id: 'audius:test', title: '<img onerror=bad()>', artist: 'Test artist', artwork: '', playing: true, position: 30000, duration: 120000, seekable: true, hasNext: false };
     w.__xmusicPlayback(state);
+    if(full){assert.equal(d.querySelector('.xm-now-compact strong').textContent,state.title);assert.equal(d.querySelector('.xm-now-compact small').textContent,state.artist);checks+=2;}
+    const cover=(full?d.querySelector('main img'):mini?.querySelector('img'));
+    if(cover){
+      assert.ok(cover.getAttribute('src').startsWith('data:image/svg+xml'));
+      const artwork='https://xmusic.local/artwork/'+'a'.repeat(64)+'.jpg';
+      w.__xmusicPlayback({...state,artwork});assert.equal(cover.getAttribute('src'),artwork);
+      const observer=new w.MutationObserver(()=>{});observer.observe(cover,{attributes:true,attributeFilter:['src']});
+      w.__xmusicPlayback({...state,artwork,position:31000});assert.equal(observer.takeRecords().length,0);
+      cover.dispatchEvent(new w.Event('error'));assert.ok(cover.getAttribute('src').startsWith('data:image/svg+xml'));
+      w.__xmusicPlayback({...state,artwork});assert.ok(cover.getAttribute('src').startsWith('data:image/svg+xml'));
+      w.__xmusicPlayback({...state,artwork:'javascript:bad()'});assert.ok(cover.getAttribute('src').startsWith('data:image/svg+xml'));observer.disconnect();checks+=6;
+    }
+    w.__xmusicPlayback(state);
     assert.equal(title.textContent, state.title); assert.equal(title.children.length, 0); checks += 2;
     const button = (full ? d : mini).querySelector('[aria-label="Oynat veya Duraklat"]');
     if (button) { button.click(); assert.deepEqual(calls.pop(), ['togglePlayPause']); assert.equal(button.querySelector('span').textContent, 'pause'); checks += 2; }
@@ -49,3 +62,4 @@ for (const entry of folders) {
 }
 console.log('Playback UI: ' + checks + ' assertions passed across Stitch pages.');
 assert.ok(checks >= 40);
+
