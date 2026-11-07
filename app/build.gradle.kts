@@ -16,8 +16,9 @@ android {
     applicationId = "com.example"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    // CI yapı numarası APK sürüm koduna da yazılır; güncellemeler veriyi korur.
+    versionCode = maxOf(238, System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 238)
+    versionName = "1.3.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -52,13 +53,22 @@ android {
     debug {
       // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
       // AI Studio.
-      signingConfig = signingConfigs.getByName("debug")
+      signingConfig = signingConfigs.getByName("debug").apply {
+        if (System.getenv("CI") == "true") {
+          storeFile = file(System.getenv("HOME") + "/.android/debug.keystore")
+          storeType = "PKCS12"
+          storePassword = "android"
+          keyAlias = "androiddebugkey"
+          keyPassword = "android"
+        }
+      }
     }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
   }
+  packaging { jniLibs.useLegacyPackaging = true }
   buildFeatures {
     compose = true
     buildConfig = true
@@ -98,8 +108,14 @@ dependencies {
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
+  // Deneysel kaynak çözümleyici; yalnızca deneme dalında kullanılır.
+  implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
+  implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
+  implementation("com.google.android.gms:play-services-auth:22.0.0")
+  implementation("androidx.work:work-runtime-ktx:2.12.0")
   // Media3 dependencies
   implementation("androidx.media3:media3-exoplayer:1.5.1")
+  implementation("androidx.media3:media3-exoplayer-hls:1.5.1")
   implementation("androidx.media3:media3-ui:1.5.1")
   implementation("androidx.media3:media3-session:1.5.1")
   // Retrofit and networking
