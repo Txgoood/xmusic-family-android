@@ -350,8 +350,13 @@ selectionCard.click();assert.ok(x.d.getElementById('xm-dialog').textContent.incl
 assert.equal(x.d.querySelector('#xm-dialog .xm-row strong').textContent,'İki');checks++;
 [...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Dinle').click();
 assert.equal(x.calls.at(-1)[0],'resumeDriveTrack');x.d.getElementById('xm-dialog').remove();checks+=5;
+approvedMock=Array.from({length:112},(_,i)=>({id:'drive:file'+i,title:'Şarkı '+i,artist:'Sanatçı',artwork:'https://example.com/cover.jpg'}));
 homeMix.children[1].children[1].click();
-assert.ok(x.calls.some(c=>c[0]==='familyMix'&&c[1]==='history'));checks++;
+assert.ok(x.calls.some(c=>c[0]==='familyMix'&&c[1]==='history'));
+x.d.querySelector('#xm-dialog [aria-label="Listeyi oynat"]').click();
+const queuedFamily=x.calls.filter(call=>call[0]==='playTurkeyChartQueue').at(-1);
+assert.ok(queuedFamily);const queuedTracks=JSON.parse(queuedFamily[1]);
+assert.equal(queuedTracks.length,112);assert.equal(queuedTracks[0].sourceId.startsWith('drive:'),true);assert.equal(queuedFamily[2],0);checks+=5;
 x.dom.window.close();
 approvedMock=[];
 x=open('ana_sayfa');

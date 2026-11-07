@@ -416,8 +416,8 @@
       panel.append(create('p',familySyncState().enabled?'Aile bağlantısında paylaşımı açık yetişkinlerin ortak kayıtları.':'Bu cihazda aile miksine katılmayı seçen yetişkin profilleri.'));
       if(!tracks.length){panel.append(create('p','Henüz ortak kayıt yok. Aile bağlantısı ekranında bu profilin miks paylaşımını aç; birkaç kayıt dinle veya beğen.'),button('Aile bağlantısını aç',familyConnection));return;}
       const offset=Math.floor(Date.now()/604800000)%tracks.length;tracks=tracks.slice(offset).concat(tracks.slice(0,offset));
-      const snapshot=tracks.filter(t=>t.title&&t.artist).slice(0,1000).map(t=>({title:t.title,artist:t.artist}));
-      selectionChrome(panel,kind==='favorites'?'Aile Beğenileri':'Aile Son Dinlenenler',tracks,'#315342',()=>N.playTurkeyChartQueue(JSON.stringify(snapshot),0),(holder,term)=>{
+      const snapshot=tracks.filter(t=>typeof t.title==='string'&&t.title.trim()&&typeof t.artist==='string'&&t.artist.trim()&&!String(t.id||'').startsWith('podcast:')).slice(0,1000).map(t=>({title:t.title.trim(),artist:t.artist.trim(),sourceId:t.id||''}));
+      selectionChrome(panel,kind==='favorites'?'Aile Beğenileri':'Aile Son Dinlenenler',tracks,'#315342',()=>{if(!snapshot.length){N.showToast('Bu listede oynatılabilir şarkı bulunamadı.');return;}N.playTurkeyChartQueue(JSON.stringify(snapshot),0);},(holder,term)=>{
         tracks.filter(t=>!term||((t.title||'')+' '+(t.artist||'')).toLocaleLowerCase('tr').includes(term)).forEach(t=>holder.append(picturedTrackRow(t)));
       },tracks.length,'Ailenin dinlemeleri');
       if(profileState().role==='child')panel.querySelector('.xm-selection-play')?.remove();

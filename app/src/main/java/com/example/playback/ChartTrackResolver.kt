@@ -13,7 +13,7 @@ import org.json.JSONObject
 import java.text.Normalizer
 import java.util.Locale
 
-internal data class ChartTrack(val title: String, val artist: String, val duration: Long, val genre: String)
+internal data class ChartTrack(val title: String, val artist: String, val duration: Long, val genre: String, val sourceId: String = "")
 
 internal data class ChartDriveSource(val scope: String, val token: String)
 
@@ -24,7 +24,11 @@ internal class ChartTrackResolver(private val context: Context) {
         val title = item.mediaMetadata.title.toString()
         val artist = item.mediaMetadata.artist.toString()
         val match = drive?.let { source ->
-            runCatching { DriveArchiveIndex(context).use { it.exact(source.scope, title, artist) } }.getOrNull()
+            runCatching { DriveArchiveIndex(context).use { index ->
+                val sourceId = item.mediaMetadata.extras?.getString("chartSourceId").orEmpty()
+                val direct = if (sourceId.startsWith("drive:")) index.get(source.scope, sourceId.removePrefix("drive:")) else null
+                direct ?: index.exact(source.scope, title, artist)
+            } }.getOrNull()
         }
         val fileId = match?.optString("id").orEmpty()
         if (drive != null && fileId.matches(Regex("[A-Za-z0-9_-]{1,200}"))) {

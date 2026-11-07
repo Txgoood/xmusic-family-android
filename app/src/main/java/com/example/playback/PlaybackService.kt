@@ -79,6 +79,7 @@ class PlaybackService : MediaSessionService() {
             val extras = android.os.Bundle().apply {
                 putLong("chartDuration", track.duration)
                 putString("chartGenre", track.genre)
+                putString("chartSourceId", track.sourceId)
             }
             val metadata = MediaMetadata.Builder().setTitle(track.title).setArtist(track.artist).setExtras(extras).build()
             val item = MediaItem.Builder().setMediaId("chart-pending:$chartGeneration:$position")

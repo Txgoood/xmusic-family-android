@@ -327,18 +327,21 @@ class WebAppInterface(private val context: Context, private val webView: WebView
         if (rows.length() !in 1..1000 || index !in 0 until rows.length()) return
         val tracks = (0 until rows.length()).map { position ->
             val row = rows.optJSONObject(position) ?: return
-            val title = row.optString("title")
-            val artist = row.optString("artist")
-            if (title.isBlank() || artist.isBlank() || title.length > 180 || artist.length > 180) return
-            com.example.playback.ChartTrack(title, artist, row.optLong("duration").coerceIn(0, 86_400_000), row.optString("genre").take(40))
+            val title = row.optString("title").trim()
+            val artist = row.optString("artist").trim()
+            if (title.isBlank() || artist.isBlank() || title.length > 1000 || artist.length > 1000) {
+                webView.post { Toast.makeText(context, "Listedeki bir şarkının adı veya sanatçısı geçersiz.", Toast.LENGTH_LONG).show() }
+                return
+            }
+            com.example.playback.ChartTrack(title, artist, row.optLong("duration").coerceIn(0, 86_400_000), row.optString("genre").take(40), row.optString("sourceId").take(300))
         }
         webView.post {
             val activity = context as? MainActivity ?: return@post
             val profile = ProfileStore(context)
             if (profile.isChild()) return@post
-            com.example.playback.PlaybackService.activeService?.playChartQueue(
-                tracks, index, profile.activeId(), activity.chartDriveSource()
-            )
+            val service = com.example.playback.PlaybackService.activeService
+            if (service == null) { Toast.makeText(context, "Oynatıcı hazırlanıyor. Tekrar dene.", Toast.LENGTH_SHORT).show(); return@post }
+            service.playChartQueue(tracks, index, profile.activeId(), activity.chartDriveSource())
         }
     }
 
