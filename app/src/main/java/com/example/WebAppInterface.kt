@@ -15,6 +15,35 @@ class WebAppInterface(private val context: Context, private val webView: WebView
     private val musicBrainzRequestLock = Any()
     private var lastMusicBrainzRequest = 0L
 
+    private val artworkExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
+
+    @JavascriptInterface
+    fun findTrackArtwork(title: String, artist: String, requestId: Int) {
+        if (title.isBlank() || artist.isBlank() || title.length > 300 || artist.length > 300) return
+        artworkExecutor.execute {
+            val cache = context.getSharedPreferences("xmusic_track_artwork", Context.MODE_PRIVATE)
+            val key = com.example.data.drive.DriveArchiveIndex.normalize("$artist | $title")
+            val cached = cache.getString(key, null)
+            val result = if (cached != null) cached else try {
+                val term = java.net.URLEncoder.encode("$artist $title", "UTF-8")
+                val conn = java.net.URL("https://itunes.apple.com/search?country=tr&entity=song&limit=15&term=$term").openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout = 5000; conn.readTimeout = 5000
+                try {
+                    val text = conn.inputStream.bufferedReader().use { it.readText().take(250000) }
+                    val rows = org.json.JSONObject(text).optJSONArray("results") ?: org.json.JSONArray()
+                    val matches = (0 until rows.length()).mapNotNull { rows.optJSONObject(it) }.filter {
+                        com.example.data.drive.DriveCoverResolver.matches(it, title, artist, "")
+                    }
+                    val image = matches.firstOrNull()?.optString("artworkUrl100").orEmpty().replace("100x100", "384x384")
+                    val uri = android.net.Uri.parse(image)
+                    if (uri.scheme == "https" && uri.host?.endsWith(".mzstatic.com") == true) image else ""
+                } finally { conn.disconnect() }
+            } catch (_: Exception) { "" }
+            if (cached == null && result.isNotEmpty()) cache.edit().putString(key, result).apply()
+            webView.post { webView.evaluateJavascript("window.__xmusicArtworkResult && window.__xmusicArtworkResult($requestId," + org.json.JSONObject.quote(result) + ")", null) }
+        }
+    }
+
     @JavascriptInterface
     fun showDriveUploadQueue() { webView.post { (context as? MainActivity)?.showDriveUploadQueue() } }
 
@@ -272,9 +301,9 @@ class WebAppInterface(private val context: Context, private val webView: WebView
 
     @JavascriptInterface
     fun playTurkeyChartQueue(snapshot: String, index: Int) {
-        if (snapshot.length > 48_000) return
+        if (snapshot.length > 450_000) return
         val rows = runCatching { org.json.JSONArray(snapshot) }.getOrNull() ?: return
-        if (rows.length() !in 1..50 || index !in 0 until rows.length()) return
+        if (rows.length() !in 1..1000 || index !in 0 until rows.length()) return
         val tracks = (0 until rows.length()).map { position ->
             val row = rows.optJSONObject(position) ?: return
             val title = row.optString("title")

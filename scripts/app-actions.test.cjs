@@ -512,4 +512,11 @@ const importPayload={profileId:'default',shows:[],files:{'YourLibrary.json':{tra
 x.w.__xmusicSpotifyPreview(importPayload);assert.equal(JSON.parse(db).favorites.length,1);
 [...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='İçe aktar').click();assert.equal(JSON.parse(db).favorites.length,2);assert.equal(JSON.parse(db).playlists.length,1);
 x.w.__xmusicSpotifyPreview(importPayload);[...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='İçe aktar').click();assert.equal(JSON.parse(db).favorites.length,2);assert.equal(JSON.parse(db).playlists[0].tracks.length,1);
+const artworkRequest=x.calls.find(call=>call[0]==='findTrackArtwork');
+assert.ok(artworkRequest);
+x.w.__xmusicArtworkResult(artworkRequest[3],'https://example.org/new-cover.jpg');
+const imported=JSON.parse(db);
+assert.equal(imported.favorites.find(t=>t.title==='New').artwork,'https://example.org/new-cover.jpg');
+assert.equal(imported.playlists[0].tracks.length,1);
+assert.equal(imported.playlists[0].tracks[0].artwork,'https://example.org/new-cover.jpg');
 x.dom.window.close();

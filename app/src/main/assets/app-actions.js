@@ -80,7 +80,7 @@
   function picturedTrackRow(track) {
     const row=trackRow(track),img=create('img');
     img.style.cssText='width:44px;height:44px;object-fit:cover;border-radius:8px;flex:none';
-    setArtwork(img,track.artwork,track.title);row.prepend(img);return row;
+    artworkForTrack(img,track);row.prepend(img);return row;
   }
   function content(title) {
     const main=document.querySelector('main');if(!main)return null;
@@ -170,7 +170,7 @@
             const row=button(t.title,()=>openFeed(t));row.className='w-full text-left p-3 rounded-xl bg-surface-container-low text-on-surface';section.append(row);return;
           }
           const row=create('div',undefined,'xm-library-row');
-          const image=create('img');setArtwork(image,t.artwork,t.title);
+          const image=create('img');artworkForTrack(image,t);
           const play=button('',()=>playTrack(t));play.className='xm-library-title';
           play.append(create('strong',t.title||'İsimsiz'),create('small',t.artist||''));
           const menu=button('⋮',()=>modal('Parça işlemleri',(panel,close)=>{
@@ -197,6 +197,7 @@
         const subtitle=name?.nextElementSibling;if(subtitle)subtitle.textContent=(l.tracks||[]).length+' parça';
         const image=row.querySelector('img');const artwork=(l.tracks||[]).find(t=>t.artwork?.startsWith('https://'))?.artwork;
         setArtwork(image,artwork);
+        if(!artwork && l.tracks?.length)artworkForTrack(image,l.tracks[0]);
         row.querySelectorAll('.absolute').forEach(n=>n.style.display='none');
         const menu=row.querySelector('button');if(menu)own(menu,()=>{sessionStorage.setItem('xm-playlist',l.id);go('alma_listesi_y_netimi');});
         clickable(row,()=>{sessionStorage.setItem('xm-playlist',l.id);go('alma_listesi_y_netimi');});
@@ -414,7 +415,11 @@
       panel.append(create('p',familySyncState().enabled?'Aile bağlantısında paylaşımı açık yetişkinlerin ortak kayıtları.':'Bu cihazda aile miksine katılmayı seçen yetişkin profilleri.'));
       if(!tracks.length){panel.append(create('p','Henüz ortak kayıt yok. Aile bağlantısı ekranında bu profilin miks paylaşımını aç; birkaç kayıt dinle veya beğen.'),button('Aile bağlantısını aç',familyConnection));return;}
       const offset=Math.floor(Date.now()/604800000)%tracks.length;tracks=tracks.slice(offset).concat(tracks.slice(0,offset));
-      tracks.forEach(t=>panel.append(picturedTrackRow(t)));
+      const snapshot=tracks.filter(t=>t.title&&t.artist).slice(0,1000).map(t=>({title:t.title,artist:t.artist}));
+      selectionChrome(panel,kind==='favorites'?'Aile Beğenileri':'Aile Son Dinlenenler',tracks,'#315342',()=>N.playTurkeyChartQueue(JSON.stringify(snapshot),0),(holder,term)=>{
+        tracks.filter(t=>!term||((t.title||'')+' '+(t.artist||'')).toLocaleLowerCase('tr').includes(term)).forEach(t=>holder.append(picturedTrackRow(t)));
+      },tracks.length,'Ailenin dinlemeleri');
+      if(profileState().role==='child')panel.querySelector('.xm-selection-play')?.remove();
     });
   }
   function mixTracks(kind) {
@@ -423,7 +428,12 @@
   function coverMosaic(holder, tracks) {
     holder.replaceChildren();
     const covers=[...new Set(tracks.map(t=>t.artwork).filter(a=>typeof a==='string'&&a.startsWith('https://')))].slice(0,4);
-    if(!covers.length){holder.append(create('span','music_note','material-symbols-outlined text-6xl text-on-surface/60'));return;}
+    if(!covers.length)holder.append(create('span','music_note','material-symbols-outlined text-6xl text-on-surface/60'));
+    tracks.slice(0,8).filter(t=>!t.artwork).forEach(track=>{
+      if(!holder.isConnected)return;
+      loadTrackArtwork(track,()=>{if(holder.isConnected){coverMosaic(holder,tracks);tintFromArtwork(holder.parentElement,track.artwork);}});
+    });
+    if(!covers.length)return;
     const grid=create('div');grid.style.cssText='display:grid;position:absolute;inset:0;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);overflow:hidden;';
     for(let i=0;i<4;i++){const img=create('img');img.style.cssText='width:100%;height:100%;object-fit:cover;min-width:0;min-height:0';setArtwork(img,covers[i%covers.length]);grid.append(img);}
     holder.append(grid);
@@ -433,6 +443,61 @@
     const title=norm(track.title),artist=norm(track.artist);
     return title&&artist?artist+'|'+title:'';
   }
+  const artworkQueue=[], artworkPending=new Map(), artworkAttempted=new Set();
+  let artworkActive=0, artworkRequest=0;
+  function loadTrackArtwork(track, onReady){
+    const key=selectionKey(track);
+    if(!key || track.artwork || typeof N.findTrackArtwork!=='function')return;
+    const existing=artworkPending.get(key);
+    if(existing){existing.callbacks.push(onReady);return;}
+    if(artworkAttempted.has(key))return;
+    artworkAttempted.add(key);
+    const item={key,track,profile:profileState().active,callbacks:[onReady],id:++artworkRequest};
+    artworkPending.set(key,item);artworkQueue.push(item);pumpArtwork();
+  }
+  function pumpArtwork(){
+    while(artworkActive<2 && artworkQueue.length){
+      const item=artworkQueue.shift();artworkActive++;
+      N.findTrackArtwork(item.track.title,item.track.artist,item.id);
+    }
+  }
+  window.__xmusicArtworkResult=(id,url)=>{
+    const item=[...artworkPending.values()].find(entry=>entry.id===id);
+    if(!item)return;
+    artworkPending.delete(item.key);artworkActive--;
+    if(url && profileState().active===item.profile){
+      const update=t=>{if(selectionKey(t)===item.key && !t.artwork)t.artwork=url;};
+      library.favorites.forEach(update);library.history.forEach(update);
+      library.playlists.forEach(list=>(list.tracks||[]).forEach(update));
+      if(library.resume)update(library.resume);
+      item.track.artwork ||= url;
+      save();item.callbacks.forEach(callback=>callback(url));
+    }
+    pumpArtwork();
+  };
+  function artworkForTrack(img,track){
+    setArtwork(img,track.artwork,track.title);
+    if(track.artwork)return;
+    const load=()=>loadTrackArtwork(track,url=>{if(img.isConnected)setArtwork(img,url,track.title);});
+    if('IntersectionObserver' in window){
+      const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){observer.disconnect();load();}},{rootMargin:'200px'});
+      observer.observe(img);
+    }else load();
+  }
+  function tintFromArtwork(holder,address){
+    if(!address)return;
+    const img=new Image();img.crossOrigin='anonymous';
+    img.onload=()=>{try{
+      const canvas=document.createElement('canvas');canvas.width=8;canvas.height=8;
+      const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0,8,8);
+      const data=ctx.getImageData(0,0,8,8).data;let r=0,g=0,b=0;
+      for(let i=0;i<data.length;i+=4){r+=data[i];g+=data[i+1];b+=data[i+2];}
+      const color='rgb('+Math.round(r/64*.32)+','+Math.round(g/64*.32)+','+Math.round(b/64*.32)+')';
+      holder.style.backgroundImage='linear-gradient(150deg,'+color+',#141818)';
+      if(holder.classList.contains('xm-selection-dialog'))holder.style.setProperty('--xm-list-color',color);
+    }catch(_){}};img.src=address;
+  }
+
   function rankArchive(items) {
     const fav=mixTracks('favorites'),hist=mixTracks('history');
     const favIds=new Set(fav.map(t=>t.id)),favKeys=new Set(fav.map(selectionKey).filter(Boolean));
@@ -450,7 +515,10 @@
     modal('Arşivden Seçkiler',panel=>{
       panel.append(create('p','Aile beğenileri ve dinleme geçmişine öncelik verilir; diğer parçalar haftalık değişir.'));
       if(!tracks.length){panel.append(create('p','Henüz arşivde parça bulunamadı. Drive bağlantısını ve arşiv taramasını kontrol et.'));return;}
-      tracks.forEach(t=>panel.append(picturedTrackRow(t)));
+      const snapshot=tracks.filter(t=>t.title&&t.artist).slice(0,1000).map(t=>({title:t.title,artist:t.artist}));
+      selectionChrome(panel,'Arşivden Seçkiler',tracks,'#315342',()=>N.playTurkeyChartQueue(JSON.stringify(snapshot),0),(holder,term)=>{
+        tracks.filter(t=>!term||((t.title||'')+' '+(t.artist||'')).toLocaleLowerCase('tr').includes(term)).forEach(t=>holder.append(picturedTrackRow(t)));
+      },tracks.length,'Aile zevkinden ilhamla');
     });
   }
   function renderChildLibrary(){
@@ -980,6 +1048,7 @@
     }
     input.addEventListener('input',draw);
     panel.replaceChildren(header,hero,tools,list);
+    queueMicrotask(()=>{if(panel.isConnected){coverMosaic(cover,items);tintFromArtwork(panel,items.find(t=>t.artwork)?.artwork);}});
     let pendingFrame=false;
     panel.addEventListener('scroll',()=>{
       if(pendingFrame)return;pendingFrame=true;
@@ -1173,8 +1242,10 @@
         }
         grid.className='grid grid-cols-2 gap-3';
         const showPersonal=(name,items)=>modal(name,panel=>{
-          panel.append(create('p','Bu profilin kayıtlarından hazırlanır.'));
-          items.forEach(track=>panel.append(picturedTrackRow(track)));
+          selectionChrome(panel,name,items,'#315342',()=>{const tracks=items.filter(t=>t.title&&t.artist).slice(0,1000).map(t=>({title:t.title,artist:t.artist}));if(tracks.length)N.playTurkeyChartQueue(JSON.stringify(tracks),0);},(holder,term)=>{
+            items.filter(track=>!term||((track.title||'')+' '+(track.artist||'')).toLocaleLowerCase('tr').includes(term)).forEach(track=>holder.append(picturedTrackRow(track)));
+          },items.length,'Bu profilin kayıtları');
+          if(profileState().role==='child')panel.querySelector('.xm-selection-play')?.remove();
         });
         const collections=[
           ['Bu haftaki seçkilerin',selected,'#593c86'],
@@ -1188,7 +1259,7 @@
           cover.style.cssText='position:relative;width:100%;aspect-ratio:1;overflow:hidden;border-radius:12px;margin-bottom:12px;background:linear-gradient(145deg,'+color+',#101010)';
           coverMosaic(cover,items);
           card.append(cover,create('strong',name),create('p',items.length+' şarkı','text-body-sm text-on-surface-variant'));
-          grid.append(card);
+          grid.append(card);coverMosaic(cover,items);tintFromArtwork(card,items.find(t=>t.artwork)?.artwork);
         });
         const all=personal.querySelector('button');
         if(all && !grid.contains(all))makeOwned(all,()=>showPersonal('Bu haftaki seçkilerin',selected));
@@ -1430,7 +1501,7 @@
     [['Aile Beğenileri','favorites','from-secondary-container to-surface-container'],['Aile Son Dinlenenler','history','from-primary-container to-surface-container']].forEach(([name,kind,gradient])=>{
       const card=button('',()=>showFamilyMix(kind));card.className='flex-shrink-0 w-44 flex flex-col text-left group';
       const art=create('div',undefined,'relative w-44 h-44 rounded-2xl overflow-hidden bg-gradient-to-br '+gradient+' flex items-center justify-center mb-2.5');
-      coverMosaic(art,mixTracks(kind));mixCovers.push([art,kind]);card.append(art,create('strong',name),create('span','Gerçek profil kayıtları','text-on-surface-variant'));mixGrid.append(card);
+      coverMosaic(art,mixTracks(kind));tintFromArtwork(card,mixTracks(kind).find(t=>t.artwork)?.artwork);mixCovers.push([art,kind]);card.append(art,create('strong',name),create('span','Gerçek profil kayıtları','text-on-surface-variant'));mixGrid.append(card);coverMosaic(art,mixTracks(kind));
     });
     const archiveCard=button('',()=>showArchiveSelections(archiveTracks));archiveCard.className='flex-shrink-0 w-44 flex flex-col text-left group';
     const archiveArt=create('div',undefined,'relative w-44 h-44 rounded-2xl overflow-hidden bg-gradient-to-br from-primary-container to-surface-container flex items-center justify-center mb-2.5');
@@ -1533,8 +1604,8 @@
       }
     });
     function mergeTracks(target, additions) {
-      const keys = new Set(target.map(importKey));
-      additions.forEach(track => { const key = importKey(track); if (key && !keys.has(key)) { keys.add(key); target.push(track); } });
+      const keys = new Map(target.map(track=>[importKey(track),track]));
+      additions.forEach(track => { const key = importKey(track); if(!key)return; const current=keys.get(key); if(current){if(!current.artwork && track.artwork)current.artwork=track.artwork;}else{keys.set(key,track);target.push(track);} });
     }
     const baseline = JSON.stringify(library);
     const updated = JSON.parse(baseline);
@@ -1570,7 +1641,8 @@
         if(JSON.stringify(library)!==baseline){close();window.__xmusicSpotifyPreview(payload);N.showToast('Kitaplık güncellendi. Yeni önizlemeyi kontrol et.');return;}
         updated.spotifyImportedAt = Date.now();
         if (!A.saveLibrary(JSON.stringify(updated))) { N.showToast('Aktarım kaydedilemedi. Veri boyutunu veya depolama alanını kontrol et.'); return; }
-        library = updated; close(); N.showToast('Spotify verileri kitaplığına eklendi.');
+        library = updated; close(); N.showToast('Spotify verileri kitaplığına eklendi; eksik kapaklar aranıyor.');
+        [...library.favorites,...library.playlists.flatMap(list=>list.tracks||[]),...library.history].filter(t=>!t.artwork).forEach(t=>loadTrackArtwork(t,()=>{}));
       }));
     });
   };
