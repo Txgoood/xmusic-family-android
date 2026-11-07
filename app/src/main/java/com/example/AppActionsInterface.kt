@@ -187,6 +187,61 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
         }
     }
 
+    /** Podcast kapakları müzik albümü aramasına gönderilmez; önce yayıncının RSS'i kullanılır. */
+    @JavascriptInterface fun findPodcastArtwork(address: String, title: String, episodeId: String, requestId: Int) {
+        if (address.length > 2048 || title.length > 300 || episodeId.length > 100) return
+        val profileId = profiles.activeId()
+        rssExecutor.execute {
+            val key = java.security.MessageDigest.getInstance("SHA-256")
+                .digest((address + "|" + title + "|" + episodeId).toByteArray()).joinToString("") { "%02x".format(it) }
+            val cache = activity.getSharedPreferences("xmusic_podcast_artwork", Context.MODE_PRIVATE)
+            val saved = runCatching { JSONObject(cache.getString(key, "") ?: "") }.getOrNull()
+            val lifetime = if (saved?.optString("artwork").isNullOrBlank()) 3_600_000L else 86_400_000L
+            val result = if (saved != null && System.currentTimeMillis() - saved.optLong("time") < lifetime) saved else {
+                var programArtwork = ""
+                var episodeArtwork = ""
+                var feed = address
+                var programTitle = title
+                if (address.isNotBlank()) {
+                    runCatching {
+                        val rss = readPodcastFeed(address)
+                        programArtwork = rss.optString("artwork")
+                        programTitle = rss.optString("title", title)
+                        episodeArtwork = episodes[episodeId]?.takeIf { it.optString("feed") == address }?.optString("artwork").orEmpty()
+                    }
+                }
+                if (programArtwork.isBlank() && programTitle.trim().length in 2..100) {
+                    runCatching {
+                        fun normalized(value: String) = value.lowercase(java.util.Locale.ROOT)
+                            .replace(Regex("[^\\p{L}\\p{N}]+"), " ").trim()
+                        val rows = podcastCatalog.search(programTitle).optJSONArray("items") ?: org.json.JSONArray()
+                        val matches = (0 until rows.length()).map { rows.getJSONObject(it) }
+                            .filter { it.optString("feed") == address || normalized(it.optString("title")) == normalized(programTitle) }
+                        val exactFeed = matches.firstOrNull { address.isNotBlank() && it.optString("feed") == address }
+                        val match = exactFeed ?: matches.singleOrNull()
+                        if (match != null) {
+                            programArtwork = match.optString("artwork")
+                            if (feed.isBlank()) feed = match.optString("feed")
+                        }
+                    }
+                }
+                fun secure(image: String): String {
+                    val uri = android.net.Uri.parse(image)
+                    return if (uri.scheme == "https" && !uri.host.isNullOrBlank()) image else ""
+                }
+                programArtwork = secure(programArtwork)
+                val found = JSONObject().put("feed", feed).put("programArtwork", programArtwork)
+                    .put("artwork", secure(episodeArtwork).ifBlank { programArtwork }).put("time", System.currentTimeMillis())
+                cache.edit().putString(key, found.toString()).apply()
+                found
+            }
+            webView.post {
+                if (profiles.activeId() == profileId) webView.evaluateJavascript(
+                    "window.__xmusicPodcastArtworkResult && window.__xmusicPodcastArtworkResult($requestId,$result)", null)
+            }
+        }
+    }
+
     @JavascriptInterface fun setPodcastArtwork(address: String, artwork: String) {
         val image = android.net.Uri.parse(artwork)
         if (image.scheme != "https" || image.host.isNullOrBlank() || artwork.length > 2048) return

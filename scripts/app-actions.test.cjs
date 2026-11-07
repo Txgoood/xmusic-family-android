@@ -573,5 +573,30 @@ assert.equal(x.calls.at(-1)[3],240000);checks++;resumeOverride=savedResume;
 x.dom.window.close();db=beforePodcasts;
 
 
+// Podcast kapakları: müzik aramasına düşmeden RSS çözümleme ve eski kayıtları tamamlama.
+const coverBaseline=db;
+const coverTrack={id:'podcast:cover-old',title:'Eski bölüm',artist:'Asla Durma',feed:'https://example.org/asla'};
+db=JSON.stringify({history:[coverTrack],favorites:[{...coverTrack}],playlists:[{id:'pod-list',name:'Podcast listem',tracks:[{...coverTrack}]}],feeds:[{url:coverTrack.feed,title:'Asla Durma'}],local:[],resume:{...coverTrack,position:1000},weeklyMusicMix:{week:'unchanged'}});
+x=open('ana_sayfa');
+const podCoverRequest=x.calls.find(c=>c[0]==='findPodcastArtwork'&&c[3]===coverTrack.id);
+assert.ok(podCoverRequest);assert.ok(!x.calls.some(c=>c[0]==='findTrackArtwork'&&c[2]==='Asla Durma'));checks+=2;
+x.w.__xmusicPodcastArtworkResult(podCoverRequest[4],{feed:coverTrack.feed,artwork:'https://example.org/episode.jpg',programArtwork:'https://example.org/show.jpg'});
+const covered=JSON.parse(db);
+assert.equal(covered.history[0].artwork,'https://example.org/episode.jpg');assert.equal(covered.favorites[0].artwork,'https://example.org/episode.jpg');assert.equal(covered.playlists[0].tracks[0].artwork,'https://example.org/episode.jpg');assert.equal(covered.resume.artwork,'https://example.org/episode.jpg');assert.equal(covered.feeds[0].artwork,'https://example.org/show.jpg');assert.equal(covered.weeklyMusicMix.week,'unchanged');checks+=6;
+const programCard=[...x.d.querySelectorAll('.xm-discovery-card')].find(c=>c.textContent.includes('Asla Durma'));
+assert.equal(programCard.querySelector('img').getAttribute('src'),'https://example.org/episode.jpg');programCard.click();assert.deepEqual(x.calls.at(-1),['navigateTo','podcast_program_ve_b_l_m_detay']);checks+=2;
+x.dom.window.close();
+x=open('kitapl_m');const podcastFilter=[...x.d.querySelectorAll('.filter-chip')].find(b=>b.textContent.trim()==="Podcast'ler");podcastFilter.click();
+const followedRow=[...x.d.querySelectorAll('#xm-library-tracks .xm-library-row')].find(n=>n.textContent.includes('Asla Durma'));
+assert.ok(followedRow.querySelector('img'));assert.equal(followedRow.querySelector('img').getAttribute('src'),'https://example.org/show.jpg');assert.ok(!x.calls.some(c=>c[0]==='findPodcastArtwork'));checks+=3;
+x.dom.window.close();
+// Yayın kapağı zaten biliniyorsa eski geçmiş kaydına ağ isteği olmadan uygulanır.
+const missing=JSON.parse(db);missing.history[0].artwork='';db=JSON.stringify(missing);x=open('ana_sayfa');
+assert.equal(JSON.parse(db).history[0].artwork,'https://example.org/show.jpg');assert.ok(!x.calls.some(c=>c[0]==='findTrackArtwork'&&c[2]==='Asla Durma'));checks+=2;
+x.dom.window.close();
+// Tekrar çizim ve çözümleme takip veya geçmiş kayıtlarını çoğaltmaz.
+assert.equal(JSON.parse(db).feeds.length,1);assert.equal(JSON.parse(db).history.length,1);checks+=2;
+db=coverBaseline;
+
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));
