@@ -580,6 +580,8 @@ db=JSON.stringify({history:[coverTrack],favorites:[{...coverTrack}],playlists:[{
 x=open('ana_sayfa');
 const podCoverRequest=x.calls.find(c=>c[0]==='findPodcastArtwork'&&c[3]===coverTrack.id);
 assert.ok(podCoverRequest);assert.ok(!x.calls.some(c=>c[0]==='findTrackArtwork'&&c[2]==='Asla Durma'));checks+=2;
+x.w.__xmusicArtworkResult(podCoverRequest[4],'https://example.org/wrong-album.jpg');
+assert.ok(!JSON.parse(db).history[0].artwork);checks++;
 x.w.__xmusicPodcastArtworkResult(podCoverRequest[4],{feed:coverTrack.feed,artwork:'https://example.org/episode.jpg',programArtwork:'https://example.org/show.jpg'});
 const covered=JSON.parse(db);
 assert.equal(covered.history[0].artwork,'https://example.org/episode.jpg');assert.equal(covered.favorites[0].artwork,'https://example.org/episode.jpg');assert.equal(covered.playlists[0].tracks[0].artwork,'https://example.org/episode.jpg');assert.equal(covered.resume.artwork,'https://example.org/episode.jpg');assert.equal(covered.feeds[0].artwork,'https://example.org/show.jpg');assert.equal(covered.weeklyMusicMix.week,'unchanged');checks+=6;

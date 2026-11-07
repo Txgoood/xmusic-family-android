@@ -456,7 +456,7 @@
     return title&&artist?artist+'|'+title:'';
   }
   const artworkQueue=[], artworkPending=new Map(), artworkAttempted=new Set();
-  let artworkActive=0, artworkRequest=0;
+  let artworkActive=0, artworkRequest=Number(sessionStorage.getItem('xm-artwork-sequence'))||0;
   function loadTrackArtwork(track, onReady){
     const key=selectionKey(track);
     if(!key || track.artwork || (!isPodcastTrack(track)&&typeof N.findTrackArtwork!=='function'))return;
@@ -465,7 +465,7 @@
     if(artworkAttempted.has(key))return;
     artworkAttempted.add(key);
     const item={key,track,podcast:isPodcastTrack(track),profile:profileState().active,callbacks:[onReady],id:++artworkRequest};
-    artworkPending.set(key,item);artworkQueue.push(item);pumpArtwork();
+    sessionStorage.setItem('xm-artwork-sequence',String(artworkRequest));artworkPending.set(key,item);artworkQueue.push(item);pumpArtwork();
   }
   function pumpArtwork(){
     while(artworkActive<2 && artworkQueue.length){
@@ -474,7 +474,7 @@
     }
   }
   window.__xmusicArtworkResult=(id,url)=>{
-    const item=[...artworkPending.values()].find(entry=>entry.id===id);
+    const item=[...artworkPending.values()].find(entry=>entry.id===id&&!entry.podcast);
     if(!item)return;
     artworkPending.delete(item.key);artworkActive--;
     if(url && profileState().active===item.profile){
