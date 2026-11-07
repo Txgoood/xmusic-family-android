@@ -564,7 +564,14 @@ const pickerCall=x.calls.filter(c=>c[0]==='searchPodcasts').at(-1);x.w.__xmusicP
 [...x.d.querySelectorAll('#xm-dialog .xm-pod-program button')].find(b=>b.textContent==='Takip Et').click();
 assert.ok(JSON.parse(db).feeds.some(f=>f.url==='https://example.org/new-feed'));assert.equal(JSON.parse(db).weeklyMusicMix.week,'preserve-week');checks+=2;
 [...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Bitti').click();assert.equal(x.d.querySelector('#xm-dialog'),null);checks++;
+x.dom.window.close();
+const savedResume=resumeOverride;resumeOverride={id:'podcast:partial',feed:'https://example.org/rss',position:240000,duration:1800000,updatedAt:Date.now()+1000};
+x=open('podcast_program_ve_b_l_m_detay',{'xm-feed':'https://example.org/rss'});
+const resumeLoad=x.calls.find(c=>c[0]==='loadRss');x.w.__xmusicRssResult(resumeLoad[2],{feed:'https://example.org/rss',items:podcastRows});
+x.d.querySelector('#xm-podcast-episodes [data-episode="podcast:partial"] [aria-label="Oynat"]').click();
+assert.equal(x.calls.at(-1)[3],240000);checks++;resumeOverride=savedResume;
 x.dom.window.close();db=beforePodcasts;
+
 
 console.log('Application actions: '+checks+' assertions passed.');
 console.log('Audited pages: '+report.length+'; active controls: '+report.reduce((n,p)=>n+p.active,0)+'; explicitly blocked controls: '+report.reduce((n,p)=>n+p.blocked.length,0));

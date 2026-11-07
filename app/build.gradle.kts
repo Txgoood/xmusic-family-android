@@ -17,7 +17,7 @@ android {
     minSdk = 24
     targetSdk = 36
     // CI yapı numarası APK sürüm koduna da yazılır; güncellemeler veriyi korur.
-    versionCode = maxOf(225, System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 225)
+    versionCode = maxOf(228, System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 228)
     versionName = "1.2.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
