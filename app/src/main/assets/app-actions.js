@@ -50,6 +50,7 @@
   function search(query='') { sessionStorage.setItem('xm-search',query);go('arama_ve_ke_fet'); }
   function playTrack(track, enqueue=false) {
     if(track.id.startsWith('drive:')) N.resumeDriveTrack(track.id.slice(6),track.title||'',track.artist||'',0);
+    else if(track.id.startsWith('spotify:')) N.playTurkeyChartQueue(JSON.stringify([{title:track.title,artist:track.artist}]),0);
     else if(track.id.startsWith('local:')) A.playSavedTrack(JSON.stringify(track),enqueue);
     else if(track.id.startsWith('podcast:')) { if(profileState().role==='child'&&track.feed){A.resumePodcast(track.feed,track.id,0);return;} if(track.feed){sessionStorage.setItem('xm-feed',track.feed);go('podcast_program_ve_b_l_m_detay');}else N.showToast('Podcast kaynağını aç.'); }
     else if(track.id.startsWith('experimental:')||track.id.startsWith('drive-source:')) {
@@ -470,6 +471,7 @@
   let rssRequest=0, downloadSnapshot='';
   let podcastRequest=0, podcastQuery='', podcastTimer;
   function openFeed(feed){
+    if(!feed.url){sessionStorage.setItem('xm-podcast-search',feed.title||'');go('podcast_merkezi');N.showToast('Podcast kaynağını arayıp seç.');return;}
     sessionStorage.setItem('xm-feed',feed.url);
     sessionStorage.setItem('xm-feed-info',JSON.stringify(feed));
     go('podcast_program_ve_b_l_m_detay');
@@ -533,9 +535,13 @@
       });
     }
     recentSection();
+    (library.spotifyPreferences?.podcastEvents || []).slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30).forEach(item=>{
+      const row=button(item.title+' · '+item.artist,()=>{const feed=library.feeds.find(f=>f.title===item.artist);if(feed)openFeed(feed);else {podcastQuery=item.artist;renderPodcasts();}});
+      row.className='w-full text-left p-3 rounded-xl bg-surface-container-low text-on-surface';episodeList.append(row);
+    });
     const searchSection=create('section',undefined,'flex flex-col gap-2');
     const form=create('form',undefined,'flex items-center gap-2');
-    const input=create('input');input.id='xm-podcast-search';input.type='search';input.maxLength=100;input.value=podcastQuery;
+    const input=create('input');input.id='xm-podcast-search';input.type='search';input.maxLength=100;input.value=sessionStorage.getItem('xm-podcast-search')||podcastQuery;sessionStorage.removeItem('xm-podcast-search');
     input.placeholder='Program adı veya yayıncı ara…';input.setAttribute('aria-label','Podcast ara');
     input.className='w-full rounded-full bg-surface-container px-4 py-3 text-body-md text-on-surface focus:outline-none';
     const submit=button('Ara',()=>searchNow());submit.className='px-4 py-2 rounded-full bg-primary text-on-primary font-label-md';
@@ -854,7 +860,7 @@
     state=e.detail;updateFavorites();
     const childStatus=document.getElementById('xm-child-status');if(childStatus)childStatus.textContent=state.familyBlock||'';
     if(state.familyBlock&&state.familyBlock!==window.__xmLastFamilyBlock){window.__xmLastFamilyBlock=state.familyBlock;N.showToast(state.familyBlock);}if(!state.familyBlock)window.__xmLastFamilyBlock='';
-    if(state.playing&&state.id&&library.history[0]?.id!==state.id){library.history=[trackData(),...library.history.filter(t=>t.id!==state.id)].slice(0,100);save();}
+    if(state.playing&&state.id&&library.history[0]?.id!==state.id){library.history=[trackData(),...library.history.filter(t=>t.id!==state.id)].slice(0,Math.max(100,library.history.length));save();}
     if(state.id&&state.artwork){
       let changed=false;
       const update=t=>{if(t.id===state.id&&t.artwork!==state.artwork){t.artwork=state.artwork;changed=true;}};
@@ -909,9 +915,28 @@
   };
   const editorialGenres={pop:'Pop',rock:'Rock',rap:'Rap & Hip-Hop',electronic:'Elektronik',
     jazz:'Caz',classical:'Klasik',acoustic:'Akustik',sufi:'Tasavvuf & Klasik'};
+  function personalizeEditorial(items, genre) {
+    const preferences = library.spotifyPreferences;
+    if (!preferences || !genre || genre === 'new') return items;
+    const names = new Set(preferences.artists.map(name => name.toLocaleLowerCase('tr')));
+    const candidates = [];
+    library.playlists.forEach(list => {
+      if (list.name.toLocaleLowerCase('tr').includes(({rock:'rock',pop:'pop',rap:'rap',electronic:'elektronik',acoustic:'akustik',jazz:'caz',classical:'klasik',sufi:'tasavvuf'})[genre]||genre)) candidates.push(...list.tracks);
+    });
+    const sourceArtists = new Set(items.map(t => t.artist.toLocaleLowerCase('tr')));
+    library.favorites.forEach(t => { if(sourceArtists.has(t.artist.toLocaleLowerCase('tr'))) candidates.push(t); });
+    const week = Math.floor(Date.now()/604800000);
+    const seen = new Set();
+    const result = [...candidates, ...items].filter(t => {const key=selectionKey(t);if(!key||seen.has(key))return false;seen.add(key);return true;});
+    const score = t => {
+      let hash=0; for(const char of selectionKey(t)+week) hash=(Math.imul(hash,31)+char.charCodeAt(0))|0;
+      return (names.has(t.artist.toLocaleLowerCase('tr'))?100:0)+(hash>>>0)%100;
+    };
+    return result.sort((a,b)=>score(b)-score(a)).slice(0,50);
+  }
   function loadEditorial(query,callback){
     const id=++shelfId;
-    shelfCallbacks.set(id,callback);
+    shelfCallbacks.set(id,payload=>callback({...payload,items:personalizeEditorial(payload.items||[],editorialKeys[query])}));
     N.loadEditorialMusicList(editorialKeys[query],id);
   }
   function editorialRows(holder,items,max=50,genre=''){
@@ -1181,7 +1206,7 @@
     function liveSection(label,title,query,max){
       const section=findTitle(label);if(!section)return;
       const heading=section.querySelector('h2');if(heading)heading.textContent=title;
-      const subtitle=section.querySelector('p');if(subtitle)subtitle.textContent='Apple Music seçkisi · haftalık yenilenir';
+      const subtitle=section.querySelector('p');if(subtitle)subtitle.textContent=library.spotifyPreferences?'Kaynak seçkisi ve kişisel tercihler · haftalık yenilenir':'Apple Music seçkisi · haftalık yenilenir';
       const holder=section.children[1];if(!holder)return;holder.replaceChildren();
       const message=create('p','Yükleniyor…','text-on-surface-variant');holder.append(message);
       const all=section.querySelector('button');
@@ -1479,7 +1504,83 @@
       if(!(payload.items||[]).length)list.append(create('p','Sonuç bulunamadı.','text-on-surface-variant'));
     });
   }
+  const importKey = track => selectionKey(track);
+  window.__xmusicSpotifyPreview = payload => {
+    if (payload.error) { N.showToast(payload.error); return; }
+    if (profileState().role === 'child' || payload.profileId !== profileState().active) return;
+    const files = payload.files || {};
+    const incoming = {favorites: [], playlists: [], history: [], artists: [], podcastHistory: []};
+    function music(title, artist, uri = '') {
+      if (!title || !artist) return null;
+      return {id: uri || 'spotify:metadata:' + encodeURIComponent(artist + '|' + title), title, artist, artwork: ''};
+    }
+    Object.entries(files).forEach(([name, data]) => {
+      if (name === 'YourLibrary.json') {
+        incoming.favorites = (data.tracks || []).map(t => music(t.track, t.artist, t.uri)).filter(Boolean);
+        incoming.artists = (data.artists || []).map(t => t.name).filter(Boolean);
+      } else if (name.startsWith('Playlist')) {
+        (data.playlists || []).forEach(list => incoming.playlists.push({name: list.name, tracks: (list.items || []).map(item => {
+          const t = item.track;
+          return t && music(t.trackName, t.artistName, t.trackUri);
+        }).filter(Boolean)}));
+      } else if (name.startsWith('StreamingHistory_music')) {
+        data.forEach(t => {
+          const track = music(t.trackName, t.artistName);
+          if (track) incoming.history.push({...track, importedAt: t.endTime, msPlayed: Math.max(0, Number(t.msPlayed) || 0)});
+        });
+      } else if (name.startsWith('StreamingHistory_podcast')) {
+        data.forEach(t => incoming.podcastHistory.push({title: t.episodeName, artist: t.podcastName, date: t.endTime, msPlayed: Math.max(0, Number(t.msPlayed) || 0)}));
+      }
+    });
+    function mergeTracks(target, additions) {
+      const keys = new Set(target.map(importKey));
+      additions.forEach(track => { const key = importKey(track); if (key && !keys.has(key)) { keys.add(key); target.push(track); } });
+    }
+    const baseline = JSON.stringify(library);
+    const updated = JSON.parse(baseline);
+    mergeTracks(updated.favorites, incoming.favorites);
+    incoming.playlists.forEach(list => {
+      if (!list.name) return;
+      let target = updated.playlists.find(p => p.name.trim().toLocaleLowerCase('tr') === list.name.trim().toLocaleLowerCase('tr'));
+      if (!target) { target = {id: 'import-' + Date.now().toString(36) + '-' + updated.playlists.length, name: list.name, tracks: []}; updated.playlists.push(target); }
+      mergeTracks(target.tracks, list.tracks);
+    });
+    incoming.history.sort((a,b) => b.importedAt.localeCompare(a.importedAt));
+    mergeTracks(updated.history, incoming.history);
+    updated.spotifyPreferences ||= {artists: [], events: [], podcastEvents: []};
+    const preferences = updated.spotifyPreferences;
+    preferences.artists = [...new Set([...preferences.artists, ...incoming.artists])];
+    const eventKeys = new Set(preferences.events.map(t => importKey(t) + '|' + t.importedAt + '|' + t.msPlayed));
+    incoming.history.forEach(t => { const key = importKey(t) + '|' + t.importedAt + '|' + t.msPlayed; if (!eventKeys.has(key)) { eventKeys.add(key); preferences.events.push(t); } });
+    const podcastKeys = new Set(preferences.podcastEvents.map(t => t.artist + '|' + t.title + '|' + t.date + '|' + t.msPlayed));
+    incoming.podcastHistory.forEach(t => { const key = t.artist + '|' + t.title + '|' + t.date + '|' + t.msPlayed; if (!podcastKeys.has(key)) { podcastKeys.add(key); preferences.podcastEvents.push(t); } });
+    (payload.shows || []).forEach(show => {
+      if (updated.feeds.some(f => f.spotifyUri === show.uri || (show.match && f.url === show.match.feed) || f.title === show.title)) return;
+      updated.feeds.push({title: show.title, spotifyUri: show.uri, url: show.match?.feed || '', artwork: show.match?.artwork || ''});
+    });
+    modal('Spotify aktarımını kontrol et', (panel, close) => {
+      panel.append(create('p', 'Hedef profil: ' + (profileState().profiles || []).find(p => p.id === payload.profileId)?.name));
+      panel.append(create('p', (updated.favorites.length - library.favorites.length) + ' yeni beğeni · ' + incoming.playlists.length + ' liste birleştirilecek · ' + incoming.history.length + ' müzik dinleme kaydı'));
+      panel.append(create('p', incoming.artists.length + ' sanatçı tercihi · ' + (payload.shows || []).length + ' podcast programı · ' + incoming.podcastHistory.length + ' bölüm dinleme kaydı'));
+      panel.append(create('p', 'Haftalık seçkiler bu tercihlerden yararlanır. Kaynak sıralamaları kendi kataloglarından yenilenir.'));
+      const unresolved = (payload.shows || []).filter(s => !s.match).length;
+      if (unresolved) panel.append(create('p', unresolved + ' podcast için kaynak seçimi gerekiyor.'));
+      panel.append(button('İçe aktar', () => {
+        if (profileState().active !== payload.profileId) { N.showToast('Profil değişti. Aktarımı yeniden başlat.'); return; }
+        if(JSON.stringify(library)!==baseline){close();window.__xmusicSpotifyPreview(payload);N.showToast('Kitaplık güncellendi. Yeni önizlemeyi kontrol et.');return;}
+        updated.spotifyImportedAt = Date.now();
+        if (!A.saveLibrary(JSON.stringify(updated))) { N.showToast('Aktarım kaydedilemedi. Veri boyutunu veya depolama alanını kontrol et.'); return; }
+        library = updated; close(); N.showToast('Spotify verileri kitaplığına eklendi.');
+      }));
+    });
+  };
+
   function initSettings(){
+    if(profileState().role!=='child'){
+      const section=create('section',undefined,'xm-panel');
+      section.append(create('h2','Spotify verilerini içe aktar'),create('p','ZIP içindeki beğeniler, listeler ve geçmiş aktif profile birleştirilir.'),button('Spotify ZIP seç',()=>{N.showToast('ZIP okuma ve podcast eşleştirmesi tamamlanınca önizleme açılacak.');A.importSpotifyZip();}));
+      document.querySelector('main')?.prepend(section);
+    }
     // Şablondaki örnek çocuk güvenliği bilgileri mevcut özellik gibi görünmesin.
     document.querySelectorAll('main h4').forEach(h=>{
       const label=h.textContent.trim();

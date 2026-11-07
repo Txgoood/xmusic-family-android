@@ -16,6 +16,7 @@ class AppActionsInterface(private val activity: MainActivity, private val webVie
     private var libraryProfileId = profiles.activeId()
     private val prefs get() = activity.getSharedPreferences("xmusic_library_" + profiles.activeId(), Context.MODE_PRIVATE)
     private val avatarPrefs get() = activity.getSharedPreferences("xmusic_profile_avatars", Context.MODE_PRIVATE)
+    @JavascriptInterface fun importSpotifyZip() { webView.post { activity.openSpotifyImport() } }
     @JavascriptInterface fun appVersionInfo(): String =
         "XMusic Family Android v" + com.example.BuildConfig.VERSION_NAME +
             " · (Build " + com.example.BuildConfig.VERSION_CODE + ")"

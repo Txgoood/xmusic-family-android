@@ -1,6 +1,7 @@
 package com.example
 
 import android.content.ComponentName
+import org.json.JSONObject
 import android.os.Bundle
 import android.webkit.WebView
 import androidx.activity.ComponentActivity
@@ -716,6 +717,44 @@ class MainActivity : ComponentActivity() {
     private lateinit var playbackBridge: PlaybackWebBridge
     private lateinit var appWebView: WebView
     private lateinit var appActions: AppActionsInterface
+    private var spotifyProfileId: String? = null
+    private val spotifyPicker = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        val profileId = spotifyProfileId
+        if (uri != null && profileId != null) {
+            Thread {
+                val payload = try {
+                    val files = contentResolver.openInputStream(uri)?.use { SpotifyZipImport.read(it) }
+                        ?: error("Dosya okunamadı")
+                    val catalog = PodcastCatalogClient()
+                    val shows = files.optJSONObject("YourLibrary.json")?.optJSONArray("shows") ?: org.json.JSONArray()
+                    val resolved = org.json.JSONArray()
+                    for (index in 0 until minOf(shows.length(), 50)) {
+                        val show = shows.optJSONObject(index) ?: continue
+                        val name = show.optString("name")
+                        val matches = try { catalog.search(name).optJSONArray("items") } catch (_: Exception) { null }
+                        val exact = (0 until (matches?.length() ?: 0)).mapNotNull { matches?.optJSONObject(it) }
+                            .filter { it.optString("title").trim().equals(name.trim(), true) }
+                        resolved.put(JSONObject().put("title", name).put("uri", show.optString("uri"))
+                            .put("match", if (exact.size == 1) exact.first() else JSONObject.NULL))
+                    }
+                    JSONObject().put("files", files).put("shows", resolved).put("profileId", profileId)
+                } catch (error: Exception) {
+                    JSONObject().put("error", error.message ?: "ZIP okunamadı")
+                }
+                runOnUiThread {
+                    if (!isDestroyed && ProfileStore(this).activeId() == profileId) {
+                        appWebView.evaluateJavascript("window.__xmusicSpotifyPreview && window.__xmusicSpotifyPreview(" + payload.toString() + ")", null)
+                    }
+                }
+            }.start()
+        }
+    }
+    fun openSpotifyImport() {
+        val profiles = ProfileStore(this)
+        if (profiles.isChild()) return
+        spotifyProfileId = profiles.activeId()
+        spotifyPicker.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream"))
+    }
     private val audioPicker = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             try {

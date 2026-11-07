@@ -504,3 +504,12 @@ if(process.env.XMUSIC_AUDIT_OUTPUT)fs.writeFileSync(process.env.XMUSIC_AUDIT_OUT
 
 
 
+// İçe aktarım onaydan önce yazmaz, mevcut beğeniyi korur ve tekrar yüklemeyi çoğaltmaz.
+profileMock={active:'default',role:'admin',profiles:[{id:'default',name:'Test'}]};
+db=JSON.stringify({favorites:[{id:'drive:existing',title:'Old',artist:'Artist'}],playlists:[],history:[],local:[],feeds:[]});
+x=open('ayarlar_ve_profil_y_netimi');
+const importPayload={profileId:'default',shows:[],files:{'YourLibrary.json':{tracks:[{track:'New',artist:'Artist',uri:'spotify:track:new'}],artists:[{name:'Artist'}]},'Playlist1.json':{playlists:[{name:'Rock',items:[{track:{trackName:'New',artistName:'Artist',trackUri:'spotify:track:new'}}]}]}}};
+x.w.__xmusicSpotifyPreview(importPayload);assert.equal(JSON.parse(db).favorites.length,1);
+[...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='İçe aktar').click();assert.equal(JSON.parse(db).favorites.length,2);assert.equal(JSON.parse(db).playlists.length,1);
+x.w.__xmusicSpotifyPreview(importPayload);[...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='İçe aktar').click();assert.equal(JSON.parse(db).favorites.length,2);assert.equal(JSON.parse(db).playlists[0].tracks.length,1);
+x.dom.window.close();
