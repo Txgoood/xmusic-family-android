@@ -346,7 +346,9 @@ assert.ok(archiveReq);x.w.__xmusicArchiveSelections(archiveReq[1],{items:[
  {id:'drive:two',title:'İki',artist:'Sanatçı',artwork:'https://example.com/two.jpg'}]});
 const selectionCard=homeMix.children[1].children[2];
 assert.ok(selectionCard.textContent.includes('Arşivden Seçkiler'));assert.equal(selectionCard.querySelectorAll('img').length,4);
+const beforeWarmPlay=x.calls.filter(c=>c[0]==='playTurkeyChartQueue').length;
 selectionCard.click();assert.ok(x.d.getElementById('xm-dialog').textContent.includes('Bir'));
+const warmed=x.calls.filter(c=>c[0]==='warmMusicQueue').at(-1);assert.ok(warmed);assert.ok(JSON.parse(warmed[1]).length<=3);assert.equal(x.calls.filter(c=>c[0]==='playTurkeyChartQueue').length,beforeWarmPlay);checks+=3;
 assert.equal(x.d.querySelector('#xm-dialog .xm-row strong').textContent,'İki');checks++;
 [...x.d.querySelectorAll('#xm-dialog button')].find(b=>b.textContent==='Dinle').click();
 assert.equal(x.calls.at(-1)[0],'playTurkeyChartQueue');assert.ok(JSON.parse(x.calls.at(-1)[1])[0].sourceId.startsWith('drive:'));x.d.getElementById('xm-dialog').remove();checks+=5;

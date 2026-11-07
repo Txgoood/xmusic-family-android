@@ -709,6 +709,7 @@ class WebAppInterface(private val context: Context, private val webView: WebView
             } else if (controller.playWhenReady && controller.playbackState != androidx.media3.common.Player.STATE_ENDED && controller.playerError == null) {
                 controller.pause()
             } else {
+                if (com.example.playback.PlaybackService.activeService?.retryQueuedChart(controller.currentMediaItemIndex) == true) return@post
                 if (controller.playbackState == androidx.media3.common.Player.STATE_ENDED) controller.seekTo(0)
                 if (controller.playerError != null || controller.playbackState == androidx.media3.common.Player.STATE_IDLE) controller.prepare()
                 controller.play()

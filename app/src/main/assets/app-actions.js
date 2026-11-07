@@ -5,7 +5,7 @@
   const A = window.AndroidActions, N = window.Android;
   if (!A || !N) return;
   const page = location.pathname.split('/').slice(-2)[0];
-  let state = {}, lastQueue = '', timerMinutes = 45;
+  let state = {}, lastQueue = '', lastSelectionFeedback = '', timerMinutes = 45;
   let library;
   try { library = JSON.parse(A.loadLibrary() || '{}'); } catch (_) { library = {}; }
   library.favorites ||= []; library.playlists ||= []; library.local ||= []; library.history ||= []; library.feeds ||= [];
@@ -132,6 +132,7 @@
     libraryStyle.textContent=`.xm-library-row{display:flex;align-items:center;gap:12px;min-width:0;padding:10px 4px;border-bottom:1px solid #ffffff0d}.xm-library-row img{width:48px;height:48px;object-fit:cover;border-radius:6px;flex:none}.xm-library-row .xm-library-title{flex:1;min-width:0;text-align:left;background:none;border:0;color:#fff}.xm-library-title strong,.xm-library-title small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.xm-library-title small{color:#aaa;margin-top:3px}.xm-library-menu{border:0;background:none;color:#aaa;font-size:24px;width:40px;height:48px;flex:none}.xm-library-subfilters{display:flex;gap:8px;overflow-x:auto;padding:0 16px 10px}.xm-library-subfilters button{border:0;background:#272727;color:#fff;border-radius:24px;padding:8px 14px;white-space:nowrap}.xm-library-subfilters button[aria-pressed=true]{background:#20df64;color:#111}`;document.head.append(libraryStyle);
     const subfilters=create('div',undefined,'xm-library-subfilters');filters.insertAdjacentElement('afterend',subfilters);
     function draw(){
+      lastSelectionFeedback='';
       if(favoriteSub)favoriteSub.textContent=library.favorites.length+' şarkı';
       if(localSub)localSub.textContent=library.local.length+' yerel kayıt';
       const q=searchInput.value.trim().toLocaleLowerCase('tr');
@@ -914,14 +915,17 @@
     });
     if(page==='ana_sayfa'&&window.__xmusicHomeRefresh)window.__xmusicHomeRefresh();
     const key=JSON.stringify([state.queue,state.index,state.shuffle,state.repeat]);if(key!==lastQueue){lastQueue=key;if(page==='oynatma_s_ras_queue')renderQueue();if(page==='imdi_al_yor')renderInlineQueue();}
+    const feedback=JSON.stringify([state.selectionTitle,state.selectionArtist,state.selectionMessage]);
+    if(feedback!==lastSelectionFeedback){lastSelectionFeedback=feedback;
     const requestedKey=selectionKey({title:state.selectionTitle||'',artist:state.selectionArtist||''});
     document.querySelectorAll('[data-xm-source-key]').forEach(row=>{
       let note=row.querySelector('.xm-source-status');
       if(requestedKey&&row.dataset.xmSourceKey===requestedKey&&state.selectionMessage){
         if(!note){note=create('small',undefined,'xm-source-status');note.style.cssText='display:block;color:#a9b5ad;font-size:11px;line-height:1.5;flex-basis:100%';note.setAttribute('role','status');(row.querySelector('.xm-library-title')||row.querySelector('div')||row.querySelector('span.flex-1')||row).append(note);}
-        note.textContent=state.selectionMessage;
+        if(note.textContent!==state.selectionMessage)note.textContent=state.selectionMessage;
       }else note?.remove();
     });
+    }
     const sleep=document.getElementById('xm-sleep-status');if(sleep)sleep.textContent=state.sleepAtEnd?'Şarkı bitiminde duracak':state.sleepRemaining>0?'Kalan: '+Math.ceil(state.sleepRemaining/60000)+' dakika':'Zamanlayıcı kapalı';
     const count=document.getElementById('xmusic-queue-count');if(count)count.textContent='Sırada ('+(state.queue?.length||0)+')';
     const sleepLabel=document.getElementById('xmusic-sleep-label');if(sleepLabel)sleepLabel.textContent=state.sleepRemaining>0?Math.ceil(state.sleepRemaining/60000)+' dk uyku sayacı':'Uyku zamanlayıcısı';
@@ -1025,7 +1029,7 @@
     function draw(){
       const term=input.value.trim().toLocaleLowerCase('tr');
       list.replaceChildren();
-      showItems(list,term);
+      showItems(list,term);lastSelectionFeedback='';
     }
     input.addEventListener('input',draw);
     panel.replaceChildren(header,hero,tools,list);

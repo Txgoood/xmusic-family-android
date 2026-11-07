@@ -128,6 +128,7 @@ class PlaybackService : MediaSessionService() {
         cancelSelection(); val serial = selectionSerial
         selectionBusy = true
         val generation = chartGeneration + serial + 1L
+        val selectionDeadline = android.os.SystemClock.elapsedRealtime() + 90_000L
         val items = tracks.mapIndexed { position, track -> chartItem(track, generation, position) }
         fun attempt(position: Int, failed: Set<Int>, retry: Boolean = false, excluded: Set<String> = emptySet()) {
             if (!selectionValid(serial, profile)) return
@@ -137,7 +138,7 @@ class PlaybackService : MediaSessionService() {
             fun unavailable() {
                 if (!selectionValid(serial, profile)) return
                 val failures = failed + position
-                if (tracks.size > 1 && position + 1 < tracks.size && failures.size < 3) attempt(position + 1, failures)
+                if (tracks.size > 1 && position + 1 < tracks.size && android.os.SystemClock.elapsedRealtime() < selectionDeadline) attempt(position + 1, failures)
                 else { selectionBusy = false; selectionMessage = "Şimdilik kullanılamıyor · daha sonra tekrar denenecek" }
             }
             prepareTrack(item, drive, true, retry, excluded) { result ->
@@ -150,6 +151,8 @@ class PlaybackService : MediaSessionService() {
                     .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), false)
                     .setHandleAudioBecomingNoisy(true).setWakeMode(C.WAKE_MODE_LOCAL).build()
                 warmingPlayer = warm; warm.volume = 0f
+                warm.playbackParameters = old.playbackParameters
+                if (old.audioSessionId > 0) warm.setAudioSessionId(old.audioSessionId)
                 val readyExtras = android.os.Bundle(item.mediaMetadata.extras ?: android.os.Bundle()).apply { putBoolean("chartUnavailable", false) }
                 val ready = result.item.buildUpon().setMediaMetadata(result.item.mediaMetadata.buildUpon().setExtras(readyExtras).build()).build()
                 val sources = items.mapIndexed { n, pending ->
@@ -240,7 +243,7 @@ class PlaybackService : MediaSessionService() {
     private fun prefetchUpcoming() {
         val p = player ?: return
         if (closing || ownChartChange || !p.playWhenReady || slot(p.currentMediaItem).isBlank() || ProfileStore(this).activeId() != chartProfile || ProfileStore(this).isChild()) return
-        val indices = ((p.currentMediaItemIndex + 1) until p.mediaItemCount).filter { !unavailable(p.getMediaItemAt(it)) }.take(2)
+        val indices = ((p.currentMediaItemIndex + 1) until minOf(p.mediaItemCount, p.currentMediaItemIndex + 5)).filter { !unavailable(p.getMediaItemAt(it)) }.take(2)
         indices.forEach { index -> val item = p.getMediaItemAt(index); if (item.mediaId.startsWith("chart-pending:")) resolveSlot(p, item) }
     }
     private fun skipChartTrack(p: ExoPlayer) {
