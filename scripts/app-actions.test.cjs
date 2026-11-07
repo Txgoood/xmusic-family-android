@@ -539,6 +539,9 @@ assert.deepEqual([...x.d.querySelectorAll('#xm-podcast-episodes article h4')].ma
 assert.ok(x.calls.some(c=>c[0]==='setPodcastArtwork'&&c[2]==='https://example.org/rss-art.jpg'));checks++;
 x.d.querySelector('#xm-podcast-episodes [data-episode="podcast:partial"] [aria-label="Oynat"]').click();
 let sequence=x.calls.at(-1);assert.equal(sequence[0],'playPodcastSequence');assert.deepEqual(JSON.parse(sequence[1]),['podcast:new','podcast:partial','podcast:old']);assert.equal(sequence[2],1);assert.equal(sequence[3],60000);checks+=4;
+x.d.querySelector('#filterContainer button:nth-child(2)').click();
+x.d.querySelector('#heroPlayBtn').click();assert.deepEqual(x.calls.at(-1),['playPodcastSequence','["podcast:new"]',0,0]);checks++;
+x.d.querySelector('#filterContainer button:first-child').click();
 const order=x.d.querySelector('[aria-label="Bölüm sıralaması"]');order.value='old';order.dispatchEvent(new x.w.Event('change'));
 assert.equal(x.d.querySelector('#xm-podcast-episodes article h4').textContent,'Eski bölüm');checks++;
 x.d.querySelector('#filterContainer button:nth-child(4)').click();assert.equal(x.d.querySelectorAll('#xm-podcast-episodes article').length,1);assert.equal(x.d.querySelector('#xm-podcast-episodes h4').textContent,'Yarım bölüm');checks+=2;
